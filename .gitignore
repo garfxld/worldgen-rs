@@ -1,3 +1,4 @@
 /target
+/src/registry/generated
 *.zip
 perf.data*

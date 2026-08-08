@@ -9,13 +9,13 @@ pub struct RegistryTags {
 
 #[derive(Debug)]
 struct RegistryTag {
-    ordered_keys: Vec<&'static Identifier>,
-    member_keys: FxHashSet<&'static Identifier>,
+    ordered_keys: Vec<Identifier>,
+    member_keys: FxHashSet<Identifier>,
 }
 
 impl RegistryTag {
-    fn new(ordered_keys: Vec<&'static Identifier>) -> Self {
-        let member_keys = ordered_keys.iter().copied().collect();
+    fn new(ordered_keys: Vec<Identifier>) -> Self {
+        let member_keys = ordered_keys.iter().cloned().collect();
         Self {
             ordered_keys,
             member_keys,
@@ -24,11 +24,11 @@ impl RegistryTag {
 }
 
 impl RegistryTags {
-    pub fn insert(&mut self, tag: Identifier, ordered_keys: Vec<&'static Identifier>) {
+    pub fn insert(&mut self, tag: Identifier, ordered_keys: Vec<Identifier>) {
         self.tags.insert(tag, RegistryTag::new(ordered_keys));
     }
 
-    pub fn remove(&mut self, tag: &Identifier) -> Option<Vec<&'static Identifier>> {
+    pub fn remove(&mut self, tag: &Identifier) -> Option<Vec<Identifier>> {
         self.tags.remove(tag).map(|tag| tag.ordered_keys)
     }
 
@@ -40,7 +40,7 @@ impl RegistryTags {
     }
 
     #[must_use]
-    pub fn get(&self, tag: &Identifier) -> Option<&[&'static Identifier]> {
+    pub fn get(&self, tag: &Identifier) -> Option<&[Identifier]> {
         self.tags
             .get(tag)
             .map(|entries| entries.ordered_keys.as_slice())
@@ -62,7 +62,7 @@ mod tests {
         let tag: Identifier = "minecraft:mineable/pickaxe".parse().expect("test value");
 
         let mut tags = RegistryTags::default();
-        tags.insert(tag.clone(), vec![Box::leak(Box::new(stone.clone()))]);
+        tags.insert(tag.clone(), vec![stone.clone()]);
 
         assert!(tags.contains(&tag, &stone));
         assert!(!tags.contains(&tag, &dirt));
@@ -74,7 +74,7 @@ mod tests {
         let tag: Identifier = "minecraft:mineable/pickaxe".parse().expect("test value");
 
         let mut tags = RegistryTags::default();
-        tags.insert(tag.clone(), vec![Box::leak(Box::new(stone.clone()))]);
+        tags.insert(tag.clone(), vec![stone.clone()]);
         assert!(tags.get(&tag).is_some());
 
         tags.remove(&tag);
@@ -83,14 +83,12 @@ mod tests {
 
     #[test]
     fn get_preserves_insertion_order() {
-        let a: &'static Identifier =
-            Box::leak(Box::new("minecraft:a".parse().expect("test value")));
-        let b: &'static Identifier =
-            Box::leak(Box::new("minecraft:b".parse().expect("test value")));
+        let a: Identifier = "minecraft:a".parse().expect("test value");
+        let b: Identifier = "minecraft:b".parse().expect("test value");
         let tag: Identifier = "minecraft:ordered".parse().expect("test value");
 
         let mut tags = RegistryTags::default();
-        tags.insert(tag.clone(), vec![a, b]);
+        tags.insert(tag.clone(), vec![a.clone(), b.clone()]);
 
         assert_eq!(tags.get(&tag), Some([a, b].as_slice()));
     }

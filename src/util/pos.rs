@@ -245,8 +245,6 @@ impl BlockPos {
         }
     }
 
-    /// # Panics
-    /// Panics if `radius` is negative or the two directions share an axis.
     #[must_use]
     pub fn spiral_around(
         center: Self,
