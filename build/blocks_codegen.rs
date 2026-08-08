@@ -20,6 +20,8 @@ use serde::Deserialize;
 #[serde(rename_all = "camelCase")]
 pub struct BlockConfig {
     pub can_occlude: bool,
+    pub force_solid_off: bool,
+    pub force_solid_on: bool,
     pub dynamic_shape: bool,
     pub offset_type: Cow<'static, str>,
     pub max_horizontal_offset: f32,
@@ -33,6 +35,8 @@ impl BlockConfig {
     pub const fn new() -> Self {
         Self {
             can_occlude: true,
+            force_solid_off: false,
+            force_solid_on: false,
             dynamic_shape: false,
             offset_type: Cow::Borrowed("NONE"),
             max_horizontal_offset: 0.25,
@@ -162,6 +166,14 @@ fn generate_builder_calls(bp: &BlockConfig, default_props: &BlockConfig) -> Vec<
     if bp.can_occlude != default_props.can_occlude {
         let val = bp.can_occlude;
         builder_calls.push(quote! { .can_occlude(#val) });
+    }
+    if bp.force_solid_off != default_props.force_solid_off {
+        let val = bp.force_solid_off;
+        builder_calls.push(quote! { .force_solid_off(#val) });
+    }
+    if bp.force_solid_on != default_props.force_solid_on {
+        let val = bp.force_solid_on;
+        builder_calls.push(quote! { .force_solid_on(#val) });
     }
     if bp.dynamic_shape != default_props.dynamic_shape {
         let val = bp.dynamic_shape;

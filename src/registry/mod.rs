@@ -216,6 +216,7 @@ impl Registries {
 
         let mut blocks = blocks::BlockRegistry::new();
         blocks::vanilla_blocks::register_blocks(&mut blocks);
+        blocks::vanilla_block_tags::register_tags(&mut blocks);
 
         let mut biomes = biome::BiomeRegistry::new();
         vanilla_biomes::register_biomes(&mut biomes);

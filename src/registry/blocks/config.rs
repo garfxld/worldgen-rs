@@ -13,6 +13,8 @@ pub enum OffsetType {
 #[derive(Debug)]
 pub struct BlockConfig {
     pub can_occlude: bool,
+    pub force_solid_off: bool,
+    pub force_solid_on: bool,
     pub dynamic_shape: bool,
     pub offset_type: OffsetType,
     pub max_horizontal_offset: f32,
@@ -27,6 +29,8 @@ impl BlockConfig {
     pub const fn new() -> Self {
         Self {
             can_occlude: true,
+            force_solid_off: false,
+            force_solid_on: false,
             dynamic_shape: false,
             offset_type: OffsetType::None,
             max_horizontal_offset: 0.25,
@@ -40,6 +44,18 @@ impl BlockConfig {
     #[must_use]
     pub const fn can_occlude(mut self, can_occlude: bool) -> Self {
         self.can_occlude = can_occlude;
+        self
+    }
+
+    #[must_use]
+    pub const fn force_solid_off(mut self, force: bool) -> Self {
+        self.force_solid_off = force;
+        self
+    }
+
+    #[must_use]
+    pub const fn force_solid_on(mut self, force: bool) -> Self {
+        self.force_solid_on = force;
         self
     }
 

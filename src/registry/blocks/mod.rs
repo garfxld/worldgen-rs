@@ -9,6 +9,7 @@
 pub mod config;
 pub mod properties;
 pub mod shapes;
+pub mod vanilla_block_tags;
 
 #[allow(
     clippy::allow_attributes,
@@ -891,6 +892,149 @@ impl BlockRegistry {
     }
 }
 
+impl BlockStateId {
+    #[must_use]
+    pub fn get_block(&self) -> BlockRef {
+        REGISTRY
+            .blocks
+            .by_state_id(*self)
+            .expect("Expected a valid state id")
+    }
+
+    #[must_use]
+    pub fn is_air(&self) -> bool {
+        let Some(metadata) = REGISTRY.blocks.get_state_metadata(*self) else {
+            panic!("invalid block state id {}", self.0);
+        };
+        metadata.is_air()
+    }
+
+    #[must_use]
+    pub fn get_fluid_state(&self) -> FluidState {
+        let Some(metadata) = REGISTRY.blocks.get_state_metadata(*self) else {
+            panic!("invalid block state id {}", self.0);
+        };
+        metadata.fluid_state()
+    }
+
+    #[must_use]
+    pub fn has_fluid(&self) -> bool {
+        let Some(metadata) = REGISTRY.blocks.get_state_metadata(*self) else {
+            panic!("invalid block state id {}", self.0);
+        };
+        metadata.has_fluid()
+    }
+
+    #[must_use]
+    pub fn get_value<P: Property>(&self, property: &P) -> P::Value {
+        REGISTRY.blocks.get_property(*self, property)
+    }
+
+    #[must_use]
+    pub fn try_get_value<P: Property>(&self, property: &P) -> Option<P::Value> {
+        REGISTRY.blocks.try_get_property(*self, property)
+    }
+
+    #[must_use]
+    pub fn set_value<P: Property>(&self, property: &P, value: P::Value) -> BlockStateId {
+        REGISTRY.blocks.set_property(*self, property, value)
+    }
+
+    #[must_use]
+    pub fn get_static_collision_shape(&self) -> shapes::VoxelShape {
+        REGISTRY.blocks.get_static_collision_shape(*self)
+    }
+
+    #[must_use]
+    pub fn get_collision_shape_at(&self, pos: BlockPos) -> shapes::OffsetVoxelShape {
+        REGISTRY.blocks.get_collision_shape_at(*self, pos)
+    }
+
+    #[must_use]
+    pub fn get_support_shape_at(&self, pos: BlockPos) -> shapes::OffsetVoxelShape {
+        REGISTRY.blocks.get_support_shape_at(*self, pos)
+    }
+
+    #[must_use]
+    pub fn get_outline_shape_at(&self, pos: BlockPos) -> shapes::OffsetVoxelShape {
+        REGISTRY.blocks.get_outline_shape_at(*self, pos)
+    }
+
+    #[must_use]
+    pub fn get_occlusion_shape(&self) -> shapes::VoxelShape {
+        REGISTRY.blocks.get_occlusion_shape(*self)
+    }
+
+    #[must_use]
+    pub fn get_light_emission(&self) -> u8 {
+        REGISTRY.blocks.get_light_properties(*self).light_emission
+    }
+
+    #[must_use]
+    pub fn get_light_dampening(&self) -> u8 {
+        REGISTRY.blocks.get_light_properties(*self).light_dampening
+    }
+
+    #[must_use]
+    pub fn use_shape_for_light_occlusion(&self) -> bool {
+        REGISTRY
+            .blocks
+            .get_light_properties(*self)
+            .use_shape_for_light_occlusion
+    }
+
+    #[must_use]
+    pub fn is_face_sturdy_at(&self, pos: BlockPos, direction: properties::Direction) -> bool {
+        self.is_face_sturdy_for_at(pos, direction, shapes::SupportType::Full)
+    }
+
+    #[must_use]
+    pub fn is_face_sturdy_for_at(
+        &self,
+        pos: BlockPos,
+        direction: properties::Direction,
+        support_type: shapes::SupportType,
+    ) -> bool {
+        let shape = self.get_support_shape_at(pos);
+        shapes::is_offset_face_sturdy(shape, direction, support_type)
+    }
+
+    #[must_use]
+    pub fn is_solid(&self) -> bool {
+        let block = self.get_block();
+
+        if block.config.force_solid_on {
+            return true;
+        }
+        if block.config.force_solid_off {
+            return false;
+        }
+
+        let shape = self.get_static_collision_shape();
+        if shape.is_empty() {
+            return false;
+        }
+        let bounds = shapes::bounding_box(shape);
+        bounds.size() >= 0.729_166_7 || bounds.height() >= 1.0
+    }
+
+    #[must_use]
+    pub fn blocks_motion(&self) -> bool {
+        let block = self.get_block();
+        block != &vanilla_blocks::COBWEB && block != &vanilla_blocks::BAMBOO_SAPLING && self.is_solid()
+    }
+
+    #[must_use]
+    pub fn is_solid_render(&self) -> bool {
+        self.get_block().config.can_occlude && shapes::is_shape_full_block(self.get_occlusion_shape())
+    }
+
+    #[must_use]
+    pub fn is_replaceable(&self) -> bool {
+        self.get_block().config.replaceable
+    }
+}
+
 #[macro_export]
 macro_rules! offset {
     ($($prop:expr => $value:expr),* $(,)?) => {{
@@ -905,7 +1049,8 @@ pub use offset;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::blocks::properties::{Properties, Direction};
+    use crate::registry::Registries;
+    use crate::registry::blocks::properties::{Direction, Properties};
     use crate::registry::blocks::vanilla_blocks;
 
     fn create_test_registry() -> BlockRegistry {
@@ -1225,5 +1370,82 @@ mod tests {
                 "Power level {power} mismatch"
             );
         }
+    }
+
+    fn init_global_registry() {
+        use std::sync::Once;
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            let mut registries = Registries::new_vanilla();
+            registries.freeze();
+            let _ = REGISTRY.init(registries);
+        });
+    }
+
+    #[test]
+    fn solid_render_uses_occlusion_shape_not_collision_shape() {
+        init_global_registry();
+
+        let stone = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::STONE);
+        assert!(stone.is_solid_render());
+
+        let glass = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::GLASS);
+        assert!(shapes::is_shape_full_block(
+            glass.get_static_collision_shape()
+        ));
+        assert!(!glass.is_solid_render());
+    }
+
+    #[test]
+    fn light_properties_match_generated_state_offsets() {
+        init_global_registry();
+
+        let air = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR);
+        assert_eq!(air.get_light_emission(), 0);
+        assert_eq!(air.get_light_dampening(), 0);
+        assert!(!air.use_shape_for_light_occlusion());
+
+        let stone = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::STONE);
+        assert_eq!(stone.get_light_emission(), 0);
+        assert_eq!(stone.get_light_dampening(), 15);
+        assert!(!stone.use_shape_for_light_occlusion());
+
+        let light = vanilla_blocks::LIGHT.default_state();
+        assert_eq!(light.get_light_emission(), 15);
+        let dim_light = light.set_value(&Properties::LEVEL, 7);
+        assert_eq!(dim_light.get_light_emission(), 7);
+
+        let sticky_piston = vanilla_blocks::STICKY_PISTON.default_state();
+        assert_eq!(sticky_piston.get_light_dampening(), 15);
+        assert!(!sticky_piston.use_shape_for_light_occlusion());
+
+        let extended_piston = sticky_piston.set_value(&Properties::EXTENDED, true);
+        assert_eq!(extended_piston.get_light_dampening(), 0);
+        assert!(extended_piston.use_shape_for_light_occlusion());
+    }
+
+    #[test]
+    fn blocks_motion_matches_vanilla_base_predicate() {
+        init_global_registry();
+
+        let stone = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::STONE);
+        assert!(stone.blocks_motion());
+
+        let cobweb = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::COBWEB);
+        assert!(!cobweb.blocks_motion());
+
+        let air = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR);
+        assert!(!air.blocks_motion());
+    }
+
+    #[test]
+    fn is_replaceable_matches_vanilla_flag() {
+        init_global_registry();
+
+        let air = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR);
+        assert!(air.is_replaceable());
+
+        let stone = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::STONE);
+        assert!(!stone.is_replaceable());
     }
 }
