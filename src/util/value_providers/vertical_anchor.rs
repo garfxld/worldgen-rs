@@ -1,0 +1,91 @@
+use serde::{Deserialize, Deserializer, de::Error as _};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerticalAnchor {
+    Absolute(i32),
+    AboveBottom(i32),
+    BelowTop(i32),
+}
+
+impl VerticalAnchor {
+    #[must_use]
+    pub const fn resolve_y(self, min_y: i32, height: i32) -> i32 {
+        match self {
+            Self::Absolute(y) => y,
+            Self::AboveBottom(offset) => min_y + offset,
+            Self::BelowTop(offset) => min_y + height - 1 - offset,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for VerticalAnchor {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Raw {
+            #[serde(default)]
+            absolute: Option<i32>,
+            #[serde(default)]
+            above_bottom: Option<i32>,
+            #[serde(default)]
+            below_top: Option<i32>,
+        }
+        let raw = Raw::deserialize(d)?;
+        match (raw.absolute, raw.above_bottom, raw.below_top) {
+            (Some(y), None, None) => Ok(Self::Absolute(y)),
+            (None, Some(o), None) => Ok(Self::AboveBottom(o)),
+            (None, None, Some(o)) => Ok(Self::BelowTop(o)),
+            (None, None, None) => Err(D::Error::custom(
+                "VerticalAnchor requires exactly one of absolute/above_bottom/below_top",
+            )),
+            _ => Err(D::Error::custom(
+                "VerticalAnchor must have exactly one of absolute/above_bottom/below_top",
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolves_absolute_ignoring_bounds() {
+        assert_eq!(VerticalAnchor::Absolute(64).resolve_y(-64, 384), 64);
+    }
+
+    #[test]
+    fn resolves_above_bottom_relative_to_min_y() {
+        assert_eq!(VerticalAnchor::AboveBottom(10).resolve_y(-64, 384), -54);
+    }
+
+    #[test]
+    fn resolves_below_top_relative_to_max_y() {
+        assert_eq!(VerticalAnchor::BelowTop(0).resolve_y(-64, 384), 319);
+        assert_eq!(VerticalAnchor::BelowTop(5).resolve_y(-64, 384), 314);
+    }
+
+    #[test]
+    fn deserializes_each_variant_from_json() {
+        let absolute: VerticalAnchor =
+            serde_json::from_str(r#"{"absolute": 100}"#).expect("test value");
+        assert_eq!(absolute, VerticalAnchor::Absolute(100));
+
+        let above: VerticalAnchor =
+            serde_json::from_str(r#"{"above_bottom": 5}"#).expect("test value");
+        assert_eq!(above, VerticalAnchor::AboveBottom(5));
+
+        let below: VerticalAnchor =
+            serde_json::from_str(r#"{"below_top": 1}"#).expect("test value");
+        assert_eq!(below, VerticalAnchor::BelowTop(1));
+    }
+
+    #[test]
+    fn rejects_ambiguous_or_empty_json() {
+        assert!(serde_json::from_str::<VerticalAnchor>("{}").is_err());
+        assert!(
+            serde_json::from_str::<VerticalAnchor>(r#"{"absolute": 1, "above_bottom": 2}"#)
+                .is_err()
+        );
+    }
+}

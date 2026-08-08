@@ -1,0 +1,240 @@
+use serde::{Deserialize, Deserializer, de::Error as _};
+
+use crate::util::rng::RandomSource;
+
+use super::VerticalAnchor;
+
+#[derive(Debug, Clone, Copy)]
+pub enum HeightProvider {
+    Constant(VerticalAnchor),
+    Uniform {
+        min_inclusive: VerticalAnchor,
+        max_inclusive: VerticalAnchor,
+    },
+    Trapezoid {
+        min_inclusive: VerticalAnchor,
+        max_inclusive: VerticalAnchor,
+        plateau: i32,
+    },
+    BiasedToBottom {
+        min_inclusive: VerticalAnchor,
+        max_inclusive: VerticalAnchor,
+        inner: i32,
+    },
+    VeryBiasedToBottom {
+        min_inclusive: VerticalAnchor,
+        max_inclusive: VerticalAnchor,
+        inner: i32,
+    },
+}
+
+impl HeightProvider {
+    pub fn sample(self, random: &mut RandomSource, min_y: i32, height: i32) -> i32 {
+        match self {
+            Self::Constant(anchor) => anchor.resolve_y(min_y, height),
+            Self::Uniform {
+                min_inclusive,
+                max_inclusive,
+            } => {
+                let min = min_inclusive.resolve_y(min_y, height);
+                let max = max_inclusive.resolve_y(min_y, height);
+                if min > max {
+                    min
+                } else {
+                    random.next_i32_between(min, max)
+                }
+            }
+            Self::Trapezoid {
+                min_inclusive,
+                max_inclusive,
+                plateau,
+            } => {
+                let min = min_inclusive.resolve_y(min_y, height);
+                let max = max_inclusive.resolve_y(min_y, height);
+                if min > max {
+                    min
+                } else {
+                    let range = max - min;
+                    if plateau >= range {
+                        random.next_i32_between(min, max)
+                    } else {
+                        let plateau_start = (range - plateau) / 2;
+                        let plateau_end = range - plateau_start;
+                        min + random.next_i32_between(0, plateau_end)
+                            + random.next_i32_between(0, plateau_start)
+                    }
+                }
+            }
+            Self::BiasedToBottom {
+                min_inclusive,
+                max_inclusive,
+                inner,
+            } => {
+                let min = min_inclusive.resolve_y(min_y, height);
+                let max = max_inclusive.resolve_y(min_y, height);
+                if max - min - inner < 0 {
+                    min
+                } else {
+                    let limit = random.next_i32_bounded(max - min - inner + 1);
+                    random.next_i32_bounded(limit + inner) + min
+                }
+            }
+            Self::VeryBiasedToBottom {
+                min_inclusive,
+                max_inclusive,
+                inner,
+            } => {
+                let min = min_inclusive.resolve_y(min_y, height);
+                let max = max_inclusive.resolve_y(min_y, height);
+                if max - min - inner < 0 {
+                    min
+                } else {
+                    let upper_inclusive = random.next_i32_between(min + inner, max);
+                    let biased_upper_inclusive = random.next_i32_between(min, upper_inclusive - 1);
+                    random.next_i32_between(min, biased_upper_inclusive - 1 + inner)
+                }
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for HeightProvider {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(tag = "type", deny_unknown_fields)]
+        enum Tagged {
+            #[serde(rename = "minecraft:constant")]
+            Constant { value: VerticalAnchor },
+            #[serde(rename = "minecraft:uniform")]
+            Uniform {
+                min_inclusive: VerticalAnchor,
+                max_inclusive: VerticalAnchor,
+            },
+            #[serde(rename = "minecraft:trapezoid")]
+            Trapezoid {
+                min_inclusive: VerticalAnchor,
+                max_inclusive: VerticalAnchor,
+                #[serde(default)]
+                plateau: i32,
+            },
+            #[serde(rename = "minecraft:biased_to_bottom")]
+            BiasedToBottom {
+                min_inclusive: VerticalAnchor,
+                max_inclusive: VerticalAnchor,
+                #[serde(default = "default_inner")]
+                inner: i32,
+            },
+            #[serde(rename = "minecraft:very_biased_to_bottom")]
+            VeryBiasedToBottom {
+                min_inclusive: VerticalAnchor,
+                max_inclusive: VerticalAnchor,
+                #[serde(default = "default_inner")]
+                inner: i32,
+            },
+        }
+
+        const fn default_inner() -> i32 {
+            1
+        }
+
+        let value = serde_json::Value::deserialize(d)?;
+        let has_type = value
+            .as_object()
+            .is_some_and(|object| object.contains_key("type"));
+
+        if !has_type {
+            let anchor = VerticalAnchor::deserialize(value).map_err(D::Error::custom)?;
+            return Ok(Self::Constant(anchor));
+        }
+
+        Ok(
+            match serde_json::from_value(value).map_err(D::Error::custom)? {
+                Tagged::Constant { value } => Self::Constant(value),
+                Tagged::Uniform {
+                    min_inclusive,
+                    max_inclusive,
+                } => Self::Uniform {
+                    min_inclusive,
+                    max_inclusive,
+                },
+                Tagged::Trapezoid {
+                    min_inclusive,
+                    max_inclusive,
+                    plateau,
+                } => Self::Trapezoid {
+                    min_inclusive,
+                    max_inclusive,
+                    plateau,
+                },
+                Tagged::BiasedToBottom {
+                    min_inclusive,
+                    max_inclusive,
+                    inner,
+                } => Self::BiasedToBottom {
+                    min_inclusive,
+                    max_inclusive,
+                    inner,
+                },
+                Tagged::VeryBiasedToBottom {
+                    min_inclusive,
+                    max_inclusive,
+                    inner,
+                } => Self::VeryBiasedToBottom {
+                    min_inclusive,
+                    max_inclusive,
+                    inner,
+                },
+            },
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::rng::xoroshiro::XoroshiroRandomSource;
+
+    fn rng() -> RandomSource {
+        RandomSource::Xoroshiro(XoroshiroRandomSource::from_seed(0))
+    }
+
+    #[test]
+    fn constant_provider_resolves_the_anchor() {
+        let provider = HeightProvider::Constant(VerticalAnchor::Absolute(100));
+        let mut random = rng();
+        assert_eq!(provider.sample(&mut random, -64, 384), 100);
+    }
+
+    #[test]
+    fn uniform_provider_samples_within_resolved_bounds() {
+        let provider = HeightProvider::Uniform {
+            min_inclusive: VerticalAnchor::AboveBottom(0),
+            max_inclusive: VerticalAnchor::AboveBottom(10),
+        };
+        let mut random = rng();
+        for _ in 0..50 {
+            let value = provider.sample(&mut random, -64, 384);
+            assert!((-64..=-54).contains(&value));
+        }
+    }
+
+    #[test]
+    fn inverted_range_falls_back_to_min() {
+        let provider = HeightProvider::Uniform {
+            min_inclusive: VerticalAnchor::AboveBottom(10),
+            max_inclusive: VerticalAnchor::AboveBottom(0),
+        };
+        let mut random = rng();
+        assert_eq!(provider.sample(&mut random, -64, 384), -54);
+    }
+
+    #[test]
+    fn deserializes_bare_anchor_as_constant() {
+        let provider: HeightProvider =
+            serde_json::from_str(r#"{"absolute": 5}"#).expect("test value");
+        assert!(matches!(
+            provider,
+            HeightProvider::Constant(VerticalAnchor::Absolute(5))
+        ));
+    }
+}

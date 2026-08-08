@@ -1,4 +1,4 @@
-#![feature(portable_simd)]
+#![feature(portable_simd, derive_const, const_cmp, const_trait_impl)]
 
 pub mod chunk;
 pub mod error;

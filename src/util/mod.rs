@@ -1,5 +1,10 @@
+pub mod axis;
+pub mod direction;
+pub mod geometry;
 pub mod ident;
 pub mod math;
 pub mod noise;
 pub mod pos;
 pub mod rng;
+pub mod rotation;
+pub mod value_providers;
