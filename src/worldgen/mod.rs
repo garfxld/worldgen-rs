@@ -1,6 +1,5 @@
 pub mod backend;
-pub mod biome_source;
-pub mod climate;
+pub mod biome;
 pub mod density;
 pub mod generator;
 pub mod scheduler;
