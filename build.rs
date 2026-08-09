@@ -8,9 +8,6 @@ use std::{env, fs, path::Path, process::Command};
 #[path = "build/blocks_codegen.rs"]
 mod blocks_codegen;
 
-#[path = "build/biomes_codegen.rs"]
-mod biomes_codegen;
-
 fn write_generated(out_dir: &Path, name: &str, content: String) {
     let path = out_dir.join(name);
     let write = fs::read_to_string(&path)
@@ -33,5 +30,4 @@ fn main() {
     }
 
     write_generated(&out_dir, "vanilla_blocks.rs", blocks_codegen::build().to_string());
-    write_generated(&out_dir, "vanilla_biomes.rs", biomes_codegen::build().to_string());
 }

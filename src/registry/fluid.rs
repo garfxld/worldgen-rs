@@ -243,7 +243,7 @@ mod tests {
         use std::sync::Once;
         static INIT: Once = Once::new();
         INIT.call_once(|| {
-            let mut registries = Registries::new_vanilla();
+            let mut registries = Registries::new_vanilla().expect("vanilla datapack should load");
             registries.freeze();
             let _ = REGISTRY.init(registries);
         });

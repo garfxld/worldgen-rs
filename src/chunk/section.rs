@@ -1,9 +1,22 @@
+use std::sync::OnceLock;
+
 use parking_lot::RwLock;
 
 use crate::chunk::paletted_container::{BiomePalette, BlockPalette};
-use crate::registry::vanilla_biomes;
-use crate::util::ident::BlockStateId;
+use crate::registry::REGISTRY;
+use crate::util::ident::{BlockStateId, Identifier};
 use crate::util::pos::{BlockPos, ChunkPos};
+
+fn plains_biome_id() -> u16 {
+    static PLAINS_ID: OnceLock<u16> = OnceLock::new();
+    *PLAINS_ID.get_or_init(|| {
+        REGISTRY
+            .biomes
+            .by_key(&Identifier::const_vanilla("plains"))
+            .expect("vanilla biome registry should contain plains")
+            .id() as u16
+    })
+}
 
 #[derive(Debug)]
 pub struct Sections {
@@ -216,7 +229,7 @@ impl ChunkSection {
 
     #[must_use]
     pub fn new_empty() -> Self {
-        let plains_id = vanilla_biomes::PLAINS.id() as u16;
+        let plains_id = plains_biome_id();
         Self {
             states: BlockPalette::Homogeneous(BlockStateId(0)),
             biomes: BiomePalette::Homogeneous(plains_id),
@@ -294,7 +307,12 @@ impl ChunkSection {
         match &self.states {
             BlockPalette::Homogeneous(state) => {
                 let counts = counts_for_state(*state);
-                Self::accumulate_counter_traits(&mut non_empty, &mut fluid, counts, BLOCKS_PER_SECTION);
+                Self::accumulate_counter_traits(
+                    &mut non_empty,
+                    &mut fluid,
+                    counts,
+                    BLOCKS_PER_SECTION,
+                );
             }
             BlockPalette::Heterogeneous(data) => {
                 for &(state, count) in &data.palette {
@@ -398,14 +416,14 @@ mod tests {
         use std::sync::Once;
         static INIT: Once = Once::new();
         INIT.call_once(|| {
-            let mut registries = Registries::new_vanilla();
+            let mut registries = Registries::new_vanilla().expect("vanilla datapack should load");
             registries.freeze();
             let _ = REGISTRY.init(registries);
         });
     }
 
     fn plains_biomes() -> BiomePalette {
-        BiomePalette::Homogeneous(vanilla_biomes::PLAINS.id() as u16)
+        BiomePalette::Homogeneous(plains_biome_id())
     }
 
     #[test]
