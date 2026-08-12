@@ -127,7 +127,6 @@ impl VoxelShape {
             min_x, min_y, min_z, max_x, max_y, max_z,
         ))
     }
-
 }
 
 impl IntoIterator for VoxelShape {

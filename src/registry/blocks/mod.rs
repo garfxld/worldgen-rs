@@ -840,12 +840,7 @@ impl BlockRegistry {
         state_id: BlockStateId,
         pos: BlockPos,
     ) -> shapes::OffsetVoxelShape {
-        self.offset_shape_for_state(
-            state_id,
-            pos,
-            ShapeKind::Support,
-            Block::get_support_shape,
-        )
+        self.offset_shape_for_state(state_id, pos, ShapeKind::Support, Block::get_support_shape)
     }
 
     #[must_use]
@@ -859,12 +854,7 @@ impl BlockRegistry {
         state_id: BlockStateId,
         pos: BlockPos,
     ) -> shapes::OffsetVoxelShape {
-        self.offset_shape_for_state(
-            state_id,
-            pos,
-            ShapeKind::Outline,
-            Block::get_outline_shape,
-        )
+        self.offset_shape_for_state(state_id, pos, ShapeKind::Outline, Block::get_outline_shape)
     }
 
     #[must_use]
@@ -1021,12 +1011,15 @@ impl BlockStateId {
     #[must_use]
     pub fn blocks_motion(&self) -> bool {
         let block = self.get_block();
-        block != &vanilla_blocks::COBWEB && block != &vanilla_blocks::BAMBOO_SAPLING && self.is_solid()
+        block != &vanilla_blocks::COBWEB
+            && block != &vanilla_blocks::BAMBOO_SAPLING
+            && self.is_solid()
     }
 
     #[must_use]
     pub fn is_solid_render(&self) -> bool {
-        self.get_block().config.can_occlude && shapes::is_shape_full_block(self.get_occlusion_shape())
+        self.get_block().config.can_occlude
+            && shapes::is_shape_full_block(self.get_occlusion_shape())
     }
 
     #[must_use]
@@ -1291,24 +1284,19 @@ mod tests {
         let registry = create_test_registry();
         let wall_torch = registry.get_default_state_id(&vanilla_blocks::WALL_TORCH);
 
-        let south_torch = registry.set_property(
-            wall_torch,
-            &Properties::HORIZONTAL_FACING,
-            Direction::South,
-        );
+        let south_torch =
+            registry.set_property(wall_torch, &Properties::HORIZONTAL_FACING, Direction::South);
         let facing_from_six_way_property =
             registry.try_get_property(south_torch, &Properties::FACING);
         assert_eq!(facing_from_six_way_property, Some(Direction::South));
 
-        let west_torch =
-            registry.set_property(south_torch, &Properties::FACING, Direction::West);
+        let west_torch = registry.set_property(south_torch, &Properties::FACING, Direction::West);
         let facing_from_horizontal_property =
             registry.try_get_property(west_torch, &Properties::HORIZONTAL_FACING);
         assert_eq!(facing_from_horizontal_property, Some(Direction::West));
 
         let dispenser = registry.get_default_state_id(&vanilla_blocks::DISPENSER);
-        let upward_dispenser =
-            registry.set_property(dispenser, &Properties::FACING, Direction::Up);
+        let upward_dispenser = registry.set_property(dispenser, &Properties::FACING, Direction::Up);
         let horizontal_facing =
             registry.try_get_property(upward_dispenser, &Properties::HORIZONTAL_FACING);
         assert_eq!(horizontal_facing, None);
@@ -1431,7 +1419,9 @@ mod tests {
         let stone = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::STONE);
         assert!(stone.blocks_motion());
 
-        let cobweb = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::COBWEB);
+        let cobweb = REGISTRY
+            .blocks
+            .get_default_state_id(&vanilla_blocks::COBWEB);
         assert!(!cobweb.blocks_motion());
 
         let air = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR);

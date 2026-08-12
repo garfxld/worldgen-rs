@@ -4,8 +4,10 @@ use std::path::{Path, PathBuf};
 pub use crate::util::datapack::LoadError;
 use crate::util::datapack::{collect_json_files, path_to_id, read_and_parse_normalized};
 use crate::worldgen::backend::ir::DensityProgram;
-use crate::worldgen::backend::ir::json::{NoiseSettingsJson, router_to_entries};
-use crate::worldgen::backend::ir::types::DensityFunction;
+use crate::worldgen::backend::ir::json::{
+    MultiNoiseBiomeParametersJson, NoiseSettingsJson, router_to_entries,
+};
+use crate::worldgen::backend::ir::types::{DensityFunction, NoiseParameters};
 
 pub struct DatapackSource {
     root: PathBuf,
@@ -34,7 +36,9 @@ impl DatapackSource {
         self
     }
 
-    pub fn density_function_registry(&self) -> Result<BTreeMap<String, DensityFunction>, LoadError> {
+    pub fn density_function_registry(
+        &self,
+    ) -> Result<BTreeMap<String, DensityFunction>, LoadError> {
         let mut registry = BTreeMap::new();
         Self::read_density_functions(&self.namespace, &self.root, &mut registry)?;
         for (namespace, worldgen_dir) in &self.extra_namespaces {
@@ -59,6 +63,38 @@ impl DatapackSource {
     pub fn noise_settings(&self, dimension: &str) -> Result<NoiseSettingsJson, LoadError> {
         let path = self.root.join(format!("noise_settings/{dimension}.json"));
         read_and_parse_normalized(&path)
+    }
+
+    pub fn multi_noise_biome_parameters(
+        &self,
+        dimension: &str,
+    ) -> Result<MultiNoiseBiomeParametersJson, LoadError> {
+        let path = self.root.join(format!(
+            "multi_noise_biome_source_parameter_list/{dimension}.json"
+        ));
+        read_and_parse_normalized(&path)
+    }
+
+    pub fn noise_parameters(&self) -> Result<BTreeMap<String, NoiseParameters>, LoadError> {
+        let mut params = BTreeMap::new();
+        Self::read_noise_parameters(&self.namespace, &self.root, &mut params)?;
+        for (namespace, worldgen_dir) in &self.extra_namespaces {
+            Self::read_noise_parameters(namespace, worldgen_dir, &mut params)?;
+        }
+        Ok(params)
+    }
+
+    fn read_noise_parameters(
+        namespace: &str,
+        worldgen_dir: &Path,
+        params: &mut BTreeMap<String, NoiseParameters>,
+    ) -> Result<(), LoadError> {
+        let dir = worldgen_dir.join("noise");
+        for file in collect_json_files(&dir) {
+            let noise: NoiseParameters = read_and_parse_normalized(&file)?;
+            params.insert(path_to_id(namespace, &file, &dir), noise);
+        }
+        Ok(())
     }
 
     pub fn program(
@@ -102,6 +138,20 @@ mod tests {
 
         for df in program.router_entries.values() {
             assert_dangling_free(df, &program.registry, &mut Vec::new());
+        }
+    }
+
+    #[test]
+    fn overworld_noise_ids_all_resolve_to_parameters() {
+        let source = DatapackSource::new(datapack_root());
+        let registry = source.density_function_registry().unwrap();
+        let (program, _settings) = source.program("overworld", "Overworld", &registry).unwrap();
+        let params = source.noise_parameters().unwrap();
+        assert!(!params.is_empty());
+
+        let analysis = program.analyze();
+        for id in &analysis.noise_ids {
+            assert!(params.contains_key(id), "no noise parameters for {id}");
         }
     }
 

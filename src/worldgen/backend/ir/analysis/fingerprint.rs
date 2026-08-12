@@ -61,7 +61,10 @@ pub fn collect_expensive_subexprs(df: &DensityFunction) -> FxHashMap<u64, Densit
     result
 }
 
-pub(crate) fn collect_expensive_inner(df: &DensityFunction, out: &mut FxHashMap<u64, DensityFunction>) {
+pub(crate) fn collect_expensive_inner(
+    df: &DensityFunction,
+    out: &mut FxHashMap<u64, DensityFunction>,
+) {
     if is_cse_candidate(df) {
         let fp = fingerprint(df);
         out.entry(fp).or_insert_with(|| df.clone());

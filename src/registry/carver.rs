@@ -96,8 +96,8 @@ pub type ConfiguredCarverRegistry = Registry<ConfiguredCarver>;
 
 pub mod vanilla_carvers {
     use super::{
-        CanyonCarverConfig, CanyonShapeConfig, CarverConfig,
-        CaveCarverConfig, ConfiguredCarver, ConfiguredCarverKind, ConfiguredCarverRegistry,
+        CanyonCarverConfig, CanyonShapeConfig, CarverConfig, CaveCarverConfig, ConfiguredCarver,
+        ConfiguredCarverKind, ConfiguredCarverRegistry,
     };
     use crate::util::ident::Identifier;
     use crate::util::value_providers::{FloatProvider, HeightProvider, VerticalAnchor};

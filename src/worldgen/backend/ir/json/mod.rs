@@ -61,6 +61,23 @@ pub struct BlockStateJson {
 }
 
 #[derive(Deserialize)]
+pub struct MultiNoiseBiomeParametersJson {
+    pub biomes: Vec<MultiNoiseBiomeEntryJson>,
+}
+
+#[derive(Deserialize)]
+pub struct MultiNoiseBiomeEntryJson {
+    pub biome: String,
+    pub t: [i64; 2],
+    pub h: [i64; 2],
+    pub c: [i64; 2],
+    pub e: [i64; 2],
+    pub d: [i64; 2],
+    pub w: [i64; 2],
+    pub o: i64,
+}
+
+#[derive(Deserialize)]
 pub struct NoiseSettingsJson {
     pub sea_level: i32,
     pub ore_veins_enabled: bool,

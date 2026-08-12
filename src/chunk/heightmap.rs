@@ -457,10 +457,10 @@ impl Default for ChunkHeightmaps {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chunk::section::{ChunkSection, Sections};
     use crate::registry::blocks::properties::Properties;
     use crate::registry::blocks::vanilla_blocks;
     use crate::registry::{REGISTRY, Registries};
-    use crate::chunk::section::{ChunkSection, Sections};
 
     fn init_test_registry() {
         use std::sync::Once;

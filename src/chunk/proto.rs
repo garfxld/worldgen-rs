@@ -508,20 +508,8 @@ mod tests {
         let stone = vanilla_blocks::STONE.default_state();
 
         let chunk = test_chunk();
-        chunk.set_relative_block_for_generation(
-            ChunkStatus::Noise,
-            0,
-            15,
-            0,
-            stone,
-        );
-        chunk.set_relative_block_for_generation(
-            ChunkStatus::Noise,
-            0,
-            16,
-            0,
-            stone,
-        );
+        chunk.set_relative_block_for_generation(ChunkStatus::Noise, 0, 15, 0, stone);
+        chunk.set_relative_block_for_generation(ChunkStatus::Noise, 0, 16, 0, stone);
 
         assert_eq!(chunk.get_relative_block(0, 15, 0), Some(stone));
         assert_eq!(chunk.get_relative_block(0, 16, 0), Some(stone));
@@ -535,15 +523,12 @@ mod tests {
         let stone = vanilla_blocks::STONE.default_state();
 
         let chunk = test_chunk();
-        chunk.set_relative_block_for_generation(
-            ChunkStatus::Noise,
-            0,
-            20,
-            0,
-            stone,
-        );
+        chunk.set_relative_block_for_generation(ChunkStatus::Noise, 0, 20, 0, stone);
 
-        assert_eq!(chunk.generation_height_at(HeightmapType::WorldSurfaceWg, 0, 0), 5);
+        assert_eq!(
+            chunk.generation_height_at(HeightmapType::WorldSurfaceWg, 0, 0),
+            5
+        );
     }
 
     #[test]

@@ -6,10 +6,9 @@ use serde::Deserialize;
 use super::{NoiseRouterJson, SplineJson, SplinePointJson};
 use crate::worldgen::backend::ir::types::{
     BlendAlpha, BlendDensity, BlendOffset, BlendedNoise, Clamp, Constant, CubicSpline,
-    DensityFunction, FindTopSurface, IntervalSelect, Mapped, MappedType, Marker, MarkerType,
-    Noise, RangeChoice, Reference, Shift, ShiftA, ShiftB, ShiftedNoise, Spline, SplinePoint,
-    SplineValue, TwoArgType, TwoArgumentSimple, WeirdScaledSampler, YClampedGradient,
-    normalize_id,
+    DensityFunction, FindTopSurface, IntervalSelect, Mapped, MappedType, Marker, MarkerType, Noise,
+    RangeChoice, Reference, Shift, ShiftA, ShiftB, ShiftedNoise, Spline, SplinePoint, SplineValue,
+    TwoArgType, TwoArgumentSimple, WeirdScaledSampler, YClampedGradient, normalize_id,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -275,7 +274,9 @@ mod tests {
             panic!("expected a TwoArgumentSimple node");
         };
         assert_eq!(two_arg.op, TwoArgType::Add);
-        assert!(matches!(*two_arg.argument1, DensityFunction::Constant(Constant { value }) if value == 1.5));
+        assert!(
+            matches!(*two_arg.argument1, DensityFunction::Constant(Constant { value }) if value == 1.5)
+        );
 
         let DensityFunction::Noise(noise) = &*two_arg.argument2 else {
             panic!("expected a Noise node");
@@ -296,7 +297,8 @@ mod tests {
 
     #[test]
     fn beardifier_collapses_to_zero_constant() {
-        let df: DensityFunction = serde_json::from_str(r#"{"type": "minecraft:beardifier"}"#).unwrap();
+        let df: DensityFunction =
+            serde_json::from_str(r#"{"type": "minecraft:beardifier"}"#).unwrap();
 
         assert!(matches!(df, DensityFunction::Constant(Constant { value }) if value == 0.0));
     }

@@ -308,8 +308,9 @@ impl DensityFunction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct NoiseParameters {
+    #[serde(rename = "firstOctave")]
     pub first_octave: i32,
     pub amplitudes: Vec<f64>,
 }

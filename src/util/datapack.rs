@@ -8,7 +8,10 @@ use serde::de::DeserializeOwned;
 
 #[derive(Debug)]
 pub enum LoadError {
-    Read { path: PathBuf, source: io::Error },
+    Read {
+        path: PathBuf,
+        source: io::Error,
+    },
     Parse {
         path: PathBuf,
         source: serde_json::Error,

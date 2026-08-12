@@ -29,5 +29,9 @@ fn main() {
         fs::create_dir_all(&out_dir).unwrap();
     }
 
-    write_generated(&out_dir, "vanilla_blocks.rs", blocks_codegen::build().to_string());
+    write_generated(
+        &out_dir,
+        "vanilla_blocks.rs",
+        blocks_codegen::build().to_string(),
+    );
 }
