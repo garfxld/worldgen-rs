@@ -15,12 +15,10 @@ pub struct Fluid {
 }
 
 impl Fluid {
-    #[must_use]
     pub fn has_tag(&self, tag: &Identifier) -> bool {
         REGISTRY.fluids.is_in_tag(&self.key, tag)
     }
 
-    #[must_use]
     pub fn source_variant(&'static self) -> FluidRef {
         let Some(source_key) = &self.source_fluid else {
             return self;
@@ -35,7 +33,6 @@ impl Fluid {
         }
     }
 
-    #[must_use]
     pub fn flowing_variant(&'static self) -> FluidRef {
         let Some(flowing_key) = &self.flowing_fluid else {
             return self;
@@ -67,7 +64,6 @@ impl FluidState {
         falling: false,
     };
 
-    #[must_use]
     pub const fn new(fluid: FluidRef, amount: u8, falling: bool) -> Self {
         Self {
             fluid_id: fluid,
@@ -76,7 +72,6 @@ impl FluidState {
         }
     }
 
-    #[must_use]
     pub const fn source(fluid: FluidRef) -> Self {
         Self {
             fluid_id: fluid,
@@ -85,7 +80,6 @@ impl FluidState {
         }
     }
 
-    #[must_use]
     pub const fn flowing(fluid: FluidRef, amount: u8, falling: bool) -> Self {
         Self {
             fluid_id: fluid,
@@ -94,27 +88,22 @@ impl FluidState {
         }
     }
 
-    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.fluid_id.is_empty || self.amount == 0
     }
 
-    #[must_use]
     pub const fn is_source(&self) -> bool {
         self.fluid_id.is_source
     }
 
-    #[must_use]
     pub const fn is_full(&self) -> bool {
         self.amount == 8
     }
 
-    #[must_use]
     pub const fn is_randomly_ticking(&self) -> bool {
         self.fluid_id.is_randomly_ticking
     }
 
-    #[must_use]
     pub fn own_height(&self) -> f32 {
         if self.is_empty() {
             0.0
@@ -123,7 +112,6 @@ impl FluidState {
         }
     }
 
-    #[must_use]
     pub const fn to_block_level(self) -> u8 {
         if self.is_source() {
             0
@@ -134,12 +122,10 @@ impl FluidState {
         }
     }
 
-    #[must_use]
     pub fn is_water(&self) -> bool {
         is_water_fluid(self.fluid_id)
     }
 
-    #[must_use]
     pub fn is_lava(&self) -> bool {
         is_lava_fluid(self.fluid_id)
     }
@@ -147,14 +133,12 @@ impl FluidState {
 
 pub type FluidRegistry = Registry<Fluid>;
 
-#[must_use]
 pub fn is_water_fluid(fluid: FluidRef) -> bool {
     !fluid.is_empty
         && (fluid.key == vanilla_fluids::WATER.key
             || fluid.key == vanilla_fluids::FLOWING_WATER.key)
 }
 
-#[must_use]
 pub fn is_lava_fluid(fluid: FluidRef) -> bool {
     !fluid.is_empty
         && (fluid.key == vanilla_fluids::LAVA.key || fluid.key == vanilla_fluids::FLOWING_LAVA.key)

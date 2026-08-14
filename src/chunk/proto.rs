@@ -7,7 +7,7 @@ use crate::chunk::section::Sections;
 use crate::chunk::status::ChunkStatus;
 use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_blocks;
-use crate::util::ident::BlockStateId;
+use crate::util::ident::BlockState;
 use crate::util::pos::{BlockPos, ChunkPos};
 
 fn empty_postprocessing(height: i32) -> Box<[Vec<u16>]> {
@@ -63,13 +63,13 @@ impl Chunk {
         relative_x: usize,
         relative_y: usize,
         relative_z: usize,
-    ) -> Option<BlockStateId> {
+    ) -> Option<BlockState> {
         self.sections
             .get_relative_block(relative_x, relative_y, relative_z)
     }
 
     #[must_use]
-    pub fn get_block_state(&self, pos: BlockPos) -> BlockStateId {
+    pub fn get_block_state(&self, pos: BlockPos) -> BlockState {
         let y = pos.0.y;
         if y < self.min_y || y >= self.min_y + self.height {
             return REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR);
@@ -92,7 +92,7 @@ impl Chunk {
 
     pub(crate) fn write_block_batch_for_generation(
         &self,
-        blocks: &[(usize, usize, usize, BlockStateId)],
+        blocks: &[(usize, usize, usize, BlockState)],
     ) {
         if blocks.is_empty() {
             return;
@@ -104,7 +104,7 @@ impl Chunk {
         &self,
         x: usize,
         z: usize,
-        blocks: &[(usize, BlockStateId)],
+        blocks: &[(usize, BlockState)],
     ) {
         if blocks.is_empty() {
             return;
@@ -118,7 +118,7 @@ impl Chunk {
         relative_x: usize,
         relative_y: usize,
         relative_z: usize,
-        value: BlockStateId,
+        value: BlockState,
     ) {
         self.sections
             .set_relative_block_for_generation(relative_x, relative_y, relative_z, value);
@@ -169,7 +169,7 @@ impl Chunk {
         status: ChunkStatus,
         local_x: usize,
         local_z: usize,
-        relative_writes: &[(usize, BlockStateId)],
+        relative_writes: &[(usize, BlockState)],
     ) {
         if relative_writes.is_empty() {
             return;
@@ -188,7 +188,7 @@ impl Chunk {
         local_x: usize,
         y: i32,
         local_z: usize,
-        state: BlockStateId,
+        state: BlockState,
     ) {
         let min_y = self.min_y;
         let sections = &self.sections;
@@ -218,7 +218,7 @@ impl Chunk {
         heightmap_types: &[HeightmapType],
         local_x: usize,
         local_z: usize,
-        relative_writes: &[(usize, BlockStateId)],
+        relative_writes: &[(usize, BlockState)],
     ) {
         let min_y = self.min_y;
         let sections = &self.sections;
@@ -333,21 +333,21 @@ impl<'a, Phase> GenerationChunk<'a, Phase> {
         relative_x: usize,
         relative_y: usize,
         relative_z: usize,
-    ) -> Option<BlockStateId> {
+    ) -> Option<BlockState> {
         self.chunk
             .get_relative_block(relative_x, relative_y, relative_z)
     }
 
     #[must_use]
     #[inline]
-    pub fn get_block_state(self, pos: BlockPos) -> BlockStateId {
+    pub fn get_block_state(self, pos: BlockPos) -> BlockState {
         self.chunk.get_block_state(pos)
     }
 }
 
 impl GenerationChunk<'_, NoisePhase> {
     #[inline]
-    pub fn write_block_batch(self, blocks: &[(usize, usize, usize, BlockStateId)]) {
+    pub fn write_block_batch(self, blocks: &[(usize, usize, usize, BlockState)]) {
         self.chunk.write_block_batch_for_generation(blocks);
     }
 
@@ -373,7 +373,7 @@ impl GenerationChunk<'_, NoisePhase> {
         relative_x: usize,
         relative_y: usize,
         relative_z: usize,
-        state: BlockStateId,
+        state: BlockState,
     ) {
         self.chunk.set_relative_block_for_generation(
             ChunkStatus::Biomes,
@@ -397,7 +397,7 @@ impl GenerationChunk<'_, SurfacePhase> {
     }
 
     #[inline]
-    pub fn read_column_into(self, local_x: usize, local_z: usize, output: &mut Vec<BlockStateId>) {
+    pub fn read_column_into(self, local_x: usize, local_z: usize, output: &mut Vec<BlockState>) {
         self.chunk
             .sections()
             .read_column_into(local_x, local_z, output);
@@ -411,7 +411,7 @@ impl GenerationChunk<'_, SurfacePhase> {
     }
 
     #[inline]
-    pub fn write_column(self, local_x: usize, local_z: usize, blocks: &[(usize, BlockStateId)]) {
+    pub fn write_column(self, local_x: usize, local_z: usize, blocks: &[(usize, BlockState)]) {
         self.chunk
             .write_column_blocks_for_generation(local_x, local_z, blocks);
         self.chunk.update_heightmaps_after_direct_column_writes(
@@ -428,7 +428,7 @@ impl GenerationChunk<'_, SurfacePhase> {
         relative_x: usize,
         relative_y: usize,
         relative_z: usize,
-        state: BlockStateId,
+        state: BlockState,
     ) {
         self.chunk.set_relative_block_for_generation(
             ChunkStatus::Noise,
@@ -447,7 +447,7 @@ impl GenerationChunk<'_, CarversPhase> {
     }
 
     #[inline]
-    pub fn set_block_state(self, pos: BlockPos, state: BlockStateId) {
+    pub fn set_block_state(self, pos: BlockPos, state: BlockState) {
         let relative_x = (pos.0.x & 15) as usize;
         let relative_y = (pos.0.y - self.chunk.min_y) as usize;
         let relative_z = (pos.0.z & 15) as usize;

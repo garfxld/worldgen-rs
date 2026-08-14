@@ -76,12 +76,12 @@ fn cerium_world_generator_hook_fills_terrain() {
     // seed 42, chunk (0,0), column (0,0): water down to y=55, stone from y=42
     // (cross-checked against the old steel-worldgen tree).
     let water = world.get_block(0, 60, 0);
-    assert_eq!(water.block(), Block::Water);
+    assert_eq!(water.as_block(), Block::Water);
 
     let stone = world.get_block(0, 30, 0);
-    assert_eq!(stone.block(), Block::Stone);
+    assert_eq!(stone.as_block(), Block::Stone);
 
     // Near the top of the world, nothing was generated -> still air.
     let sky = world.get_block(0, 300, 0);
-    assert_eq!(sky.block(), Block::Air);
+    assert_eq!(sky.as_block(), Block::Air);
 }

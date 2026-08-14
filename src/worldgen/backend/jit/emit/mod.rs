@@ -173,7 +173,6 @@ impl CompiledExpr {
         })
     }
 
-    #[must_use]
     pub fn eval(&self, x: f64, y: f64, z: f64) -> f64 {
         // SAFETY: `self.func` was produced by `compile` from a matching
         // signature, and `self.module` keeps its code mapped for as long as
@@ -226,12 +225,6 @@ mod tests {
         let compiled = CompiledExpr::compile(module, &df, &program, &noises, None, true)
             .expect("density function should compile");
 
-        #[expect(
-            clippy::float_cmp,
-            reason = "arithmetic on constants must be bit-exact, not merely close"
-        )]
-        {
-            assert_eq!(compiled.eval(0.0, 0.0, 0.0), 4.0);
-        }
+        assert_eq!(compiled.eval(0.0, 0.0, 0.0), 4.0);
     }
 }

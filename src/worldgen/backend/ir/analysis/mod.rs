@@ -29,7 +29,6 @@ pub struct AnalysisContext {
 }
 
 impl AnalysisContext {
-    #[must_use]
     pub const fn new(legacy_random_source: bool) -> Self {
         Self {
             noise_ids: BTreeSet::new(),

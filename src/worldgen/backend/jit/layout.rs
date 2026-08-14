@@ -71,10 +71,6 @@ impl CacheLayout {
         self.grid_side
     }
 
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "slot counts are bounded by the density function registry size"
-    )]
     const fn offset(slot: usize) -> i32 {
         (slot * SLOT_SIZE) as i32
     }
@@ -87,7 +83,6 @@ pub(crate) enum FlatSlot {
 }
 
 impl CacheLayout {
-    #[must_use]
     pub(crate) fn flat_order(&self, analysis: &AnalysisContext) -> Vec<FlatSlot> {
         let mut order = Vec::with_capacity(self.slots);
         order.extend(

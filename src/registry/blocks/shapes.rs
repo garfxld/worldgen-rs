@@ -3,7 +3,7 @@ use std::slice;
 use glam::DVec3;
 
 use crate::util::axis::Axis;
-use crate::util::geometry::{Aabb, BlockLocalAabb};
+use crate::util::geometry::BlockLocalAabb;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BooleanOp {
@@ -26,7 +26,6 @@ pub enum BooleanOp {
 }
 
 impl BooleanOp {
-    #[must_use]
     pub const fn apply(self, first: bool, second: bool) -> bool {
         match self {
             Self::False => false,
@@ -59,12 +58,10 @@ impl VoxelShape {
 
     pub const FULL_BLOCK: Self = Self::from_boxes(FULL_BLOCK_BOXES);
 
-    #[must_use]
     pub const fn from_boxes(boxes: &'static [BlockLocalAabb]) -> Self {
         Self { boxes }
     }
 
-    #[must_use]
     pub const fn boxes(self) -> &'static [BlockLocalAabb] {
         self.boxes
     }
@@ -73,17 +70,14 @@ impl VoxelShape {
         self.boxes.iter()
     }
 
-    #[must_use]
     pub const fn len(self) -> usize {
         self.boxes.len()
     }
 
-    #[must_use]
     pub fn is_empty(self) -> bool {
-        self.boxes.iter().all(Aabb::is_empty)
+        self.boxes.iter().all(BlockLocalAabb::is_empty)
     }
 
-    #[must_use]
     pub fn min(self, axis: Axis) -> f64 {
         self.boxes
             .iter()
@@ -92,7 +86,6 @@ impl VoxelShape {
             .fold(f64::INFINITY, f64::min)
     }
 
-    #[must_use]
     pub fn max(self, axis: Axis) -> f64 {
         self.boxes
             .iter()
@@ -101,7 +94,6 @@ impl VoxelShape {
             .fold(f64::NEG_INFINITY, f64::max)
     }
 
-    #[must_use]
     pub fn bounds(self) -> Option<BlockLocalAabb> {
         let first = self.boxes.iter().find(|aabb| !aabb.is_empty())?;
         let mut min_x = first.min_x();
@@ -145,12 +137,10 @@ pub struct OffsetVoxelShape {
 }
 
 impl OffsetVoxelShape {
-    #[must_use]
     pub const fn new(shape: VoxelShape, offset: DVec3) -> Self {
         Self { shape, offset }
     }
 
-    #[must_use]
     pub const fn without_offset(shape: VoxelShape) -> Self {
         Self {
             shape,
@@ -158,17 +148,14 @@ impl OffsetVoxelShape {
         }
     }
 
-    #[must_use]
     pub const fn shape(self) -> VoxelShape {
         self.shape
     }
 
-    #[must_use]
     pub const fn offset(self) -> DVec3 {
         self.offset
     }
 
-    #[must_use]
     pub fn is_empty(self) -> bool {
         self.shape.is_empty()
     }
@@ -179,17 +166,14 @@ impl OffsetVoxelShape {
             .map(move |aabb| aabb.translate(self.offset))
     }
 
-    #[must_use]
     pub fn min(self, axis: Axis) -> f64 {
         self.shape.min(axis) + axis_offset(self.offset, axis)
     }
 
-    #[must_use]
     pub fn max(self, axis: Axis) -> f64 {
         self.shape.max(axis) + axis_offset(self.offset, axis)
     }
 
-    #[must_use]
     pub fn bounds(self) -> Option<BlockLocalAabb> {
         self.shape
             .bounds()
@@ -226,7 +210,6 @@ impl Default for ShapeRegistry {
 }
 
 impl ShapeRegistry {
-    #[must_use]
     pub fn new() -> Self {
         let mut registry = Self {
             shapes: Vec::new(),
@@ -253,7 +236,6 @@ impl ShapeRegistry {
         id
     }
 
-    #[must_use]
     pub fn get(&self, id: ShapeId) -> VoxelShape {
         self.shapes
             .get(id.0 as usize)
@@ -261,12 +243,10 @@ impl ShapeRegistry {
             .unwrap_or(VoxelShape::EMPTY)
     }
 
-    #[must_use]
     pub const fn len(&self) -> usize {
         self.shapes.len()
     }
 
-    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.shapes.is_empty()
     }
@@ -299,11 +279,6 @@ pub struct ShapeOffsetFlags {
 impl ShapeOffsetFlags {
     pub const NONE: Self = Self::new(false, false, false, false);
 
-    #[must_use]
-    #[expect(
-        clippy::fn_params_excessive_bools,
-        reason = "one flag per vanilla shape kind; matches the build script's generated call site"
-    )]
     pub const fn new(collision: bool, support: bool, outline: bool, occlusion: bool) -> Self {
         Self {
             collision,
@@ -313,7 +288,6 @@ impl ShapeOffsetFlags {
         }
     }
 
-    #[must_use]
     pub const fn uses_offset(self, kind: ShapeKind) -> bool {
         match kind {
             ShapeKind::Collision => self.collision,
@@ -326,7 +300,6 @@ impl ShapeOffsetFlags {
 
 use crate::util::direction::Direction;
 
-#[must_use]
 pub fn bounding_box(shape: VoxelShape) -> BlockLocalAabb {
     match shape.bounds() {
         Some(bounds) => bounds,
@@ -334,12 +307,10 @@ pub fn bounding_box(shape: VoxelShape) -> BlockLocalAabb {
     }
 }
 
-#[must_use]
 pub fn is_shape_full_block(shape: VoxelShape) -> bool {
     !join_is_not_empty(VoxelShape::FULL_BLOCK, shape, BooleanOp::NotSame)
 }
 
-#[must_use]
 pub fn is_offset_shape_full_block(shape: OffsetVoxelShape) -> bool {
     if shape.offset == DVec3::ZERO {
         return is_shape_full_block(shape.shape);
@@ -402,7 +373,6 @@ pub fn is_offset_shape_full_block(shape: OffsetVoxelShape) -> bool {
     true
 }
 
-#[must_use]
 pub fn join_is_not_empty(first: VoxelShape, second: VoxelShape, op: BooleanOp) -> bool {
     assert!(
         !op.apply(false, false),
@@ -461,7 +431,6 @@ pub fn join_is_not_empty(first: VoxelShape, second: VoxelShape, op: BooleanOp) -
     false
 }
 
-#[must_use]
 pub fn join_unoptimized_boxes(
     first: VoxelShape,
     second: VoxelShape,
@@ -579,19 +548,16 @@ const CENTER_SUPPORT_MIN: f64 = 7.0 / 16.0;
 const CENTER_SUPPORT_MAX: f64 = 9.0 / 16.0;
 const CENTER_SUPPORT_Y_MAX: f64 = 10.0 / 16.0;
 
-const RIGID_BORDER: f64 = 0.125; // 2/16
+const RIGID_BORDER: f64 = 0.125;
 
-#[must_use]
 pub fn is_face_full(shape: VoxelShape, direction: Direction) -> bool {
     face_rectangles_cover(shape, direction, 0.0, 1.0, 0.0, 1.0)
 }
 
-#[must_use]
 pub fn is_offset_face_full(shape: OffsetVoxelShape, direction: Direction) -> bool {
     offset_face_rectangles_cover(shape, direction, 0.0, 1.0, 0.0, 1.0)
 }
 
-#[must_use]
 pub fn is_face_center_supported(shape: VoxelShape, direction: Direction) -> bool {
     if shape.is_empty() {
         return false;
@@ -625,7 +591,6 @@ pub fn is_face_center_supported(shape: VoxelShape, direction: Direction) -> bool
     }
 }
 
-#[must_use]
 pub fn is_offset_face_center_supported(shape: OffsetVoxelShape, direction: Direction) -> bool {
     if shape.is_empty() {
         return false;
@@ -659,7 +624,6 @@ pub fn is_offset_face_center_supported(shape: OffsetVoxelShape, direction: Direc
     }
 }
 
-#[must_use]
 pub fn is_face_rigid_supported(shape: VoxelShape, direction: Direction) -> bool {
     if shape.is_empty() {
         return false;
@@ -692,7 +656,6 @@ pub fn is_face_rigid_supported(shape: VoxelShape, direction: Direction) -> bool 
     }
 }
 
-#[must_use]
 pub fn is_offset_face_rigid_supported(shape: OffsetVoxelShape, direction: Direction) -> bool {
     if shape.is_empty() {
         return false;
@@ -725,7 +688,6 @@ pub fn is_offset_face_rigid_supported(shape: OffsetVoxelShape, direction: Direct
     }
 }
 
-#[must_use]
 pub fn is_face_sturdy(shape: VoxelShape, direction: Direction, support_type: SupportType) -> bool {
     match support_type {
         SupportType::Full => is_face_full(shape, direction),
@@ -734,7 +696,6 @@ pub fn is_face_sturdy(shape: VoxelShape, direction: Direction, support_type: Sup
     }
 }
 
-#[must_use]
 pub fn is_offset_face_sturdy(
     shape: OffsetVoxelShape,
     direction: Direction,
@@ -747,7 +708,6 @@ pub fn is_offset_face_sturdy(
     }
 }
 
-#[must_use]
 pub fn is_block_local_face_sturdy(
     boxes: &[BlockLocalAabb],
     direction: Direction,
@@ -828,7 +788,6 @@ struct FaceRect {
 
 const FACE_EPSILON: f64 = 1.0e-6;
 
-#[must_use]
 pub fn face_rectangles_cover(
     shape: VoxelShape,
     direction: Direction,
@@ -884,7 +843,6 @@ fn block_local_face_rectangles_cover(
     )
 }
 
-#[must_use]
 pub fn offset_face_rectangles_cover(
     shape: OffsetVoxelShape,
     direction: Direction,

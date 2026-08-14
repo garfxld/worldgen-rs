@@ -15,7 +15,6 @@ pub enum Direction {
 }
 
 impl Direction {
-    #[must_use]
     pub const fn offset(self) -> (i32, i32, i32) {
         match self {
             Direction::Down => (0, -1, 0),
@@ -27,7 +26,6 @@ impl Direction {
         }
     }
 
-    #[must_use]
     pub const fn offset_xz(self) -> (i32, i32) {
         match self {
             Direction::Down | Direction::Up => (0, 0),
@@ -38,18 +36,15 @@ impl Direction {
         }
     }
 
-    #[must_use]
     pub const fn offset_vec(self) -> IVec3 {
         let (x, y, z) = self.offset();
         IVec3::new(x, y, z)
     }
 
-    #[must_use]
     pub fn relative(self, pos: BlockPos) -> BlockPos {
         BlockPos(pos.0 + self.offset_vec())
     }
 
-    #[must_use]
     pub const fn get_axis(self) -> Axis {
         match self {
             Direction::Down | Direction::Up => Axis::Y,
@@ -58,7 +53,6 @@ impl Direction {
         }
     }
 
-    #[must_use]
     pub const fn opposite(self) -> Direction {
         match self {
             Direction::Down => Direction::Up,
@@ -70,7 +64,6 @@ impl Direction {
         }
     }
 
-    #[must_use]
     pub fn from_yaw(yaw: f32) -> Direction {
         let adjusted = yaw.rem_euclid(360.0);
         match adjusted {
@@ -81,7 +74,6 @@ impl Direction {
         }
     }
 
-    #[must_use]
     pub const fn to_yaw(self) -> f32 {
         match self {
             Direction::North => 180.0,
@@ -91,12 +83,10 @@ impl Direction {
         }
     }
 
-    #[must_use]
     pub const fn axis(self) -> Axis {
         self.get_axis()
     }
 
-    #[must_use]
     pub const fn positive_for_axis(axis: Axis) -> Direction {
         match axis {
             Axis::X => Direction::East,
@@ -105,7 +95,6 @@ impl Direction {
         }
     }
 
-    #[must_use]
     pub const fn is_horizontal(self) -> bool {
         matches!(
             self,
@@ -113,7 +102,6 @@ impl Direction {
         )
     }
 
-    #[must_use]
     pub const fn rotate_y_clockwise(self) -> Direction {
         match self {
             Direction::North => Direction::East,
@@ -124,7 +112,6 @@ impl Direction {
         }
     }
 
-    #[must_use]
     pub const fn rotate_y_counter_clockwise(self) -> Direction {
         match self {
             Direction::North => Direction::West,
@@ -168,7 +155,6 @@ impl Direction {
         Direction::East,
     ];
 
-    #[must_use]
     pub fn ordered_by_nearest(yaw: f32, pitch: f32) -> [Direction; 6] {
         let pitch_rad = pitch.to_radians();
         let yaw_rad = (-yaw).to_radians();
@@ -236,7 +222,6 @@ impl Direction {
         ]
     }
 
-    #[must_use]
     pub const fn as_str(&self) -> &str {
         match self {
             Direction::Down => "down",

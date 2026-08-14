@@ -198,10 +198,6 @@ impl BlendedNoisePlan {
         builder.block_params(merge)[0]
     }
 
-    #[expect(
-        clippy::unused_self,
-        reason = "mirrors emit_skippable_sum's method form for a uniform call site"
-    )]
     fn emit_octave_sum(
         &self,
         builder: &mut FunctionBuilder<'_>,
@@ -260,10 +256,6 @@ struct Coords {
 }
 
 #[expect(clippy::too_many_arguments, reason = "mirrors noise_with_y_scale")]
-#[expect(
-    clippy::similar_names,
-    reason = "yr_fudge and y_fudge match vanilla naming"
-)]
 fn emit_noise_with_y_scale(
     builder: &mut FunctionBuilder<'_>,
     flags: MemFlagsData,

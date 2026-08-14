@@ -44,17 +44,14 @@ pub struct BoolProperty {
     pub name: &'static str,
 }
 impl BoolProperty {
-    #[must_use]
     pub const fn new(name: &'static str) -> Self {
         Self { name }
     }
 
-    #[must_use]
     pub const fn value_count(&self) -> usize {
         2
     }
 
-    #[must_use]
     pub const fn index_of(&self, value: bool) -> usize {
         !value as usize
     }
@@ -103,7 +100,6 @@ impl Property for BoolProperty {
 }
 
 impl BoolProperty {
-    #[must_use]
     pub const fn get_internal_index_const(self, value: bool) -> usize {
         if value { 0 } else { 1 }
     }
@@ -122,12 +118,10 @@ pub struct IntProperty {
 }
 
 impl IntProperty {
-    #[must_use]
     pub const fn new(name: &'static str, min: u8, max: u8) -> Self {
         Self { min, max, name }
     }
 
-    #[must_use]
     pub const fn value_count(&self) -> usize {
         (self.max - self.min + 1) as usize
     }
@@ -177,7 +171,6 @@ impl Property for IntProperty {
 }
 
 impl IntProperty {
-    #[must_use]
     pub const fn get_internal_index_const(self, value: &u8) -> usize {
         if *value <= self.max {
             (*value - self.min) as usize
@@ -246,7 +239,6 @@ impl<T: PropertyEnum> EnumProperty<T> {
         }
     }
 
-    #[must_use]
     pub const fn value_count(&self) -> usize {
         self.possible_values.len()
     }
@@ -449,7 +441,6 @@ pub enum RailShape {
 }
 
 impl RailShape {
-    #[must_use]
     pub const fn is_slope(&self) -> bool {
         matches!(
             self,
@@ -574,7 +565,6 @@ pub enum NoteBlockInstrument {
 }
 
 impl NoteBlockInstrument {
-    #[must_use]
     pub const fn is_tunable(&self) -> bool {
         !matches!(
             self,
@@ -588,12 +578,10 @@ impl NoteBlockInstrument {
         )
     }
 
-    #[must_use]
     pub const fn has_custom_sound(&self) -> bool {
         matches!(self, Self::CustomHead)
     }
 
-    #[must_use]
     pub const fn works_above_note_block(&self) -> bool {
         !self.is_tunable()
     }

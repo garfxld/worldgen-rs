@@ -19,11 +19,6 @@ pub struct NoiseChunk {
 }
 
 impl NoiseChunk {
-    #[must_use]
-    #[expect(
-        clippy::missing_panics_doc,
-        reason = "panic is a compile-time constant check"
-    )]
     pub fn new(chunk_min_block_x: i32, chunk_min_block_z: i32, noises: &Noises) -> Self {
         let cell_width = noises.cell_width();
         let cell_height = noises.cell_height();
@@ -57,10 +52,6 @@ impl NoiseChunk {
         let n_slices = cell_count_xz + 1;
         let mut slices = Vec::with_capacity(n_slices);
         for _ in 0..n_slices {
-            #[expect(
-                clippy::large_stack_arrays,
-                reason = "fixed-size boxed array keeps the [f64; N] type the fill path relies on; cold per-chunk constructor"
-            )]
             slices.push(Box::new([0.0; MAX_INTERP * MAX_SLICE_LEN]));
         }
 
@@ -77,11 +68,11 @@ impl NoiseChunk {
         }
     }
 
-    fn blended_column(noises: &Noises, x: i32, block_ys: &[i32], z: i32, out: &mut [f64]) {
+    fn fill_blended_column(noises: &Noises, x: i32, block_ys: &[i32], z: i32, out: &mut [f64]) {
         match noises.blended() {
             Some(blended) => {
-                for (out_v, &y) in out.iter_mut().zip(block_ys) {
-                    *out_v = blended.compute(f64::from(x), f64::from(y), f64::from(z));
+                for (value, &y) in out.iter_mut().zip(block_ys) {
+                    *value = blended.compute(f64::from(x), f64::from(y), f64::from(z));
                 }
             }
             None => out.fill(0.0),
@@ -92,7 +83,7 @@ impl NoiseChunk {
         clippy::too_many_arguments,
         reason = "slice filling needs the precomputed geometry and per-thread cache"
     )]
-    fn fill_slice_into(
+    fn fill_column_slice(
         slice: &mut [f64; MAX_INTERP * MAX_SLICE_LEN],
         cell_x: i32,
         block_ys: &[i32],
@@ -117,7 +108,7 @@ impl NoiseChunk {
             let block_z = cell_z * cell_width;
 
             cache.ensure(block_x, block_z, noises);
-            Self::blended_column(noises, block_x, block_ys, block_z, blended_column);
+            Self::fill_blended_column(noises, block_x, block_ys, block_z, blended_column);
             let cache_ptr = cache.ptr(block_x, block_z, noises);
 
             let mut cy = 0;
@@ -184,14 +175,6 @@ impl NoiseChunk {
         }
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "single trilinear-interpolation kernel; splitting the loop nest would scatter the per-corner SAFETY invariants"
-    )]
-    #[expect(
-        clippy::similar_names,
-        reason = "factor_{x,y,z}_v vector splats deliberately mirror their scalar factor_{x,y,z} sources"
-    )]
     pub fn fill<F>(
         &mut self,
         noises: &Noises,
@@ -216,7 +199,7 @@ impl NoiseChunk {
         let mut local_blended = vec![0.0f64; corners_y];
         for cx_off in 0..n_slices {
             let cell_x = first_cell_x + cx_off as i32;
-            Self::fill_slice_into(
+            Self::fill_column_slice(
                 &mut self.slices[cx_off],
                 cell_x,
                 block_ys,

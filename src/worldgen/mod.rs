@@ -63,10 +63,6 @@ impl Worldgen {
 
         let (dimension, prefix, biome_source_kind) = dimension_info(&settings.dimension)?;
         let source = DatapackSource::new(vanilla_datapack_root());
-        #[expect(
-            clippy::cast_sign_loss,
-            reason = "world seeds are reinterpreted as raw bits, matching Java's long -> hash usage"
-        )]
         let seed = settings.seed as u64;
         let generator = Generator::new(&source, dimension, prefix, biome_source_kind, seed)
             .map_err(|e| Error::Generator(e.to_string()))?;

@@ -185,7 +185,6 @@ impl<T> SingleOrList<T> {
 }
 
 impl BiomeIdJson {
-    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }

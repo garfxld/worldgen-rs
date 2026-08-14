@@ -1,5 +1,5 @@
 use crate::registry::REGISTRY;
-use crate::util::ident::{BlockStateId, Identifier};
+use crate::util::ident::{BlockState, Identifier};
 use crate::worldgen::backend::ir::json::{
     SurfaceConditionJson, SurfaceRuleJson, VerticalAnchorJson,
 };
@@ -9,7 +9,7 @@ pub struct DatapackSurfaceRules {
     rule: Option<CompiledRule>,
     noise_ids: &'static [&'static str],
     gradient_ids: &'static [&'static str],
-    block_states: &'static [BlockStateId],
+    block_states: &'static [BlockState],
     uses_biome: bool,
     uses_preliminary_surface: bool,
     uses_surface_secondary: bool,
@@ -65,7 +65,7 @@ enum CompiledCondition {
 struct Compiler {
     noise_ids: Vec<String>,
     gradient_ids: Vec<String>,
-    block_states: Vec<BlockStateId>,
+    block_states: Vec<BlockState>,
     uses_biome: bool,
     uses_preliminary_surface: bool,
     uses_surface_secondary: bool,
@@ -236,7 +236,7 @@ fn condition_uses_preliminary_surface(condition: &SurfaceConditionJson) -> bool 
     }
 }
 
-fn resolve_block_state(name: &str) -> BlockStateId {
+fn resolve_block_state(name: &str) -> BlockState {
     let key: Identifier = name
         .parse()
         .unwrap_or_else(|e| panic!("invalid surface rule block id {name}: {e}"));
@@ -248,7 +248,6 @@ fn resolve_block_state(name: &str) -> BlockStateId {
 }
 
 impl DatapackSurfaceRules {
-    #[must_use]
     pub fn new(rule: Option<&SurfaceRuleJson>, min_y: i32, height: i32) -> Self {
         let uses_preliminary_surface = rule.is_some_and(rule_uses_preliminary_surface);
         let mut compiler = Compiler {
@@ -276,48 +275,40 @@ impl DatapackSurfaceRules {
         }
     }
 
-    #[must_use]
     pub const fn noise_ids(&self) -> &'static [&'static str] {
         self.noise_ids
     }
 
-    #[must_use]
     pub const fn gradient_ids(&self) -> &'static [&'static str] {
         self.gradient_ids
     }
 
-    #[must_use]
-    pub const fn block_states(&self) -> &'static [BlockStateId] {
+    pub const fn block_states(&self) -> &'static [BlockState] {
         self.block_states
     }
 
-    #[must_use]
     pub const fn uses_biome(&self) -> bool {
         self.uses_biome
     }
 
-    #[must_use]
     pub const fn uses_preliminary_surface(&self) -> bool {
         self.uses_preliminary_surface
     }
 
-    #[must_use]
     pub const fn uses_surface_secondary(&self) -> bool {
         self.uses_surface_secondary
     }
 
-    #[must_use]
     pub const fn uses_steep(&self) -> bool {
         self.uses_steep
     }
 
-    #[must_use]
-    pub fn try_apply(&self, ctx: &mut SurfaceRuleContext<'_>) -> Option<BlockStateId> {
+    pub fn try_apply(&self, ctx: &mut SurfaceRuleContext<'_>) -> Option<BlockState> {
         let rule = self.rule.as_ref()?;
         Self::eval_rule(rule, ctx)
     }
 
-    fn eval_rule(rule: &CompiledRule, ctx: &mut SurfaceRuleContext<'_>) -> Option<BlockStateId> {
+    fn eval_rule(rule: &CompiledRule, ctx: &mut SurfaceRuleContext<'_>) -> Option<BlockState> {
         match rule {
             CompiledRule::Block(index) => Some(ctx.block_state(*index)),
             CompiledRule::Sequence(rules) => {
@@ -341,14 +332,6 @@ impl DatapackSurfaceRules {
         }
     }
 
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "surface depth ranges are always small integers"
-    )]
-    #[expect(
-        clippy::manual_midpoint,
-        reason = "matches vanilla's (secondary + 1) / 2 * range formula, not a midpoint"
-    )]
     fn eval_condition(cond: &CompiledCondition, ctx: &mut SurfaceRuleContext<'_>) -> bool {
         match cond {
             CompiledCondition::StoneDepth {
@@ -563,7 +546,7 @@ mod tests {
         }
     }
 
-    fn block_name(state: BlockStateId) -> String {
+    fn block_name(state: BlockState) -> String {
         REGISTRY
             .blocks
             .by_state_id(state)
@@ -601,15 +584,15 @@ mod tests {
         let values: Vec<Cell<f64>> = (0..rules.noise_ids().len())
             .map(|_| Cell::new(0.0))
             .collect();
-        let initialized: Vec<Cell<bool>> = (0..rules.noise_ids().len())
-            .map(|_| Cell::new(false))
+        let computed_at: Vec<Cell<u64>> = (0..rules.noise_ids().len())
+            .map(|_| Cell::new(0))
             .collect();
 
         let resolve = |block_y: i32,
                        stone_depth_above: i32,
                        stone_depth_below: i32|
-         -> Option<BlockStateId> {
-            let noise_cache = SurfaceConditionNoiseCache::new(&values, &initialized);
+         -> Option<BlockState> {
+            let noise_cache = SurfaceConditionNoiseCache::new(&values, &computed_at);
             noise_cache.reset();
             let mut xz = TemperatureXzCache::new(0, 0);
             let mut ctx = SurfaceRuleContext::new(

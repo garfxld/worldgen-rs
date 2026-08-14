@@ -8,17 +8,9 @@ use crate::util::noise::PerlinNoise;
 use crate::util::rng::name_hash::NameHash;
 use crate::util::rng::{RandomFactory, RandomSource};
 
-#[expect(
-    clippy::unreadable_literal,
-    reason = "exact vanilla constant; underscores would obscure precision"
-)]
 pub const INPUT_FACTOR: f64 = 1.0181268882175227;
 
-#[expect(
-    clippy::unreadable_literal,
-    reason = "exact vanilla constant; underscores would obscure precision"
-)]
-const VALUE_FACTOR_NUMERATOR: f64 = 0.16666666666666666;
+const TARGET_DEVIATION: f64 = 0.16666666666666666;
 
 #[derive(Debug, Clone)]
 pub struct NormalNoise {
@@ -29,7 +21,6 @@ pub struct NormalNoise {
 }
 
 impl NormalNoise {
-    #[must_use]
     pub fn create_from_random(
         random: &mut RandomSource,
         first_octave: i32,
@@ -41,7 +32,6 @@ impl NormalNoise {
         Self::finish(first, second, amplitudes)
     }
 
-    #[must_use]
     pub fn create(
         splitter: &RandomFactory,
         noise_id: &str,
@@ -52,7 +42,6 @@ impl NormalNoise {
         Self::create_from_random(&mut random, first_octave, amplitudes)
     }
 
-    #[must_use]
     pub fn create_legacy_nether_biome(
         random: &mut RandomSource,
         first_octave: i32,
@@ -67,10 +56,10 @@ impl NormalNoise {
     fn finish(first: PerlinNoise, second: PerlinNoise, amplitudes: &[f64]) -> Self {
         let mut min_octave = i32::MAX;
         let mut max_octave = i32::MIN;
-        for (i, &amp) in amplitudes.iter().enumerate() {
-            if amp != 0.0 {
-                min_octave = min_octave.min(i as i32);
-                max_octave = max_octave.max(i as i32);
+        for (index, &amplitude) in amplitudes.iter().enumerate() {
+            if amplitude != 0.0 {
+                min_octave = min_octave.min(index as i32);
+                max_octave = max_octave.max(index as i32);
             }
         }
 
@@ -83,8 +72,7 @@ impl NormalNoise {
             };
         }
 
-        let octave_span = max_octave - min_octave;
-        let value_factor = VALUE_FACTOR_NUMERATOR / expected_deviation(octave_span);
+        let value_factor = TARGET_DEVIATION / expected_deviation(max_octave - min_octave);
         let max_value = (first.max_value() + second.max_value()) * value_factor;
 
         Self {
@@ -95,23 +83,19 @@ impl NormalNoise {
         }
     }
 
-    #[must_use]
     pub const fn first(&self) -> &PerlinNoise {
         &self.first
     }
 
-    #[must_use]
     pub const fn second(&self) -> &PerlinNoise {
         &self.second
     }
 
-    #[must_use]
     pub const fn value_factor(&self) -> f64 {
         self.value_factor
     }
 
     #[inline]
-    #[must_use]
     pub fn get_value(&self, x: f64, y: f64, z: f64) -> f64 {
         let x2 = x * INPUT_FACTOR;
         let y2 = y * INPUT_FACTOR;
@@ -120,7 +104,6 @@ impl NormalNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn get_value_simd<F, const N: usize>(
         &self,
         x: Simd<F, N>,
@@ -147,7 +130,6 @@ impl NormalNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn get_value_xz(&self, x: f64, z: f64) -> f64 {
         let x2 = x * INPUT_FACTOR;
         let z2 = z * INPUT_FACTOR;
@@ -155,7 +137,6 @@ impl NormalNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn get_value_xy(&self, x: f64, y: f64) -> f64 {
         let x2 = x * INPUT_FACTOR;
         let y2 = y * INPUT_FACTOR;
@@ -163,7 +144,6 @@ impl NormalNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn get_value_y_4x(&self, x: f64, ys: f64x4, z: f64) -> f64x4 {
         let x2 = x * INPUT_FACTOR;
         let ys2 = ys * f64x4::splat(INPUT_FACTOR);
@@ -178,7 +158,6 @@ impl NormalNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn get_value_y_simd<const N: usize>(
         &self,
         x: f64,
@@ -198,7 +177,6 @@ impl NormalNoise {
     }
 
     #[inline]
-    #[must_use]
     pub const fn max_value(&self) -> f64 {
         self.max_value
     }

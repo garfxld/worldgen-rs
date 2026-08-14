@@ -4,7 +4,6 @@ use std::sync::OnceLock;
 
 use glam::IVec3;
 use parking_lot::{Mutex, RwLock};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::chunk::proto::{Chunk, GenerationChunk};
@@ -26,12 +25,10 @@ impl ChunkSlot {
         }
     }
 
-    #[must_use]
     pub fn chunk(&self) -> Option<&Chunk> {
         self.chunk.get()
     }
 
-    #[must_use]
     pub fn status(&self) -> Option<ChunkStatus> {
         *self.status.lock()
     }
@@ -43,7 +40,6 @@ pub struct ChunkStore {
 }
 
 impl ChunkStore {
-    #[must_use]
     pub fn new(generator: Generator) -> Self {
         Self {
             generator,
@@ -51,7 +47,6 @@ impl ChunkStore {
         }
     }
 
-    #[must_use]
     pub const fn generator(&self) -> &Generator {
         &self.generator
     }
@@ -77,14 +72,12 @@ impl ChunkStore {
             let Some(needed) = levels.get(&status) else {
                 continue;
             };
-            let needed: Vec<ChunkPos> = needed.iter().copied().collect();
-            needed
-                .par_iter()
-                .for_each(|&pos| self.advance_one(pos, status));
+            for &pos in needed {
+                self.advance_one(pos, status);
+            }
         }
     }
 
-    #[must_use]
     pub fn get(&self, pos: ChunkPos) -> Option<Arc<ChunkSlot>> {
         self.slots.read().get(&pos).cloned()
     }
@@ -99,10 +92,6 @@ impl ChunkStore {
         *status = Some(target);
     }
 
-    #[expect(
-        clippy::similar_names,
-        reason = "matches vanilla's local_qx/local_qy/local_qz naming"
-    )]
     fn run_step(&self, pos: ChunkPos, target: ChunkStatus, slot: &ChunkSlot) {
         match target {
             ChunkStatus::Empty => {

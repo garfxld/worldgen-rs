@@ -56,7 +56,6 @@ impl UniformIntProvider {
         random.next_i32_between(self.min_inclusive, self.max_inclusive)
     }
 
-    #[must_use]
     pub const fn with_max_inclusive(self, max_inclusive: i32) -> Self {
         Self {
             min_inclusive: self.min_inclusive,
@@ -118,7 +117,6 @@ impl<'de> Deserialize<'de> for UniformIntProvider {
 }
 
 impl IntProvider {
-    #[must_use]
     pub fn min(&self) -> i32 {
         match self {
             Self::Constant(value) => *value,
@@ -143,7 +141,6 @@ impl IntProvider {
         }
     }
 
-    #[must_use]
     pub fn max(&self) -> i32 {
         match self {
             Self::Constant(value) => *value,
@@ -246,10 +243,6 @@ impl IntProvider {
 }
 
 impl<'de> Deserialize<'de> for IntProvider {
-    #[expect(
-        clippy::too_many_lines,
-        reason = "keeps the vanilla int-provider schema variants in one deserialization table"
-    )]
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
         #[serde(tag = "type", deny_unknown_fields)]

@@ -66,10 +66,6 @@ impl<'a> EmitCtx<'a> {
     }
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "one arm per density function variant reads better than split dispatch"
-)]
 pub fn emit(
     builder: &mut FunctionBuilder<'_>,
     ctx: &mut EmitCtx<'_>,

@@ -162,10 +162,6 @@ impl<'a> DimensionCompiler<'a> {
         Ok(())
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one function body per shape variant reads better than split dispatch"
-    )]
     fn define(
         &mut self,
         id: FuncId,
@@ -384,62 +380,50 @@ pub struct CompiledDimension {
 }
 
 impl CompiledDimension {
-    #[must_use]
     pub(crate) fn flat_steps(&self) -> &[FlatStep] {
         &self.flat_steps
     }
 
-    #[must_use]
     pub(crate) fn router(&self, name: &str) -> Option<&RouterEntry> {
         self.routers.get(name)
     }
 
-    #[must_use]
     pub(crate) const fn fill(&self) -> FillFn {
         self.fill
     }
 
-    #[must_use]
     pub(crate) const fn fill_4x(&self) -> Fill4xFn {
         self.fill_4x
     }
 
-    #[must_use]
     pub(crate) const fn combine_final(&self) -> CombineFn {
         self.combine_final
     }
 
-    #[must_use]
     pub(crate) const fn combine_vein_toggle(&self) -> CombineFn {
         self.combine_vein_toggle
     }
 
-    #[must_use]
     pub(crate) const fn combine_vein_ridged(&self) -> CombineFn {
         self.combine_vein_ridged
     }
 
-    #[must_use]
     pub const fn interpolated_count(&self) -> usize {
         self.interpolated_count
     }
 
-    #[must_use]
     pub const fn vein_interp_enabled(&self) -> bool {
         self.vein_interp_enabled
     }
 
-    #[must_use]
     pub const fn slots(&self) -> usize {
         self.slots
     }
 
-    #[must_use]
     pub const fn grid_side(&self) -> usize {
         self.grid_side
     }
 
-    #[must_use]
     pub(crate) const fn grid_len_for(&self, slots: usize) -> usize {
         self.grid_side * self.grid_side * slots
     }
@@ -457,10 +441,6 @@ impl Drop for CompiledDimension {
 }
 
 impl DimensionCompiler<'_> {
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one linear pass over the function set the runtime also needs in one place"
-    )]
     pub(crate) fn compile(mut self) -> Result<CompiledDimension, CompileError> {
         let ptr = self.ptr_type();
         self.declare_end_islands()?;

@@ -31,7 +31,6 @@ pub struct CanyonShapeConfig {
 }
 
 impl CanyonShapeConfig {
-    #[must_use]
     pub fn init_width_factors(&self, gen_depth: i32, random: &mut LegacyRandomSource) -> Vec<f32> {
         let depth = gen_depth as usize;
         let mut factors = vec![0.0_f32; depth];
@@ -45,7 +44,6 @@ impl CanyonShapeConfig {
         factors
     }
 
-    #[must_use]
     pub fn update_vertical_radius(
         &self,
         random: &mut LegacyRandomSource,
@@ -82,7 +80,6 @@ pub struct ConfiguredCarver {
 }
 
 impl ConfiguredCarver {
-    #[must_use]
     pub const fn base(&self) -> &CarverConfig {
         match &self.kind {
             ConfiguredCarverKind::Cave(c) | ConfiguredCarverKind::NetherCave(c) => &c.base,
@@ -233,10 +230,6 @@ pub mod vanilla_carvers {
 #[expect(
     clippy::unwrap_used,
     reason = "carver registry tests assert required vanilla properties are present"
-)]
-#[expect(
-    clippy::float_cmp,
-    reason = "probability is an exact f32 literal transcribed from vanilla JSON, not a computed value"
 )]
 mod tests {
     use super::vanilla_carvers;

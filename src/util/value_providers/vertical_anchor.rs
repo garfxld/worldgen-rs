@@ -8,7 +8,6 @@ pub enum VerticalAnchor {
 }
 
 impl VerticalAnchor {
-    #[must_use]
     pub const fn resolve_y(self, min_y: i32, height: i32) -> i32 {
         match self {
             Self::Absolute(y) => y,

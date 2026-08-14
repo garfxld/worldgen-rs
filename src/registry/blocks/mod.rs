@@ -17,8 +17,6 @@ pub mod vanilla_block_tags;
 )]
 #[allow(
     clippy::all,
-    clippy::pedantic,
-    clippy::nursery,
     clippy::absolute_paths,
     clippy::missing_const_for_fn,
     clippy::allow_attributes_without_reason,
@@ -42,7 +40,7 @@ use crate::registry::blocks::properties::Property;
 use crate::registry::blocks::shapes::ShapeKind;
 use crate::registry::fluid::{FluidRef, FluidState};
 use crate::registry::{REGISTRY, Registry};
-use crate::util::ident::{BlockStateId, Identifier};
+use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 
 pub type ShapeFn = fn(u16) -> shapes::VoxelShape;
@@ -70,7 +68,6 @@ pub struct StateBooleanOverwrite {
 }
 
 impl StateBooleanOverwrite {
-    #[must_use]
     pub const fn new(offset: u16, value: bool) -> Self {
         Self { offset, value }
     }
@@ -86,7 +83,6 @@ impl StateBooleanData {
     pub const TRUE: Self = Self::new(true, &[]);
     pub const FALSE: Self = Self::new(false, &[]);
 
-    #[must_use]
     pub const fn new(default: bool, overwrites: &'static [StateBooleanOverwrite]) -> Self {
         Self {
             default,
@@ -94,7 +90,6 @@ impl StateBooleanData {
         }
     }
 
-    #[must_use]
     pub fn value(self, offset: u16) -> bool {
         self.overwrites
             .iter()
@@ -110,7 +105,6 @@ pub struct StateFluidOverwrite {
 }
 
 impl StateFluidOverwrite {
-    #[must_use]
     pub const fn new(offset: u16, value: FluidState) -> Self {
         Self { offset, value }
     }
@@ -125,7 +119,6 @@ pub struct StateFluidData {
 impl StateFluidData {
     pub const EMPTY: Self = Self::new(FluidState::EMPTY, &[]);
 
-    #[must_use]
     pub const fn new(default: FluidState, overwrites: &'static [StateFluidOverwrite]) -> Self {
         Self {
             default,
@@ -133,7 +126,6 @@ impl StateFluidData {
         }
     }
 
-    #[must_use]
     pub fn value(self, offset: u16) -> FluidState {
         self.overwrites
             .iter()
@@ -154,7 +146,6 @@ impl BlockStateMetadata {
     const IS_AIR: u8 = 1 << 1;
     const HAS_FLUID: u8 = 1 << 2;
 
-    #[must_use]
     pub const fn new(fluid_state: FluidState, is_air: bool) -> Self {
         let mut flags = 0;
         if fluid_state.falling {
@@ -173,17 +164,14 @@ impl BlockStateMetadata {
         }
     }
 
-    #[must_use]
     pub const fn fluid_state(self) -> FluidState {
         FluidState::new(self.fluid, self.amount, self.flags & Self::FALLING != 0)
     }
 
-    #[must_use]
     pub const fn is_air(self) -> bool {
         self.flags & Self::IS_AIR != 0
     }
 
-    #[must_use]
     pub const fn has_fluid(self) -> bool {
         self.flags & Self::HAS_FLUID != 0
     }
@@ -257,7 +245,6 @@ impl Block {
         }
     }
 
-    #[must_use]
     pub const fn with_shapes(
         mut self,
         collision: ShapeFn,
@@ -272,31 +259,26 @@ impl Block {
         self
     }
 
-    #[must_use]
     pub const fn with_suffocating(mut self, suffocating: StateBooleanData) -> Self {
         self.suffocating = suffocating;
         self
     }
 
-    #[must_use]
     pub const fn with_redstone_conductor(mut self, redstone_conductor: StateBooleanData) -> Self {
         self.redstone_conductor = redstone_conductor;
         self
     }
 
-    #[must_use]
     pub const fn with_fluid_state(mut self, fluid_state: StateFluidData) -> Self {
         self.fluid_state = fluid_state;
         self
     }
 
-    #[must_use]
     pub const fn with_light_properties(mut self, light_properties: LightPropertiesFn) -> Self {
         self.light_properties = light_properties;
         self
     }
 
-    #[must_use]
     pub const fn with_shape_offsets(mut self, offsets: shapes::ShapeOffsetFlags) -> Self {
         self.shape_offsets = offsets;
         self
@@ -327,12 +309,10 @@ impl Block {
         (self.light_properties)(offset)
     }
 
-    #[must_use]
     pub fn get_state_metadata(&self, offset: u16) -> BlockStateMetadata {
         BlockStateMetadata::new(self.fluid_state.value(offset), self.config.is_air)
     }
 
-    #[must_use]
     pub fn offset_at(&self, pos: BlockPos) -> DVec3 {
         self.config.offset_at(pos)
     }
@@ -343,7 +323,6 @@ impl Block {
         self
     }
 
-    #[must_use]
     pub const fn calculate_offset(property_indices: &[usize], property_counts: &[usize]) -> u16 {
         let mut offset = 0u16;
         let mut multiplier = 1u16;
@@ -359,12 +338,10 @@ impl Block {
         offset
     }
 
-    #[must_use]
-    pub fn default_state(&'static self) -> BlockStateId {
+    pub fn default_state(&'static self) -> BlockState {
         REGISTRY.blocks.get_default_state_id(self)
     }
 
-    #[must_use]
     pub fn state_count(&self) -> u16 {
         self.properties
             .iter()
@@ -372,7 +349,6 @@ impl Block {
             .product()
     }
 
-    #[must_use]
     pub fn has_tag(&self, tag: &Identifier) -> bool {
         REGISTRY.blocks.is_in_tag(&self.key, tag)
     }
@@ -396,7 +372,6 @@ impl Default for BlockRegistry {
 }
 
 impl BlockRegistry {
-    #[must_use]
     pub fn new() -> Self {
         Self {
             registry: Registry::new(),
@@ -433,27 +408,22 @@ impl BlockRegistry {
         self.registry.freeze();
     }
 
-    #[must_use]
     pub fn by_id(&self, id: usize) -> Option<BlockRef> {
         self.registry.by_id(id)
     }
 
-    #[must_use]
     pub fn by_key(&self, key: &Identifier) -> Option<BlockRef> {
         self.registry.by_key(key)
     }
 
-    #[must_use]
     pub fn id_from_key(&self, key: &Identifier) -> Option<usize> {
         self.registry.id_from_key(key)
     }
 
-    #[must_use]
     pub const fn len(&self) -> usize {
         self.registry.len()
     }
 
-    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.registry.is_empty()
     }
@@ -470,12 +440,10 @@ impl BlockRegistry {
         self.registry.modify_tag(tag, f);
     }
 
-    #[must_use]
     pub fn is_in_tag(&self, key: &Identifier, tag: &Identifier) -> bool {
         self.registry.is_in_tag(key, tag)
     }
 
-    #[must_use]
     pub fn get_tag(&self, tag: &Identifier) -> Option<Vec<BlockRef>> {
         self.registry.get_tag(tag)
     }
@@ -508,31 +476,26 @@ impl BlockRegistry {
         id
     }
 
-    #[must_use]
-    pub fn get_base_state_id(&self, block: BlockRef) -> BlockStateId {
+    pub fn get_base_state_id(&self, block: BlockRef) -> BlockState {
         let id = self.block_index(block);
-        BlockStateId(self.block_to_base_state[id])
+        BlockState(self.block_to_base_state[id])
     }
 
-    #[must_use]
-    pub fn get_default_state_id(&self, block: BlockRef) -> BlockStateId {
+    pub fn get_default_state_id(&self, block: BlockRef) -> BlockState {
         let id = self.block_index(block);
         let base = self.block_to_base_state[id];
-        BlockStateId(base + block.default_state_offset)
+        BlockState(base + block.default_state_offset)
     }
 
-    #[must_use]
-    pub fn by_state_id(&self, state_id: BlockStateId) -> Option<BlockRef> {
+    pub fn by_state_id(&self, state_id: BlockState) -> Option<BlockRef> {
         self.state_to_block_lookup.get(state_id.0 as usize).copied()
     }
 
-    #[must_use]
-    pub fn get_state_metadata(&self, state_id: BlockStateId) -> Option<BlockStateMetadata> {
+    pub fn get_state_metadata(&self, state_id: BlockState) -> Option<BlockStateMetadata> {
         self.state_metadata.get(state_id.0 as usize).copied()
     }
 
-    #[must_use]
-    pub fn get_properties(&self, id: BlockStateId) -> Vec<(&'static str, &'static str)> {
+    pub fn get_properties(&self, id: BlockState) -> Vec<(&'static str, &'static str)> {
         let block = self.by_state_id(id).expect("Invalid state ID");
 
         if block.properties.is_empty() {
@@ -551,57 +514,53 @@ impl BlockRegistry {
             .collect()
     }
 
-    #[must_use]
     pub fn state_id_from_properties(
         &self,
         key: &Identifier,
         properties: &[(&str, &str)],
-    ) -> Option<BlockStateId> {
+    ) -> Option<BlockState> {
         let block = self.by_key(key)?;
         self.state_id_from_block_properties(block, properties)
     }
 
-    #[must_use]
     pub fn state_id_from_block_properties(
         &self,
         block: BlockRef,
         properties: &[(&str, &str)],
-    ) -> Option<BlockStateId> {
+    ) -> Option<BlockState> {
         let block_id = self.try_block_index(block)?;
         let base_state_id = self.block_to_base_state[block_id];
 
         let mut property_indices = vec![0usize; block.properties.len()];
         Self::apply_property_overrides(block, &mut property_indices, properties.iter().copied())?;
 
-        Some(BlockStateId(
+        Some(BlockState(
             base_state_id + Self::encode_property_indices(block, &property_indices),
         ))
     }
 
-    #[must_use]
     pub fn state_id_from_block_defaulted_properties<'a>(
         &self,
         block: BlockRef,
         properties: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> Option<BlockStateId> {
+    ) -> Option<BlockState> {
         let block_id = self.try_block_index(block)?;
         let base_state_id = self.block_to_base_state[block_id];
 
         let mut property_indices = Self::decode_property_indices(block, block.default_state_offset);
         Self::apply_property_overrides(block, &mut property_indices, properties)?;
 
-        Some(BlockStateId(
+        Some(BlockState(
             base_state_id + Self::encode_property_indices(block, &property_indices),
         ))
     }
 
-    #[must_use]
-    pub fn matching_states(&self, block: BlockRef, filter: &[(&str, &str)]) -> Vec<BlockStateId> {
+    pub fn matching_states(&self, block: BlockRef, filter: &[(&str, &str)]) -> Vec<BlockState> {
         let block_id = self.block_index(block);
         let base_state_id = self.block_to_base_state[block_id];
 
         (0..block.state_count())
-            .map(|offset| BlockStateId(base_state_id + offset))
+            .map(|offset| BlockState(base_state_id + offset))
             .filter(|&state_id| {
                 let properties = self.get_properties(state_id);
                 filter
@@ -662,15 +621,14 @@ impl BlockRegistry {
             .product()
     }
 
-    pub fn get_property<P: Property>(&self, id: BlockStateId, property: &P) -> P::Value {
+    pub fn get_property<P: Property>(&self, id: BlockState, property: &P) -> P::Value {
         self.try_get_property(id, property)
             .expect("Property not found on this block")
     }
 
-    #[must_use]
     pub fn try_get_property<P: Property>(
         &self,
-        id: BlockStateId,
+        id: BlockState,
         property: &P,
     ) -> Option<P::Value> {
         let block = self.by_state_id(id).expect("Invalid state ID");
@@ -696,10 +654,10 @@ impl BlockRegistry {
 
     pub fn set_property<P: Property>(
         &self,
-        id: BlockStateId,
+        id: BlockState,
         property: &P,
         value: P::Value,
-    ) -> BlockStateId {
+    ) -> BlockState {
         let block = self.by_state_id(id).expect("Invalid state ID");
 
         let property_index = block
@@ -741,14 +699,14 @@ impl BlockRegistry {
             relative_index - (old_value_index - new_value_index) as u16 * stride
         };
 
-        BlockStateId(base_state_id + new_relative_index)
+        BlockState(base_state_id + new_relative_index)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (usize, BlockRef)> + '_ {
         self.registry.iter()
     }
 
-    fn block_and_state_offset(&self, state_id: BlockStateId) -> Option<(BlockRef, u16)> {
+    fn block_and_state_offset(&self, state_id: BlockState) -> Option<(BlockRef, u16)> {
         let block = self
             .state_to_block_lookup
             .get(state_id.0 as usize)
@@ -765,7 +723,7 @@ impl BlockRegistry {
 
     fn static_shape_for_state(
         &self,
-        state_id: BlockStateId,
+        state_id: BlockState,
         shape: fn(&Block, u16) -> shapes::VoxelShape,
     ) -> shapes::VoxelShape {
         let Some((block, offset)) = self.block_and_state_offset(state_id) else {
@@ -776,7 +734,7 @@ impl BlockRegistry {
 
     fn offset_shape_for_state(
         &self,
-        state_id: BlockStateId,
+        state_id: BlockState,
         pos: BlockPos,
         kind: ShapeKind,
         shape: fn(&Block, u16) -> shapes::VoxelShape,
@@ -794,31 +752,27 @@ impl BlockRegistry {
         shapes::OffsetVoxelShape::new(shape, offset)
     }
 
-    #[must_use]
-    pub fn get_static_collision_shape(&self, state_id: BlockStateId) -> shapes::VoxelShape {
+    pub fn get_static_collision_shape(&self, state_id: BlockState) -> shapes::VoxelShape {
         self.static_shape_for_state(state_id, Block::get_collision_shape)
     }
 
-    #[must_use]
-    pub fn is_suffocating(&self, state_id: BlockStateId) -> bool {
+    pub fn is_suffocating(&self, state_id: BlockState) -> bool {
         let Some((block, offset)) = self.block_and_state_offset(state_id) else {
             return false;
         };
         block.suffocating.value(offset)
     }
 
-    #[must_use]
-    pub fn is_static_redstone_conductor(&self, state_id: BlockStateId) -> bool {
+    pub fn is_static_redstone_conductor(&self, state_id: BlockState) -> bool {
         let Some((block, offset)) = self.block_and_state_offset(state_id) else {
             return false;
         };
         block.redstone_conductor.value(offset)
     }
 
-    #[must_use]
     pub fn get_collision_shape_at(
         &self,
-        state_id: BlockStateId,
+        state_id: BlockState,
         pos: BlockPos,
     ) -> shapes::OffsetVoxelShape {
         self.offset_shape_for_state(
@@ -829,48 +783,42 @@ impl BlockRegistry {
         )
     }
 
-    #[must_use]
-    pub fn get_static_support_shape(&self, state_id: BlockStateId) -> shapes::VoxelShape {
+    pub fn get_static_support_shape(&self, state_id: BlockState) -> shapes::VoxelShape {
         self.static_shape_for_state(state_id, Block::get_support_shape)
     }
 
-    #[must_use]
     pub fn get_support_shape_at(
         &self,
-        state_id: BlockStateId,
+        state_id: BlockState,
         pos: BlockPos,
     ) -> shapes::OffsetVoxelShape {
         self.offset_shape_for_state(state_id, pos, ShapeKind::Support, Block::get_support_shape)
     }
 
-    #[must_use]
-    pub fn get_static_outline_shape(&self, state_id: BlockStateId) -> shapes::VoxelShape {
+    pub fn get_static_outline_shape(&self, state_id: BlockState) -> shapes::VoxelShape {
         self.static_shape_for_state(state_id, Block::get_outline_shape)
     }
 
-    #[must_use]
     pub fn get_outline_shape_at(
         &self,
-        state_id: BlockStateId,
+        state_id: BlockState,
         pos: BlockPos,
     ) -> shapes::OffsetVoxelShape {
         self.offset_shape_for_state(state_id, pos, ShapeKind::Outline, Block::get_outline_shape)
     }
 
-    #[must_use]
-    pub fn get_occlusion_shape(&self, state_id: BlockStateId) -> shapes::VoxelShape {
+    pub fn get_occlusion_shape(&self, state_id: BlockState) -> shapes::VoxelShape {
         self.static_shape_for_state(state_id, Block::get_occlusion_shape)
     }
 
-    #[must_use]
-    pub fn get_light_properties(&self, state_id: BlockStateId) -> BlockLightProperties {
+    pub fn get_light_properties(&self, state_id: BlockState) -> BlockLightProperties {
         let Some((block, offset)) = self.block_and_state_offset(state_id) else {
             return BlockLightProperties::OPAQUE_FULL_BLOCK;
         };
         block.get_light_properties(offset)
     }
 
-    pub fn copy_matching_properties(&self, source: BlockStateId, target: BlockRef) -> BlockStateId {
+    pub fn copy_matching_properties(&self, source: BlockState, target: BlockRef) -> BlockState {
         let props = self.get_properties(source);
         let matching: Vec<(&str, &str)> = props
             .iter()
@@ -882,8 +830,7 @@ impl BlockRegistry {
     }
 }
 
-impl BlockStateId {
-    #[must_use]
+impl BlockState {
     pub fn get_block(&self) -> BlockRef {
         REGISTRY
             .blocks
@@ -891,7 +838,6 @@ impl BlockStateId {
             .expect("Expected a valid state id")
     }
 
-    #[must_use]
     pub fn is_air(&self) -> bool {
         let Some(metadata) = REGISTRY.blocks.get_state_metadata(*self) else {
             panic!("invalid block state id {}", self.0);
@@ -899,7 +845,6 @@ impl BlockStateId {
         metadata.is_air()
     }
 
-    #[must_use]
     pub fn get_fluid_state(&self) -> FluidState {
         let Some(metadata) = REGISTRY.blocks.get_state_metadata(*self) else {
             panic!("invalid block state id {}", self.0);
@@ -907,7 +852,6 @@ impl BlockStateId {
         metadata.fluid_state()
     }
 
-    #[must_use]
     pub fn has_fluid(&self) -> bool {
         let Some(metadata) = REGISTRY.blocks.get_state_metadata(*self) else {
             panic!("invalid block state id {}", self.0);
@@ -915,57 +859,46 @@ impl BlockStateId {
         metadata.has_fluid()
     }
 
-    #[must_use]
     pub fn get_value<P: Property>(&self, property: &P) -> P::Value {
         REGISTRY.blocks.get_property(*self, property)
     }
 
-    #[must_use]
     pub fn try_get_value<P: Property>(&self, property: &P) -> Option<P::Value> {
         REGISTRY.blocks.try_get_property(*self, property)
     }
 
-    #[must_use]
-    pub fn set_value<P: Property>(&self, property: &P, value: P::Value) -> BlockStateId {
+    pub fn set_value<P: Property>(&self, property: &P, value: P::Value) -> BlockState {
         REGISTRY.blocks.set_property(*self, property, value)
     }
 
-    #[must_use]
     pub fn get_static_collision_shape(&self) -> shapes::VoxelShape {
         REGISTRY.blocks.get_static_collision_shape(*self)
     }
 
-    #[must_use]
     pub fn get_collision_shape_at(&self, pos: BlockPos) -> shapes::OffsetVoxelShape {
         REGISTRY.blocks.get_collision_shape_at(*self, pos)
     }
 
-    #[must_use]
     pub fn get_support_shape_at(&self, pos: BlockPos) -> shapes::OffsetVoxelShape {
         REGISTRY.blocks.get_support_shape_at(*self, pos)
     }
 
-    #[must_use]
     pub fn get_outline_shape_at(&self, pos: BlockPos) -> shapes::OffsetVoxelShape {
         REGISTRY.blocks.get_outline_shape_at(*self, pos)
     }
 
-    #[must_use]
     pub fn get_occlusion_shape(&self) -> shapes::VoxelShape {
         REGISTRY.blocks.get_occlusion_shape(*self)
     }
 
-    #[must_use]
     pub fn get_light_emission(&self) -> u8 {
         REGISTRY.blocks.get_light_properties(*self).light_emission
     }
 
-    #[must_use]
     pub fn get_light_dampening(&self) -> u8 {
         REGISTRY.blocks.get_light_properties(*self).light_dampening
     }
 
-    #[must_use]
     pub fn use_shape_for_light_occlusion(&self) -> bool {
         REGISTRY
             .blocks
@@ -973,12 +906,10 @@ impl BlockStateId {
             .use_shape_for_light_occlusion
     }
 
-    #[must_use]
     pub fn is_face_sturdy_at(&self, pos: BlockPos, direction: properties::Direction) -> bool {
         self.is_face_sturdy_for_at(pos, direction, shapes::SupportType::Full)
     }
 
-    #[must_use]
     pub fn is_face_sturdy_for_at(
         &self,
         pos: BlockPos,
@@ -989,7 +920,6 @@ impl BlockStateId {
         shapes::is_offset_face_sturdy(shape, direction, support_type)
     }
 
-    #[must_use]
     pub fn is_solid(&self) -> bool {
         let block = self.get_block();
 
@@ -1008,7 +938,6 @@ impl BlockStateId {
         bounds.size() >= 0.729_166_7 || bounds.height() >= 1.0
     }
 
-    #[must_use]
     pub fn blocks_motion(&self) -> bool {
         let block = self.get_block();
         block != &vanilla_blocks::COBWEB
@@ -1016,13 +945,11 @@ impl BlockStateId {
             && self.is_solid()
     }
 
-    #[must_use]
     pub fn is_solid_render(&self) -> bool {
         self.get_block().config.can_occlude
             && shapes::is_shape_full_block(self.get_occlusion_shape())
     }
 
-    #[must_use]
     pub fn is_replaceable(&self) -> bool {
         self.get_block().config.replaceable
     }
@@ -1125,7 +1052,7 @@ mod tests {
         for prop in redstone_wire.properties {
             state_count *= prop.get_possible_value_names().len();
         }
-        assert_eq!(state_count, 3 * 3 * 3 * 3 * 16); // 1296
+        assert_eq!(state_count, 3 * 3 * 3 * 3 * 16);
     }
 
     #[test]
@@ -1202,7 +1129,7 @@ mod tests {
         assert_eq!(east.1, "side");
 
         let north = retrieved.iter().find(|(n, _)| *n == "north").unwrap();
-        assert_eq!(north.1, "up"); // Index 0 is "up" for RedstoneSide
+        assert_eq!(north.1, "up");
     }
 
     #[test]
@@ -1274,7 +1201,7 @@ mod tests {
         let registry = create_test_registry();
         let key = Identifier::const_vanilla("redstone_wire");
 
-        let invalid_props = [("power", "999")]; // Power only goes 0-15
+        let invalid_props = [("power", "999")];
         let result = registry.state_id_from_properties(&key, &invalid_props);
         assert!(result.is_none(), "Should return None for invalid value");
     }

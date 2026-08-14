@@ -4,9 +4,9 @@ use super::gaussian::MarsagliaPolarGaussian;
 use super::name_hash::NameHash;
 use super::{RandomFactory, RandomSource, get_seed};
 
-const LCG_A: u64 = 0x0005_DEEC_E66D;
-const LCG_C: u64 = 0xB;
-const LCG_MASK: u64 = 0xFFFF_FFFF_FFFF;
+const MULTIPLIER: u64 = 0x0005_DEEC_E66D;
+const INCREMENT: u64 = 0xB;
+const MODULUS_MASK: u64 = 0xFFFF_FFFF_FFFF;
 
 pub struct LegacyRandomSource {
     seed: i64,
@@ -14,21 +14,19 @@ pub struct LegacyRandomSource {
 }
 
 impl LegacyRandomSource {
-    #[must_use]
     pub const fn from_seed(seed: u64) -> Self {
         Self {
-            seed: (seed as i64 ^ LCG_A as i64) & LCG_MASK as i64,
+            seed: (seed as i64 ^ MULTIPLIER as i64) & MODULUS_MASK as i64,
             gaussian: MarsagliaPolarGaussian::new(),
         }
     }
 
-    #[must_use]
     pub const fn get_seed(&self) -> i64 {
         self.seed
     }
 
     pub const fn set_seed(&mut self, seed: i64) {
-        self.seed = (seed ^ 0x0005_DEEC_E66D) & 0xFFFF_FFFF_FFFF;
+        self.seed = (seed ^ MULTIPLIER as i64) & MODULUS_MASK as i64;
         self.gaussian = MarsagliaPolarGaussian::new();
     }
 
@@ -56,32 +54,31 @@ impl LegacyRandomSource {
     }
 
     const fn next_random(&mut self) -> i64 {
-        let l = self.seed as u64;
-        let m = (l.wrapping_mul(LCG_A).wrapping_add(LCG_C)) & LCG_MASK;
-        self.seed = m as i64;
-        m as i64
+        let old_seed = self.seed as u64;
+        let new_seed = (old_seed.wrapping_mul(MULTIPLIER).wrapping_add(INCREMENT)) & MODULUS_MASK;
+        self.seed = new_seed as i64;
+        new_seed as i64
     }
 
     const fn skip(&mut self, count: u64) {
         let mut acc_a: u64 = 1;
         let mut acc_c: u64 = 0;
-        let mut base_a: u64 = LCG_A;
-        let mut base_c: u64 = LCG_C;
+        let mut base_a: u64 = MULTIPLIER;
+        let mut base_c: u64 = INCREMENT;
         let mut k = count;
         while k > 0 {
             if k & 1 == 1 {
-                acc_c = base_a.wrapping_mul(acc_c).wrapping_add(base_c) & LCG_MASK;
-                acc_a = base_a.wrapping_mul(acc_a) & LCG_MASK;
+                acc_c = base_a.wrapping_mul(acc_c).wrapping_add(base_c) & MODULUS_MASK;
+                acc_a = base_a.wrapping_mul(acc_a) & MODULUS_MASK;
             }
-            base_c = base_a.wrapping_mul(base_c).wrapping_add(base_c) & LCG_MASK;
-            base_a = base_a.wrapping_mul(base_a) & LCG_MASK;
+            base_c = base_a.wrapping_mul(base_c).wrapping_add(base_c) & MODULUS_MASK;
+            base_a = base_a.wrapping_mul(base_a) & MODULUS_MASK;
             k >>= 1;
         }
         let s = self.seed as u64;
-        self.seed = (acc_a.wrapping_mul(s).wrapping_add(acc_c) & LCG_MASK) as i64;
+        self.seed = (acc_a.wrapping_mul(s).wrapping_add(acc_c) & MODULUS_MASK) as i64;
     }
 
-    #[must_use]
     pub fn fork(&mut self) -> Self {
         Self::from_seed(self.next_i64() as u64)
     }
@@ -95,10 +92,10 @@ impl LegacyRandomSource {
             (i64::from(bound).wrapping_mul(i64::from(self.next(31))) >> 31) as i32
         } else {
             loop {
-                let i = self.next(31);
-                let j = i % bound;
-                if i.wrapping_sub(j).wrapping_add(bound.wrapping_sub(1)) >= 0 {
-                    return j;
+                let sample = self.next(31);
+                let modulo = sample % bound;
+                if sample.wrapping_sub(modulo).wrapping_add(bound.wrapping_sub(1)) >= 0 {
+                    return modulo;
                 }
             }
         }
@@ -113,9 +110,9 @@ impl LegacyRandomSource {
     }
 
     pub fn next_i64(&mut self) -> i64 {
-        let i = self.next_i32();
-        let j = self.next_i32();
-        (i64::from(i) << 32).wrapping_add(i64::from(j))
+        let upper = self.next_i32();
+        let lower = self.next_i32();
+        (i64::from(upper) << 32).wrapping_add(i64::from(lower))
     }
 
     pub fn next_f32(&mut self) -> f32 {
@@ -123,7 +120,9 @@ impl LegacyRandomSource {
     }
 
     pub fn next_f64(&mut self) -> f64 {
-        let combined = (i64::from(self.next(26)) << 27) + i64::from(self.next(27));
+        let upper = self.next(26);
+        let lower = self.next(27);
+        let combined = (i64::from(upper) << 27) + i64::from(lower);
         combined as f64 * (1.0 / (1_i64 << 53) as f64)
     }
 
@@ -163,27 +162,23 @@ pub struct LegacyRandomFactory {
 }
 
 impl LegacyRandomFactory {
-    #[must_use]
     pub const fn new(seed: i64) -> Self {
         Self { seed }
     }
 
-    #[must_use]
     pub fn at(&self, x: i32, y: i32, z: i32) -> RandomSource {
-        let seed = get_seed(x, y, z);
+        let positional_seed = get_seed(x, y, z);
         RandomSource::Legacy(LegacyRandomSource::from_seed(
-            (seed as u64) ^ (self.seed as u64),
+            (positional_seed as u64) ^ (self.seed as u64),
         ))
     }
 
-    #[must_use]
     pub const fn with_hash_of(&self, hash: &NameHash) -> RandomSource {
         RandomSource::Legacy(LegacyRandomSource::from_seed(
-            (hash.java_hash as u64) ^ (self.seed as u64),
+            (hash.legacy_hash_code as u64) ^ (self.seed as u64),
         ))
     }
 
-    #[must_use]
     pub const fn with_seed(&self, seed: u64) -> RandomSource {
         RandomSource::Legacy(LegacyRandomSource::from_seed(seed))
     }
@@ -234,7 +229,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(clippy::float_cmp, reason = "exact match against vanilla test vectors")]
     fn next_f64_matches_java() {
         let mut rand = LegacyRandomSource::from_seed(0);
         let values = [
@@ -248,7 +242,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(clippy::float_cmp, reason = "exact match against vanilla test vectors")]
     fn next_f32_matches_java() {
         let mut rand = LegacyRandomSource::from_seed(0);
         let values: [f32; 3] = [0.730_967_76, 0.831_441, 0.240_536_39];
@@ -280,7 +273,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(clippy::float_cmp, reason = "exact match against vanilla test vectors")]
     fn next_gaussian_matches_java() {
         let mut rand = LegacyRandomSource::from_seed(0);
         let values = [
@@ -294,7 +286,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(clippy::float_cmp, reason = "exact match against vanilla test vectors")]
     fn triangle_matches_java() {
         let mut rand = LegacyRandomSource::from_seed(0);
         let values = [

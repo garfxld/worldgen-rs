@@ -216,7 +216,6 @@ fn json_spline_point(p: &SplinePointJson) -> SplinePoint {
     }
 }
 
-#[must_use]
 #[rustfmt::skip]
 pub fn router_to_entries(router: &NoiseRouterJson) -> BTreeMap<String, DensityFunction> {
     let mut entries = BTreeMap::new();
@@ -244,10 +243,6 @@ pub fn router_to_entries(router: &NoiseRouterJson) -> BTreeMap<String, DensityFu
 #[expect(
     clippy::unwrap_used,
     reason = "test-only JSON literals are known valid at compile time"
-)]
-#[expect(
-    clippy::float_cmp,
-    reason = "values are exact literals round-tripped through JSON, not computed"
 )]
 mod tests {
     use super::*;

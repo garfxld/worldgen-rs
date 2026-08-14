@@ -10,7 +10,6 @@ pub struct WorldgenRandom {
 }
 
 impl WorldgenRandom {
-    #[must_use]
     pub const fn from_seed(seed: u64) -> Self {
         Self {
             source: XoroshiroRandomSource::from_seed(seed),
@@ -45,7 +44,6 @@ impl WorldgenRandom {
         self.source.next_i64() as u64 >> (64 - bits)
     }
 
-    #[must_use]
     pub const fn fork(&mut self) -> Self {
         Self {
             source: self.source.fork(),
@@ -154,10 +152,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(
-        clippy::float_cmp,
-        reason = "gaussian cache parity must match vanilla exactly"
-    )]
     fn feature_seed_preserves_pending_gaussian() {
         let mut random = WorldgenRandom::from_seed(123);
         let _ = random.next_gaussian();

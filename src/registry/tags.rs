@@ -32,14 +32,12 @@ impl RegistryTags {
         self.tags.remove(tag).map(|tag| tag.ordered_keys)
     }
 
-    #[must_use]
     pub fn contains(&self, tag: &Identifier, entry_key: &Identifier) -> bool {
         self.tags
             .get(tag)
             .is_some_and(|entries| entries.member_keys.contains(entry_key))
     }
 
-    #[must_use]
     pub fn get(&self, tag: &Identifier) -> Option<&[Identifier]> {
         self.tags
             .get(tag)

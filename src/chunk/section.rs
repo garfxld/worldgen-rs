@@ -4,7 +4,7 @@ use parking_lot::RwLock;
 
 use crate::chunk::paletted_container::{BiomePalette, BlockPalette};
 use crate::registry::REGISTRY;
-use crate::util::ident::{BlockStateId, Identifier};
+use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::{BlockPos, ChunkPos};
 
 fn plains_biome_id() -> u16 {
@@ -25,25 +25,29 @@ pub struct Sections {
 
 const BLOCKS_PER_SECTION: u16 = 16 * 16 * 16;
 
+const fn split_by_section(relative_y: usize) -> (usize, usize) {
+    (
+        relative_y / BlockPalette::SIZE,
+        relative_y % BlockPalette::SIZE,
+    )
+}
+
 impl Sections {
-    #[must_use]
     pub fn from_owned(sections: Box<[ChunkSection]>) -> Self {
         let sections = sections.into_vec().into_iter().map(RwLock::new).collect();
         Self { sections }
     }
 
-    #[must_use]
     pub fn get_relative_block(
         &self,
         relative_x: usize,
         relative_y: usize,
         relative_z: usize,
-    ) -> Option<BlockStateId> {
+    ) -> Option<BlockState> {
         debug_assert!(relative_x < BlockPalette::SIZE);
         debug_assert!(relative_z < BlockPalette::SIZE);
 
-        let section_index = relative_y / BlockPalette::SIZE;
-        let relative_y = relative_y % BlockPalette::SIZE;
+        let (section_index, relative_y) = split_by_section(relative_y);
         self.sections.get(section_index).map(|section| {
             section
                 .read()
@@ -52,13 +56,13 @@ impl Sections {
         })
     }
 
-    pub fn read_column_into(&self, x: usize, z: usize, buf: &mut Vec<BlockStateId>) {
+    pub fn read_column_into(&self, x: usize, z: usize, buf: &mut Vec<BlockState>) {
         debug_assert!(x < BlockPalette::SIZE);
         debug_assert!(z < BlockPalette::SIZE);
 
         let total = self.sections.len() * 16;
         if buf.len() != total {
-            buf.resize(total, BlockStateId::default());
+            buf.resize(total, BlockState::default());
         }
         for (i, section) in self.sections.iter().enumerate() {
             let guard = section.read();
@@ -69,7 +73,6 @@ impl Sections {
         }
     }
 
-    #[must_use]
     pub fn read_all_biomes(&self) -> Box<[u16]> {
         let total = self.sections.len() * 64;
         let mut biomes = vec![0u16; total];
@@ -100,7 +103,6 @@ impl Sections {
         }
     }
 
-    #[must_use]
     pub fn section_emptiness_map(&self) -> Box<[bool]> {
         self.sections
             .iter()
@@ -108,7 +110,6 @@ impl Sections {
             .collect()
     }
 
-    #[must_use]
     pub fn block_light_sources(&self, chunk_pos: ChunkPos, min_y: i32) -> Vec<BlockPos> {
         let mut sources = Vec::new();
         let chunk_min_x = chunk_pos.0.x * BlockPalette::SIZE as i32;
@@ -127,46 +128,53 @@ impl Sections {
         sources
     }
 
-    pub fn write_column_blocks(&self, x: usize, z: usize, blocks: &[(usize, BlockStateId)]) {
-        const DIM: usize = BlockPalette::SIZE;
-        debug_assert!(x < DIM);
-        debug_assert!(z < DIM);
-
+    fn write_grouped_by_section(
+        &self,
+        entries: usize,
+        section_of: impl Fn(usize) -> usize,
+        mut apply: impl FnMut(&mut [BlockState], usize),
+    ) {
         let mut i = 0;
-        while i < blocks.len() {
-            let section_idx = blocks[i].0 / DIM;
+        while i < entries {
+            let section_idx = section_of(i);
             let mut guard = self.sections[section_idx].write();
             guard.states.enter_building_mode();
             let Some(cube) = guard.states.as_building_slice_mut() else {
                 unreachable!("just entered building mode")
             };
-            let xz_base = z * DIM + x;
-            while i < blocks.len() && blocks[i].0 / DIM == section_idx {
-                let (rel_y, value) = blocks[i];
-                let local_y = rel_y % DIM;
-                cube[local_y * DIM * DIM + xz_base] = value;
+            while i < entries && section_of(i) == section_idx {
+                apply(cube, i);
                 i += 1;
             }
         }
     }
 
-    pub fn write_block_batch(&self, blocks: &[(usize, usize, usize, BlockStateId)]) {
+    pub fn write_column_blocks(&self, x: usize, z: usize, blocks: &[(usize, BlockState)]) {
         const DIM: usize = BlockPalette::SIZE;
-        let mut i = 0;
-        while i < blocks.len() {
-            let section_idx = blocks[i].1 / DIM;
-            let mut guard = self.sections[section_idx].write();
-            guard.states.enter_building_mode();
-            let Some(cube) = guard.states.as_building_slice_mut() else {
-                unreachable!("just entered building mode")
-            };
-            while i < blocks.len() && blocks[i].1 / DIM == section_idx {
+        debug_assert!(x < DIM);
+        debug_assert!(z < DIM);
+
+        let xz_base = z * DIM + x;
+        self.write_grouped_by_section(
+            blocks.len(),
+            |i| blocks[i].0 / DIM,
+            |cube, i| {
+                let (rel_y, value) = blocks[i];
+                cube[(rel_y % DIM) * DIM * DIM + xz_base] = value;
+            },
+        );
+    }
+
+    pub fn write_block_batch(&self, blocks: &[(usize, usize, usize, BlockState)]) {
+        const DIM: usize = BlockPalette::SIZE;
+        self.write_grouped_by_section(
+            blocks.len(),
+            |i| blocks[i].1 / DIM,
+            |cube, i| {
                 let (x, rel_y, z, value) = blocks[i];
-                let local_y = rel_y % DIM;
-                cube[local_y * DIM * DIM + z * DIM + x] = value;
-                i += 1;
-            }
-        }
+                cube[(rel_y % DIM) * DIM * DIM + z * DIM + x] = value;
+            },
+        );
     }
 
     pub fn set_relative_block(
@@ -174,13 +182,12 @@ impl Sections {
         relative_x: usize,
         relative_y: usize,
         relative_z: usize,
-        value: BlockStateId,
+        value: BlockState,
     ) {
         debug_assert!(relative_x < BlockPalette::SIZE);
         debug_assert!(relative_z < BlockPalette::SIZE);
 
-        let idx = relative_y / BlockPalette::SIZE;
-        let relative_y = relative_y % BlockPalette::SIZE;
+        let (idx, relative_y) = split_by_section(relative_y);
         let mut guard = self.sections[idx].write();
         guard.set_block_state(relative_x, relative_y, relative_z, value);
     }
@@ -190,22 +197,15 @@ impl Sections {
         relative_x: usize,
         relative_y: usize,
         relative_z: usize,
-        value: BlockStateId,
+        value: BlockState,
     ) {
         debug_assert!(relative_x < BlockPalette::SIZE);
         debug_assert!(relative_z < BlockPalette::SIZE);
 
-        let idx = relative_y / BlockPalette::SIZE;
-        let relative_y = relative_y % BlockPalette::SIZE;
+        let (idx, relative_y) = split_by_section(relative_y);
         let mut guard = self.sections[idx].write();
         guard.set_block_state_for_generation(relative_x, relative_y, relative_z, value);
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct BlockStateSectionCounts {
-    is_air: bool,
-    has_fluid: bool,
 }
 
 #[derive(Debug)]
@@ -217,7 +217,6 @@ pub struct ChunkSection {
 }
 
 impl ChunkSection {
-    #[must_use]
     pub const fn new_with_biomes(states: BlockPalette, biomes: BiomePalette) -> Self {
         Self {
             states,
@@ -227,23 +226,20 @@ impl ChunkSection {
         }
     }
 
-    #[must_use]
     pub fn new_empty() -> Self {
         let plains_id = plains_biome_id();
         Self {
-            states: BlockPalette::Homogeneous(BlockStateId(0)),
+            states: BlockPalette::Homogeneous(BlockState(0)),
             biomes: BiomePalette::Homogeneous(plains_id),
             non_empty_block_count: 0,
             fluid_count: 0,
         }
     }
 
-    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.non_empty_block_count == 0
     }
 
-    #[must_use]
     pub fn maybe_has_block_light_sources(&self) -> bool {
         !self.is_empty()
             && self
@@ -276,69 +272,40 @@ impl ChunkSection {
         }
     }
 
-    #[must_use]
     pub const fn non_empty_block_count(&self) -> u16 {
         self.non_empty_block_count
     }
 
-    #[must_use]
     pub const fn fluid_count(&self) -> u16 {
         self.fluid_count
     }
 
-    #[must_use]
     pub const fn has_fluid(&self) -> bool {
         self.fluid_count > 0
     }
 
     pub fn recalculate_counts(&mut self) {
-        self.recalculate_counts_from_palette(Self::block_state_section_counts);
-    }
-
-    fn recalculate_counts_from_palette(
-        &mut self,
-        mut counts_for_state: impl FnMut(BlockStateId) -> BlockStateSectionCounts,
-    ) {
         self.states.finalize_building();
+
+        let entries: Vec<(BlockState, u16)> = match &self.states {
+            BlockPalette::Homogeneous(state) => vec![(*state, BLOCKS_PER_SECTION)],
+            BlockPalette::Heterogeneous(_) => self.states.palette_counts(),
+            BlockPalette::Building(_) => unreachable!("finalize_building was just called"),
+        };
 
         let mut non_empty: u16 = 0;
         let mut fluid: u16 = 0;
-
-        match &self.states {
-            BlockPalette::Homogeneous(state) => {
-                let counts = counts_for_state(*state);
-                Self::accumulate_counter_traits(
-                    &mut non_empty,
-                    &mut fluid,
-                    counts,
-                    BLOCKS_PER_SECTION,
-                );
+        for (state, count) in entries {
+            if !state.is_air() {
+                non_empty += count;
             }
-            BlockPalette::Heterogeneous(data) => {
-                for &(state, count) in &data.palette {
-                    let counts = counts_for_state(state);
-                    Self::accumulate_counter_traits(&mut non_empty, &mut fluid, counts, count);
-                }
+            if state.has_fluid() {
+                fluid += count;
             }
-            BlockPalette::Building(_) => unreachable!("finalize_building was just called"),
         }
 
         self.non_empty_block_count = non_empty;
         self.fluid_count = fluid;
-    }
-
-    const fn accumulate_counter_traits(
-        non_empty: &mut u16,
-        fluid: &mut u16,
-        counts: BlockStateSectionCounts,
-        block_count: u16,
-    ) {
-        if !counts.is_air {
-            *non_empty += block_count;
-        }
-        if counts.has_fluid {
-            *fluid += block_count;
-        }
     }
 
     pub fn set_block_state(
@@ -346,15 +313,24 @@ impl ChunkSection {
         x: usize,
         y: usize,
         z: usize,
-        new_state: BlockStateId,
-    ) -> BlockStateId {
-        self.ensure_counter_ready_for_delta();
+        new_state: BlockState,
+    ) -> BlockState {
+        if matches!(&self.states, BlockPalette::Building(_)) {
+            tracing::debug!(
+                "finalizing worldgen Building palette before applying a counter-aware block-state delta"
+            );
+            self.recalculate_counts();
+        }
+
         let old_state = self.states.set(x, y, z, new_state);
 
         if old_state != new_state {
-            let old_counts = Self::block_state_section_counts(old_state);
-            let new_counts = Self::block_state_section_counts(new_state);
-            self.apply_count_change(old_counts, new_counts);
+            let non_empty_delta = i32::from(!old_state.is_air()) - i32::from(!new_state.is_air());
+            self.non_empty_block_count =
+                (i32::from(self.non_empty_block_count) - non_empty_delta) as u16;
+
+            let fluid_delta = i32::from(new_state.has_fluid()) - i32::from(old_state.has_fluid());
+            self.fluid_count = (i32::from(self.fluid_count) + fluid_delta) as u16;
         }
 
         old_state
@@ -365,44 +341,10 @@ impl ChunkSection {
         x: usize,
         y: usize,
         z: usize,
-        new_state: BlockStateId,
-    ) -> BlockStateId {
+        new_state: BlockState,
+    ) -> BlockState {
         self.states.enter_building_mode();
         self.states.set(x, y, z, new_state)
-    }
-
-    pub(crate) fn block_state_section_counts(state: BlockStateId) -> BlockStateSectionCounts {
-        BlockStateSectionCounts {
-            is_air: state.is_air(),
-            has_fluid: state.has_fluid(),
-        }
-    }
-
-    fn ensure_counter_ready_for_delta(&mut self) {
-        if matches!(&self.states, BlockPalette::Building(_)) {
-            tracing::debug!(
-                "finalizing worldgen Building palette before applying a counter-aware block-state delta"
-            );
-            self.recalculate_counts();
-        }
-    }
-
-    const fn apply_count_change(
-        &mut self,
-        old_counts: BlockStateSectionCounts,
-        new_counts: BlockStateSectionCounts,
-    ) {
-        if !old_counts.is_air && new_counts.is_air {
-            self.non_empty_block_count -= 1;
-        } else if old_counts.is_air && !new_counts.is_air {
-            self.non_empty_block_count += 1;
-        }
-
-        if old_counts.has_fluid && !new_counts.has_fluid {
-            self.fluid_count -= 1;
-        } else if !old_counts.has_fluid && new_counts.has_fluid {
-            self.fluid_count += 1;
-        }
     }
 }
 
@@ -459,7 +401,7 @@ mod tests {
         cube[5][0][0] = lava;
 
         let mut section =
-            ChunkSection::new_with_biomes(BlockPalette::from_cube(cube), plains_biomes());
+            ChunkSection::new_with_biomes(BlockPalette::from_cube(&cube), plains_biomes());
 
         section.recalculate_counts();
 

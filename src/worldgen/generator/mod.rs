@@ -4,7 +4,7 @@ use crate::chunk::heightmap::{Heightmap, HeightmapType};
 use crate::chunk::proto::{Chunk, GenerationChunk, NoisePhase};
 use crate::registry::REGISTRY;
 use crate::registry::biome::BiomeRef;
-use crate::util::ident::{BlockStateId, Identifier};
+use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 use crate::worldgen::backend::ir::loader::{DatapackSource, LoadError};
 use crate::worldgen::backend::jit::CompileError;
@@ -30,13 +30,12 @@ pub struct Generator {
     biome_source: BiomeSourceKind,
     noises: Noises,
     ore_veinifier: Option<OreVeinifier>,
-    default_block_id: BlockStateId,
-    default_fluid_id: BlockStateId,
+    default_block_id: BlockState,
+    default_fluid_id: BlockState,
     aquifers_enabled: bool,
     surface_rules: DatapackSurfaceRules,
     surface_system: SurfaceSystem,
     surface_extension_biomes: SurfaceExtensionBiomes,
-    /// Obfuscated seed for `BiomeManager` biome zoom fuzzing.
     biome_zoom_seed: i64,
 }
 
@@ -72,7 +71,7 @@ impl SurfaceExtensionBiomes {
     }
 }
 
-fn resolve_block_state(name: &str) -> BlockStateId {
+fn resolve_block_state(name: &str) -> BlockState {
     let id: Identifier = name
         .parse()
         .unwrap_or_else(|e| panic!("invalid block id {name}: {e}"));
@@ -147,12 +146,10 @@ impl Generator {
         })
     }
 
-    #[must_use]
     pub const fn noises(&self) -> &Noises {
         &self.noises
     }
 
-    #[must_use]
     pub const fn biome_source(&self) -> &BiomeSourceKind {
         &self.biome_source
     }
@@ -228,7 +225,7 @@ impl Generator {
             ColumnCache::new(noises),
         );
 
-        let mut pending_writes: Vec<(usize, usize, usize, BlockStateId)> = Vec::new();
+        let mut pending_writes: Vec<(usize, usize, usize, BlockState)> = Vec::new();
         let mut prev_x: usize = usize::MAX;
         let mut prev_z: usize = usize::MAX;
         let mut ocean_floor_wg = Heightmap::new(HeightmapType::OceanFloorWg, min_y);
@@ -248,10 +245,6 @@ impl Generator {
                     prev_z = local_z;
                 }
 
-                #[expect(
-                    clippy::cast_sign_loss,
-                    reason = "world_y - min_y is non-negative inside the chunk's Y range"
-                )]
                 let relative_y = (world_y - min_y) as usize;
                 let world_x = chunk_min_x + local_x as i32;
                 let world_z = chunk_min_z + local_z as i32;

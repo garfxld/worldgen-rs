@@ -48,7 +48,6 @@ impl FloatProvider {
         }
     }
 
-    #[must_use]
     pub const fn min(self) -> f32 {
         match self {
             Self::Constant(v) => v,
@@ -57,7 +56,6 @@ impl FloatProvider {
         }
     }
 
-    #[must_use]
     pub const fn max(self) -> f32 {
         match self {
             Self::Constant(v) => v,

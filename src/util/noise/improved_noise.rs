@@ -26,7 +26,6 @@ pub struct ImprovedNoise {
 }
 
 impl ImprovedNoise {
-    #[must_use]
     pub const fn permutations(&self) -> &[u8; 256] {
         &self.p
     }
@@ -68,7 +67,6 @@ impl ImprovedNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn noise(&self, x: f64, y: f64, z: f64) -> f64 {
         let x = x + self.xo;
         let y = y + self.yo;
@@ -86,7 +84,6 @@ impl ImprovedNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn noise_simd<F, const N: usize>(
         &self,
         x: Simd<F, N>,
@@ -119,7 +116,6 @@ impl ImprovedNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn noise_xz(&self, x: f64, z: f64) -> f64 {
         let x = x + self.xo;
         let z = z + self.zo;
@@ -142,7 +138,6 @@ impl ImprovedNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn noise_xy(&self, x: f64, y: f64) -> f64 {
         let x = x + self.xo;
         let y = y + self.yo;
@@ -156,7 +151,6 @@ impl ImprovedNoise {
         self.sample_and_lerp(xf, yf, self.zo_floor, xr, yr, self.zo_fraction, yr)
     }
 
-    #[must_use]
     pub fn noise_with_derivative(
         &self,
         x: f64,
@@ -179,11 +173,6 @@ impl ImprovedNoise {
         self.sample_with_derivative(xf, yf, zf, xr, yr, zr, derivative_out)
     }
 
-    #[must_use]
-    #[expect(
-        clippy::similar_names,
-        reason = "yr_fudge and y_fudge match vanilla naming"
-    )]
     pub fn noise_with_y_scale(&self, x: f64, y: f64, z: f64, y_scale: f64, y_fudge: f64) -> f64 {
         let x = x + self.xo;
         let y = y + self.yo;
@@ -197,10 +186,6 @@ impl ImprovedNoise {
         let yr = y - f64::from(yf);
         let zr = z - f64::from(zf);
 
-        #[expect(
-            clippy::if_not_else,
-            reason = "matches vanilla's conditional structure"
-        )]
         let yr_fudge = if y_scale != 0.0 {
             let fudge_limit = if y_fudge >= 0.0 && y_fudge < yr {
                 y_fudge
@@ -271,14 +256,14 @@ impl ImprovedNoise {
                 let yr1 = yr - 1.0;
                 let zr1 = zr - 1.0;
 
-                let d000 = grad_dot_flat(&self.p, x, y, z, xr, yr, zr);
-                let d100 = grad_dot_flat(&self.p, px1, y, z, xr1, yr, zr);
-                let d010 = grad_dot_flat(&self.p, x, py1, z, xr, yr1, zr);
-                let d110 = grad_dot_flat(&self.p, px1, py1, z, xr1, yr1, zr);
-                let d001 = grad_dot_flat(&self.p, x, y, pz1, xr, yr, zr1);
-                let d101 = grad_dot_flat(&self.p, px1, y, pz1, xr1, yr, zr1);
-                let d011 = grad_dot_flat(&self.p, x, py1, pz1, xr, yr1, zr1);
-                let d111 = grad_dot_flat(&self.p, px1, py1, pz1, xr1, yr1, zr1);
+                let d000 = permutation_gradient_dot(&self.p, x, y, z, xr, yr, zr);
+                let d100 = permutation_gradient_dot(&self.p, px1, y, z, xr1, yr, zr);
+                let d010 = permutation_gradient_dot(&self.p, x, py1, z, xr, yr1, zr);
+                let d110 = permutation_gradient_dot(&self.p, px1, py1, z, xr1, yr1, zr);
+                let d001 = permutation_gradient_dot(&self.p, x, y, pz1, xr, yr, zr1);
+                let d101 = permutation_gradient_dot(&self.p, px1, y, pz1, xr1, yr, zr1);
+                let d011 = permutation_gradient_dot(&self.p, x, py1, pz1, xr, yr1, zr1);
+                let d111 = permutation_gradient_dot(&self.p, px1, py1, pz1, xr1, yr1, zr1);
                 (d000, d100, d010, d110, d001, d101, d011, d111)
             }
         };
@@ -292,7 +277,7 @@ impl ImprovedNoise {
     }
 
     #[inline]
-    fn p_simd<const N: usize>(&self, idx: Simd<u8, N>) -> Simd<u8, N> {
+    fn permutation_gather<const N: usize>(&self, idx: Simd<u8, N>) -> Simd<u8, N> {
         let offset = idx.cast::<usize>();
         let p = Simd::splat(self.p.as_ptr()).wrapping_add(offset);
         // SAFETY: `idx` is a `Simd<u8, N>`, meaning each lane's index is at most 255.
@@ -321,32 +306,32 @@ impl ImprovedNoise {
         let x = x.cast::<u8>();
         let y = y.cast::<u8>();
         let z = z.cast::<u8>();
-        let x0 = self.p_simd(x);
-        let x1 = self.p_simd(x + Simd::splat(1));
+        let x0 = self.permutation_gather(x);
+        let x1 = self.permutation_gather(x + Simd::splat(1));
 
-        let xy00 = self.p_simd(x0 + y);
-        let xy01 = self.p_simd(x0 + y + Simd::splat(1));
-        let xy10 = self.p_simd(x1 + y);
-        let xy11 = self.p_simd(x1 + y + Simd::splat(1));
+        let xy00 = self.permutation_gather(x0 + y);
+        let xy01 = self.permutation_gather(x0 + y + Simd::splat(1));
+        let xy10 = self.permutation_gather(x1 + y);
+        let xy11 = self.permutation_gather(x1 + y + Simd::splat(1));
 
-        let h000 = self.p_simd(xy00 + z).cast::<usize>().to_array();
-        let h100 = self.p_simd(xy10 + z).cast::<usize>().to_array();
-        let h010 = self.p_simd(xy01 + z).cast::<usize>().to_array();
-        let h110 = self.p_simd(xy11 + z).cast::<usize>().to_array();
+        let h000 = self.permutation_gather(xy00 + z).cast::<usize>().to_array();
+        let h100 = self.permutation_gather(xy10 + z).cast::<usize>().to_array();
+        let h010 = self.permutation_gather(xy01 + z).cast::<usize>().to_array();
+        let h110 = self.permutation_gather(xy11 + z).cast::<usize>().to_array();
         let h001 = self
-            .p_simd(xy00 + z + Simd::splat(1))
+            .permutation_gather(xy00 + z + Simd::splat(1))
             .cast::<usize>()
             .to_array();
         let h101 = self
-            .p_simd(xy10 + z + Simd::splat(1))
+            .permutation_gather(xy10 + z + Simd::splat(1))
             .cast::<usize>()
             .to_array();
         let h011 = self
-            .p_simd(xy01 + z + Simd::splat(1))
+            .permutation_gather(xy01 + z + Simd::splat(1))
             .cast::<usize>()
             .to_array();
         let h111 = self
-            .p_simd(xy11 + z + Simd::splat(1))
+            .permutation_gather(xy11 + z + Simd::splat(1))
             .cast::<usize>()
             .to_array();
 
@@ -389,7 +374,6 @@ impl ImprovedNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn noise_with_y_scale_simd<const N: usize>(
         &self,
         x: f64,
@@ -604,7 +588,7 @@ impl ImprovedNoise {
 
 #[cfg(not(target_feature = "avx512f"))]
 #[inline]
-fn grad_dot_flat(p: &[u8; 256], px: i32, py: i32, pz: i32, fx: f64, fy: f64, fz: f64) -> f64 {
+fn permutation_gradient_dot(p: &[u8; 256], px: i32, py: i32, pz: i32, fx: f64, fy: f64, fz: f64) -> f64 {
     let qx = (px & 0xFF) as u8;
     let qy = (py & 0xFF) as u8;
     let qz = (pz & 0xFF) as u8;

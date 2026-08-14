@@ -17,12 +17,10 @@ pub enum ChunkStatus {
 }
 
 impl ChunkStatus {
-    #[must_use]
     pub const fn get_index(self) -> usize {
         self as usize
     }
 
-    #[must_use]
     pub const fn from_index(index: usize) -> Option<Self> {
         match index {
             0 => Some(Self::Empty),
@@ -41,7 +39,6 @@ impl ChunkStatus {
         }
     }
 
-    #[must_use]
     pub const fn next(self) -> Option<Self> {
         match self {
             Self::Empty => Some(Self::StructureStarts),
@@ -59,7 +56,6 @@ impl ChunkStatus {
         }
     }
 
-    #[must_use]
     pub const fn parent(self) -> Option<Self> {
         match self {
             Self::Empty => None,
@@ -77,7 +73,6 @@ impl ChunkStatus {
         }
     }
 
-    #[must_use]
     pub const fn heightmaps_after(self) -> &'static [HeightmapType] {
         match self {
             Self::Empty
@@ -95,7 +90,6 @@ impl ChunkStatus {
         }
     }
 
-    #[must_use]
     pub const fn requirements(self) -> &'static [(ChunkStatus, usize)] {
         match self {
             Self::Empty | Self::StructureStarts | Self::InitializeLight | Self::Full => &[],

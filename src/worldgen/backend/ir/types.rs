@@ -179,7 +179,6 @@ pub enum RarityValueMapper {
 }
 
 impl RarityValueMapper {
-    #[must_use]
     pub fn get_values(self, rarity: f64) -> f64 {
         match self {
             Self::Tunnels => {
@@ -297,12 +296,10 @@ pub enum DensityFunction {
 }
 
 impl DensityFunction {
-    #[must_use]
     pub const fn constant(value: f64) -> Self {
         Self::Constant(Constant { value })
     }
 
-    #[must_use]
     pub const fn reference(id: String) -> Self {
         Self::Reference(Reference { id })
     }
@@ -316,7 +313,6 @@ pub struct NoiseParameters {
 }
 
 impl NoiseParameters {
-    #[must_use]
     pub const fn new(first_octave: i32, amplitudes: Vec<f64>) -> Self {
         Self {
             first_octave,
@@ -346,7 +342,6 @@ pub enum SplineValue {
 }
 
 impl CubicSpline {
-    #[must_use]
     pub fn new(coordinate: Arc<DensityFunction>, points: Vec<SplinePoint>) -> Self {
         let locations = points.iter().map(|p| p.location).collect();
         Self {

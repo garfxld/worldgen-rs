@@ -80,7 +80,6 @@ fn normalize_type_tags(value: &mut serde_json::Value) {
     }
 }
 
-#[must_use]
 pub fn collect_json_files(dir: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let Ok(entries) = fs::read_dir(dir) else {
@@ -98,7 +97,6 @@ pub fn collect_json_files(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
-#[must_use]
 pub fn path_to_id(namespace: &str, path: &Path, base_dir: &Path) -> String {
     let relative = path
         .strip_prefix(base_dir)

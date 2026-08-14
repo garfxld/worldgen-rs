@@ -4,7 +4,7 @@ use crate::chunk::proto::{GenerationChunk, SurfacePhase};
 use crate::registry::REGISTRY;
 use crate::registry::biome::TemperatureModifier;
 use crate::registry::blocks::vanilla_blocks;
-use crate::util::ident::BlockStateId;
+use crate::util::ident::BlockState;
 use crate::util::noise::{NormalNoise, PerlinSimplexNoise};
 use crate::util::rng::legacy_random::LegacyRandomSource;
 use crate::util::rng::name_hash::NameHash;
@@ -16,22 +16,21 @@ const CLAY_BAND_LENGTH: usize = 192;
 pub struct TemperatureXzCache {
     block_x: i32,
     block_z: i32,
-    frozen_large_x7: f64,
-    frozen_edge: f64,
-    frozen_small: f64,
-    height_temp_noise_x8: f64,
+    frozen_ground_large_variation: f64,
+    frozen_ground_edge_variation: f64,
+    frozen_ground_small_variation: f64,
+    height_adjusted_temperature_noise: f64,
 }
 
 impl TemperatureXzCache {
-    #[must_use]
     pub const fn new(block_x: i32, block_z: i32) -> Self {
         Self {
             block_x,
             block_z,
-            frozen_large_x7: f64::NAN,
-            frozen_edge: f64::NAN,
-            frozen_small: f64::NAN,
-            height_temp_noise_x8: f64::NAN,
+            frozen_ground_large_variation: f64::NAN,
+            frozen_ground_edge_variation: f64::NAN,
+            frozen_ground_small_variation: f64::NAN,
+            height_adjusted_temperature_noise: f64::NAN,
         }
     }
 }
@@ -40,7 +39,7 @@ pub struct SurfaceSystem {
     surface_noise: NormalNoise,
     surface_secondary_noise: NormalNoise,
     clay_bands_offset_noise: NormalNoise,
-    clay_bands: [BlockStateId; CLAY_BAND_LENGTH],
+    clay_bands: [BlockState; CLAY_BAND_LENGTH],
 
     noise_random: RandomFactory,
 
@@ -59,18 +58,17 @@ pub struct SurfaceSystem {
     frozen_temperature_noise: PerlinSimplexNoise,
     biome_info_noise: PerlinSimplexNoise,
 
-    pub default_block: BlockStateId,
+    pub default_block: BlockState,
     pub sea_level: i32,
 }
 
 impl SurfaceSystem {
-    #[must_use]
     pub fn new(
         splitter: &RandomFactory,
         noise_params: &BTreeMap<String, NoiseParameters>,
         condition_noise_ids: &[&str],
         vertical_gradient_ids: &[&str],
-        default_block: BlockStateId,
+        default_block: BlockState,
         sea_level: i32,
     ) -> Self {
         const CLAY_BANDS_HASH: NameHash = NameHash::new("minecraft:clay_bands");
@@ -150,11 +148,6 @@ impl SurfaceSystem {
         }
     }
 
-    #[must_use]
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "surface depth is always a small integer"
-    )]
     pub fn get_surface_depth(&self, x: i32, z: i32) -> i32 {
         let noise_value = self
             .surface_noise
@@ -163,67 +156,61 @@ impl SurfaceSystem {
         (noise_value * 2.75 + 3.0 + jitter) as i32
     }
 
-    #[must_use]
     pub fn get_surface_secondary(&self, x: i32, z: i32) -> f64 {
         self.surface_secondary_noise
             .get_value(f64::from(x), 0.0, f64::from(z))
     }
 
     #[inline]
-    fn frozen_large_x7(&self, xz: &mut TemperatureXzCache) -> f64 {
-        if !xz.frozen_large_x7.is_nan() {
-            return xz.frozen_large_x7;
+    fn frozen_ground_large_variation(&self, xz: &mut TemperatureXzCache) -> f64 {
+        if !xz.frozen_ground_large_variation.is_nan() {
+            return xz.frozen_ground_large_variation;
         }
         let v = self
             .frozen_temperature_noise
             .get_value(f64::from(xz.block_x) * 0.05, f64::from(xz.block_z) * 0.05)
             * 7.0;
-        xz.frozen_large_x7 = v;
+        xz.frozen_ground_large_variation = v;
         v
     }
 
     #[inline]
-    fn frozen_edge(&self, xz: &mut TemperatureXzCache) -> f64 {
-        if !xz.frozen_edge.is_nan() {
-            return xz.frozen_edge;
+    fn frozen_ground_edge_variation(&self, xz: &mut TemperatureXzCache) -> f64 {
+        if !xz.frozen_ground_edge_variation.is_nan() {
+            return xz.frozen_ground_edge_variation;
         }
         let v = self
             .biome_info_noise
             .get_value(f64::from(xz.block_x) * 0.2, f64::from(xz.block_z) * 0.2);
-        xz.frozen_edge = v;
+        xz.frozen_ground_edge_variation = v;
         v
     }
 
     #[inline]
-    fn frozen_small(&self, xz: &mut TemperatureXzCache) -> f64 {
-        if !xz.frozen_small.is_nan() {
-            return xz.frozen_small;
+    fn frozen_ground_small_variation(&self, xz: &mut TemperatureXzCache) -> f64 {
+        if !xz.frozen_ground_small_variation.is_nan() {
+            return xz.frozen_ground_small_variation;
         }
         let v = self
             .biome_info_noise
             .get_value(f64::from(xz.block_x) * 0.09, f64::from(xz.block_z) * 0.09);
-        xz.frozen_small = v;
+        xz.frozen_ground_small_variation = v;
         v
     }
 
     #[inline]
-    fn height_temp_noise_x8(&self, xz: &mut TemperatureXzCache) -> f64 {
-        if !xz.height_temp_noise_x8.is_nan() {
-            return xz.height_temp_noise_x8;
+    fn height_adjusted_temperature_noise(&self, xz: &mut TemperatureXzCache) -> f64 {
+        if !xz.height_adjusted_temperature_noise.is_nan() {
+            return xz.height_adjusted_temperature_noise;
         }
         let v = self
             .temperature_noise
             .get_value(f64::from(xz.block_x) / 8.0, f64::from(xz.block_z) / 8.0)
             * 8.0;
-        xz.height_temp_noise_x8 = v;
+        xz.height_adjusted_temperature_noise = v;
         v
     }
 
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_precision_loss,
-        reason = "matches vanilla's float temperature math"
-    )]
     fn get_temperature(&self, biome_id: u16, block_y: i32, xz: &mut TemperatureXzCache) -> f32 {
         let biome = REGISTRY
             .biomes
@@ -234,9 +221,9 @@ impl SurfaceSystem {
         let modified_temp = match biome.temperature_modifier {
             TemperatureModifier::None => base_temp,
             TemperatureModifier::Frozen => {
-                let combined = self.frozen_large_x7(xz) + self.frozen_edge(xz);
+                let combined = self.frozen_ground_large_variation(xz) + self.frozen_ground_edge_variation(xz);
                 if combined < 0.3 {
-                    if self.frozen_small(xz) < 0.8 {
+                    if self.frozen_ground_small_variation(xz) < 0.8 {
                         0.2
                     } else {
                         base_temp
@@ -249,14 +236,13 @@ impl SurfaceSystem {
 
         let snow_level = self.sea_level + 17;
         if block_y > snow_level {
-            let v = self.height_temp_noise_x8(xz) as f32;
+            let v = self.height_adjusted_temperature_noise(xz) as f32;
             modified_temp - (v + block_y as f32 - snow_level as f32) * 0.05 / 40.0
         } else {
             modified_temp
         }
     }
 
-    #[must_use]
     pub fn cold_enough_to_snow(
         &self,
         biome_id: u16,
@@ -276,7 +262,7 @@ impl SurfaceSystem {
         self.get_temperature(biome_id, self.sea_level, &mut xz) > 0.1
     }
 
-    fn generate_bands(random: &mut RandomSource) -> [BlockStateId; CLAY_BAND_LENGTH] {
+    fn generate_bands(random: &mut RandomSource) -> [BlockState; CLAY_BAND_LENGTH] {
         let terracotta = vanilla_blocks::TERRACOTTA.default_state();
         let orange = vanilla_blocks::ORANGE_TERRACOTTA.default_state();
         let yellow = vanilla_blocks::YELLOW_TERRACOTTA.default_state();
@@ -320,9 +306,9 @@ impl SurfaceSystem {
 
     fn make_bands(
         random: &mut RandomSource,
-        bands: &mut [BlockStateId; CLAY_BAND_LENGTH],
+        bands: &mut [BlockState; CLAY_BAND_LENGTH],
         base_width: i32,
-        state: BlockStateId,
+        state: BlockState,
     ) {
         let band_count = random.next_i32_between(6, 15);
         for _ in 0..band_count {
@@ -337,22 +323,15 @@ impl SurfaceSystem {
         }
     }
 
-    #[must_use]
     pub fn condition_noise(&self, noise_index: usize, x: i32, z: i32) -> f64 {
         self.condition_noises[noise_index].get_value(f64::from(x), 0.0, f64::from(z))
     }
 
-    #[must_use]
     pub fn condition_noise_3d(&self, noise_index: usize, x: i32, y: i32, z: i32) -> f64 {
         self.condition_noises[noise_index].get_value(f64::from(x), f64::from(y), f64::from(z))
     }
 
-    #[must_use]
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "clay band index math is bounded by CLAY_BAND_LENGTH"
-    )]
-    pub fn get_band(&self, x: i32, y: i32, z: i32) -> BlockStateId {
+    pub fn get_band(&self, x: i32, y: i32, z: i32) -> BlockState {
         let offset = (self
             .clay_bands_offset_noise
             .get_value(f64::from(x), 0.0, f64::from(z))
@@ -364,7 +343,6 @@ impl SurfaceSystem {
         self.clay_bands[index]
     }
 
-    #[must_use]
     pub fn vertical_gradient(
         &self,
         gradient_index: usize,
@@ -392,11 +370,6 @@ impl SurfaceSystem {
         clippy::too_many_arguments,
         reason = "matches vanilla SurfaceSystem.erodedBadlandsExtension signature"
     )]
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "extension heights are always in i32 range"
-    )]
-    #[must_use]
     pub fn eroded_badlands_extension(
         &self,
         chunk: GenerationChunk<'_, SurfacePhase>,
@@ -446,7 +419,7 @@ impl SurfaceSystem {
             let rel_y = (y - min_y) as usize;
             let state = chunk
                 .get_relative_block(local_x, rel_y, local_z)
-                .unwrap_or(BlockStateId(0));
+                .unwrap_or(BlockState(0));
             if state == self.default_block {
                 break;
             }
@@ -459,7 +432,7 @@ impl SurfaceSystem {
             let rel_y = (y - min_y) as usize;
             let state = chunk
                 .get_relative_block(local_x, rel_y, local_z)
-                .unwrap_or(BlockStateId(0));
+                .unwrap_or(BlockState(0));
             if !state.is_air() {
                 break;
             }
@@ -473,11 +446,6 @@ impl SurfaceSystem {
         clippy::too_many_arguments,
         reason = "keeps the vanilla frozenOceanExtension inputs explicit"
     )]
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "extension heights and Y offsets stay in range"
-    )]
     pub fn collect_frozen_ocean_extension_writes(
         &self,
         biome_id: u16,
@@ -486,8 +454,8 @@ impl SurfaceSystem {
         height: i32,
         min_surface_level: i32,
         min_y: i32,
-        column: &[BlockStateId],
-        writes: &mut Vec<(usize, BlockStateId)>,
+        column: &[BlockState],
+        writes: &mut Vec<(usize, BlockState)>,
     ) {
         let iceberg = f64::min(
             (self

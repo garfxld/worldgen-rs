@@ -4,7 +4,7 @@ use smallvec::SmallVec;
 
 use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_block_tags;
-use crate::util::ident::BlockStateId;
+use crate::util::ident::BlockState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HeightmapType {
@@ -24,12 +24,10 @@ impl HeightmapType {
     const WORLD_SURFACE_WG_MASK: u8 = 1 << 4;
     const OCEAN_FLOOR_WG_MASK: u8 = 1 << 5;
 
-    #[must_use]
     pub const fn worldgen_types() -> &'static [HeightmapType] {
         &[HeightmapType::WorldSurfaceWg, HeightmapType::OceanFloorWg]
     }
 
-    #[must_use]
     pub const fn final_types() -> &'static [HeightmapType] {
         &[
             HeightmapType::WorldSurface,
@@ -39,8 +37,7 @@ impl HeightmapType {
         ]
     }
 
-    #[must_use]
-    pub fn is_opaque(self, state: BlockStateId) -> bool {
+    pub fn is_opaque(self, state: BlockState) -> bool {
         heightmap_opacity_mask(state, self.mask()) != 0
     }
 
@@ -80,7 +77,7 @@ fn build_state_opacity_masks() -> Box<[u8]> {
         let Ok(raw_state_id) = u16::try_from(state_index) else {
             panic!("block state registry exceeded BlockStateId range");
         };
-        let state = BlockStateId(raw_state_id);
+        let state = BlockState(raw_state_id);
         let mut mask = 0;
         if !block.config.is_air {
             mask |= HeightmapType::WORLD_SURFACE_MASK | HeightmapType::WORLD_SURFACE_WG_MASK;
@@ -103,7 +100,7 @@ fn build_state_opacity_masks() -> Box<[u8]> {
 }
 
 #[inline]
-fn heightmap_opacity_mask(state: BlockStateId, requested_mask: u8) -> u8 {
+fn heightmap_opacity_mask(state: BlockState, requested_mask: u8) -> u8 {
     let world_surface_mask =
         HeightmapType::WORLD_SURFACE_MASK | HeightmapType::WORLD_SURFACE_WG_MASK;
     if requested_mask & !world_surface_mask == 0 {
@@ -127,7 +124,6 @@ pub struct Heightmap {
 }
 
 impl Heightmap {
-    #[must_use]
     pub fn new(map_type: HeightmapType, min_y: i32) -> Self {
         Self {
             data: Box::new([0; 256]),
@@ -136,7 +132,6 @@ impl Heightmap {
         }
     }
 
-    #[must_use]
     pub const fn from_raw_data(map_type: HeightmapType, min_y: i32, data: Box<[u16; 256]>) -> Self {
         Self {
             data,
@@ -145,7 +140,6 @@ impl Heightmap {
         }
     }
 
-    #[must_use]
     pub const fn heightmap_type(&self) -> HeightmapType {
         self.map_type
     }
@@ -155,14 +149,12 @@ impl Heightmap {
         local_x + local_z * 16
     }
 
-    #[must_use]
     pub fn get_first_available(&self, local_x: usize, local_z: usize) -> i32 {
         debug_assert!(local_x < 16 && local_z < 16);
         let index = Self::get_index(local_x, local_z);
         i32::from(self.data[index]) + self.min_y
     }
 
-    #[must_use]
     pub fn get_highest_taken(&self, local_x: usize, local_z: usize) -> i32 {
         self.get_first_available(local_x, local_z) - 1
     }
@@ -178,11 +170,11 @@ impl Heightmap {
         local_x: usize,
         y: i32,
         local_z: usize,
-        state: BlockStateId,
+        state: BlockState,
         get_block: F,
     ) -> bool
     where
-        F: Fn(usize, i32, usize) -> BlockStateId,
+        F: Fn(usize, i32, usize) -> BlockState,
     {
         let first_available = self.get_first_available(local_x, local_z);
 
@@ -215,7 +207,7 @@ impl Heightmap {
         local_x: usize,
         y: i32,
         local_z: usize,
-        state: BlockStateId,
+        state: BlockState,
     ) -> bool {
         let first_available = self.get_first_available(local_x, local_z);
         if self.map_type.is_opaque(state) && y >= first_available {
@@ -226,7 +218,6 @@ impl Heightmap {
         false
     }
 
-    #[must_use]
     pub fn raw_data(&self) -> &[u16; 256] {
         &self.data
     }
@@ -243,7 +234,6 @@ pub struct ChunkHeightmaps {
 }
 
 impl ChunkHeightmaps {
-    #[must_use]
     pub const fn empty() -> Self {
         Self {
             world_surface_wg: None,
@@ -255,12 +245,10 @@ impl ChunkHeightmaps {
         }
     }
 
-    #[must_use]
     pub fn new(min_y: i32) -> Self {
         Self::with_types(HeightmapType::final_types(), min_y)
     }
 
-    #[must_use]
     pub fn with_types(types: &[HeightmapType], min_y: i32) -> Self {
         let mut heightmaps = Self::empty();
         for &heightmap_type in types {
@@ -269,7 +257,6 @@ impl ChunkHeightmaps {
         heightmaps
     }
 
-    #[must_use]
     pub const fn get(&self, heightmap_type: HeightmapType) -> Option<&Heightmap> {
         match heightmap_type {
             HeightmapType::WorldSurfaceWg => self.world_surface_wg.as_ref(),
@@ -281,7 +268,6 @@ impl ChunkHeightmaps {
         }
     }
 
-    #[must_use]
     pub const fn get_mut(&mut self, heightmap_type: HeightmapType) -> Option<&mut Heightmap> {
         match heightmap_type {
             HeightmapType::WorldSurfaceWg => self.world_surface_wg.as_mut(),
@@ -319,7 +305,6 @@ impl ChunkHeightmaps {
         slot.get_or_insert_with(|| Heightmap::new(heightmap_type, min_y))
     }
 
-    #[must_use]
     pub fn get_final(&self, heightmap_type: HeightmapType) -> &Heightmap {
         if matches!(
             heightmap_type,
@@ -333,7 +318,6 @@ impl ChunkHeightmaps {
         heightmap
     }
 
-    #[must_use]
     pub fn get_final_mut(&mut self, heightmap_type: HeightmapType) -> &mut Heightmap {
         if matches!(
             heightmap_type,
@@ -352,10 +336,10 @@ impl ChunkHeightmaps {
         local_x: usize,
         y: i32,
         local_z: usize,
-        state: BlockStateId,
+        state: BlockState,
         get_block: F,
     ) where
-        F: Fn(usize, i32, usize) -> BlockStateId + Copy,
+        F: Fn(usize, i32, usize) -> BlockState + Copy,
     {
         for &heightmap_type in HeightmapType::final_types() {
             self.get_final_mut(heightmap_type)
@@ -384,10 +368,10 @@ impl ChunkHeightmaps {
     ) {
         let mut types_to_prime = SmallVec::<[(HeightmapType, u8); 4]>::new();
         let mut pending_mask_base = 0;
-        for &hm_type in types {
-            if self.get(hm_type).is_none() {
-                let mask = hm_type.mask();
-                types_to_prime.push((hm_type, mask));
+        for &heightmap_type in types {
+            if self.get(heightmap_type).is_none() {
+                let mask = heightmap_type.mask();
+                types_to_prime.push((heightmap_type, mask));
                 pending_mask_base |= mask;
             }
         }
@@ -396,17 +380,17 @@ impl ChunkHeightmaps {
             return;
         }
 
-        for &(hm_type, _) in &types_to_prime {
-            self.get_or_insert(hm_type, min_y);
+        for &(heightmap_type, _) in &types_to_prime {
+            self.get_or_insert(heightmap_type, min_y);
         }
 
         let mut pending_masks = [pending_mask_base; 16 * 16];
         let mut pending_columns = pending_masks.len();
 
         'sections: for section_idx in (0..sections.len()).rev() {
-            let guard = sections[section_idx].read();
+            let section = sections[section_idx].read();
             if matches!(
-                &guard.states,
+                &section.states,
                 super::paletted_container::BlockPalette::Homogeneous(state) if state.is_air()
             ) {
                 continue;
@@ -421,7 +405,7 @@ impl ChunkHeightmaps {
                         continue;
                     }
 
-                    let state = guard.states.get_at_index(layer_start + column_index);
+                    let state = section.states.get_at_index(layer_start + column_index);
                     let matched_mask = heightmap_opacity_mask(state, *pending_mask);
                     if matched_mask == 0 {
                         continue;
@@ -429,9 +413,9 @@ impl ChunkHeightmaps {
 
                     let x = column_index % 16;
                     let z = column_index / 16;
-                    for &(hm_type, mask) in &types_to_prime {
+                    for &(heightmap_type, mask) in &types_to_prime {
                         if matched_mask & mask != 0 {
-                            self.set_primed_height(hm_type, x, z, y + 1);
+                            self.set_primed_height(heightmap_type, x, z, y + 1);
                         }
                     }
                     *pending_mask &= !matched_mask;

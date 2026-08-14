@@ -14,7 +14,6 @@ pub enum RandomSource {
 }
 
 impl RandomSource {
-    #[must_use]
     pub fn fork(&mut self) -> Self {
         match self {
             Self::Xoroshiro(r) => Self::Xoroshiro(r.fork()),
@@ -109,7 +108,6 @@ pub enum RandomFactory {
 }
 
 impl RandomFactory {
-    #[must_use]
     pub fn at(&self, x: i32, y: i32, z: i32) -> RandomSource {
         match self {
             Self::Xoroshiro(f) => f.at(x, y, z),
@@ -117,7 +115,6 @@ impl RandomFactory {
         }
     }
 
-    #[must_use]
     pub const fn with_hash_of(&self, hash: &NameHash) -> RandomSource {
         match self {
             Self::Xoroshiro(f) => f.with_hash_of(hash),
@@ -125,7 +122,6 @@ impl RandomFactory {
         }
     }
 
-    #[must_use]
     pub const fn with_seed(&self, seed: u64) -> RandomSource {
         match self {
             Self::Xoroshiro(f) => f.with_seed(seed),
@@ -134,7 +130,6 @@ impl RandomFactory {
     }
 }
 
-#[must_use]
 pub fn get_seed(x: i32, y: i32, z: i32) -> i64 {
     let l = i64::from(x.wrapping_mul(3_129_871))
         ^ (i64::from(z).wrapping_mul(116_129_781_i64))

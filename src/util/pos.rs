@@ -34,17 +34,14 @@ impl ChunkPos {
     pub const MAX_COORDINATE_VALUE: i32 =
         SectionPos::block_to_section_coord(BlockPos::MAX_HORIZONTAL_COORDINATE);
 
-    #[must_use]
     pub fn neighbors(self) -> [ChunkPos; 8] {
         Self::OFFSETS.map(|(dx, dy)| ChunkPos::new(self.0.x + dx, self.0.y + dy))
     }
 
-    #[must_use]
     pub const fn new(x: i32, y: i32) -> Self {
         Self(IVec2::new(x, y))
     }
 
-    #[must_use]
     pub const fn from_block_pos(pos: BlockPos) -> Self {
         Self::new(
             SectionPos::block_to_section_coord(pos.0.x),
@@ -52,12 +49,10 @@ impl ChunkPos {
         )
     }
 
-    #[must_use]
     pub fn from_entity_pos(pos: DVec3) -> Self {
         Self::from_block_pos(BlockPos::from(pos))
     }
 
-    #[must_use]
     pub const fn is_valid(x: i32, z: i32) -> bool {
         x.abs().max(z.abs()) <= Self::MAX_COORDINATE_VALUE
     }
@@ -122,77 +117,62 @@ impl BlockPos {
 
     pub const MAX_HORIZONTAL_COORDINATE: i32 = (1 << PackedBlockPos::HORIZONTAL_BITS) / 2 - 1;
 
-    #[must_use]
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self(IVec3::new(x, y, z))
     }
 
-    #[must_use]
     pub const fn offset(&self, dx: i32, dy: i32, dz: i32) -> Self {
         Self(IVec3::new(self.0.x + dx, self.0.y + dy, self.0.z + dz))
     }
 
-    #[must_use]
     pub const fn x(&self) -> i32 {
         self.0.x
     }
 
-    #[must_use]
     pub const fn y(&self) -> i32 {
         self.0.y
     }
 
-    #[must_use]
     pub const fn z(&self) -> i32 {
         self.0.z
     }
 
-    #[must_use]
     pub const fn above(&self) -> Self {
         self.offset(0, 1, 0)
     }
 
-    #[must_use]
     pub const fn above_n(&self, n: i32) -> Self {
         self.offset(0, n, 0)
     }
 
-    #[must_use]
     pub const fn below(&self) -> Self {
         self.offset(0, -1, 0)
     }
 
-    #[must_use]
     pub const fn below_n(&self, n: i32) -> Self {
         self.offset(0, -n, 0)
     }
 
-    #[must_use]
     pub const fn north(&self) -> Self {
         self.offset(0, 0, -1)
     }
 
-    #[must_use]
     pub const fn south(&self) -> Self {
         self.offset(0, 0, 1)
     }
 
-    #[must_use]
     pub const fn west(&self) -> Self {
         self.offset(-1, 0, 0)
     }
 
-    #[must_use]
     pub const fn east(&self) -> Self {
         self.offset(1, 0, 0)
     }
 
-    #[must_use]
     pub fn relative(self, direction: Direction) -> Self {
         Self(self.0 + direction.offset_vec())
     }
 
-    #[must_use]
     pub fn breadth_first_traversal<NP, P>(
         start_pos: Self,
         max_depth: i32,
@@ -236,7 +216,6 @@ impl BlockPos {
         count
     }
 
-    #[must_use]
     pub fn relative_n(&self, direction: Direction, n: i32) -> Self {
         if n == 0 {
             *self
@@ -245,7 +224,6 @@ impl BlockPos {
         }
     }
 
-    #[must_use]
     pub fn spiral_around(
         center: Self,
         radius: i32,
@@ -275,7 +253,6 @@ impl BlockPos {
         }
     }
 
-    #[must_use]
     pub const fn relative_axis(&self, axis: Axis, n: i32) -> Self {
         if n == 0 {
             *self
@@ -288,12 +265,10 @@ impl BlockPos {
         }
     }
 
-    #[must_use]
     pub const fn at_y(&self, y: i32) -> Self {
         Self::new(self.0.x, y, self.0.z)
     }
 
-    #[must_use]
     pub const fn multiply(&self, factor: i32) -> Self {
         if factor == 1 {
             *self
@@ -304,7 +279,6 @@ impl BlockPos {
         }
     }
 
-    #[must_use]
     pub fn get_center(&self) -> (f64, f64, f64) {
         (
             f64::from(self.0.x) + 0.5,
@@ -313,7 +287,6 @@ impl BlockPos {
         )
     }
 
-    #[must_use]
     pub fn get_bottom_center(&self) -> (f64, f64, f64) {
         (
             f64::from(self.0.x) + 0.5,
@@ -322,22 +295,18 @@ impl BlockPos {
         )
     }
 
-    #[must_use]
     pub const fn containing(x: f64, y: f64, z: f64) -> Self {
         Self::new(x.floor() as i32, y.floor() as i32, z.floor() as i32)
     }
 
-    #[must_use]
     pub const fn min(a: BlockPos, b: BlockPos) -> Self {
         Self::new(a.0.x.min(b.0.x), a.0.y.min(b.0.y), a.0.z.min(b.0.z))
     }
 
-    #[must_use]
     pub const fn max(a: BlockPos, b: BlockPos) -> Self {
         Self::new(a.0.x.max(b.0.x), a.0.y.max(b.0.y), a.0.z.max(b.0.z))
     }
 
-    #[must_use]
     pub const fn within_manhattan(
         self,
         reach_x: i32,
@@ -360,7 +329,6 @@ impl BlockPos {
         }
     }
 
-    #[must_use]
     pub fn find_closest_match(
         self,
         horizontal_search_radius: i32,
@@ -445,7 +413,6 @@ pub struct GlobalPos {
 }
 
 impl GlobalPos {
-    #[must_use]
     pub const fn new(dimension: Identifier, pos: BlockPos) -> Self {
         Self { dimension, pos }
     }
@@ -459,17 +426,14 @@ impl SectionPos {
     const SECTION_SIZE: i32 = 1 << Self::SECTION_BITS;
     pub(super) const SECTION_MASK: i32 = Self::SECTION_SIZE - 1;
 
-    #[must_use]
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self(IVec3::new(x, y, z))
     }
 
-    #[must_use]
     pub const fn block_to_section_coord(block_coord: i32) -> i32 {
         block_coord >> Self::SECTION_BITS
     }
 
-    #[must_use]
     pub const fn from_block_pos(pos: BlockPos) -> Self {
         Self::new(
             Self::block_to_section_coord(pos.0.x),
@@ -478,47 +442,38 @@ impl SectionPos {
         )
     }
 
-    #[must_use]
     pub fn from_entity_pos(pos: DVec3) -> Self {
         Self::from_block_pos(BlockPos::from(pos))
     }
 
-    #[must_use]
     pub const fn x(&self) -> i32 {
         self.0.x
     }
 
-    #[must_use]
     pub const fn y(&self) -> i32 {
         self.0.y
     }
 
-    #[must_use]
     pub const fn z(&self) -> i32 {
         self.0.z
     }
 
-    #[must_use]
     pub const fn relative_to_block_x(&self, relative: PackedSectionBlockPos) -> i32 {
         (self.0.x << Self::SECTION_BITS) + relative.x() as i32
     }
 
-    #[must_use]
     pub const fn relative_to_block_y(&self, relative: PackedSectionBlockPos) -> i32 {
         (self.0.y << Self::SECTION_BITS) + relative.y() as i32
     }
 
-    #[must_use]
     pub const fn relative_to_block_z(&self, relative: PackedSectionBlockPos) -> i32 {
         (self.0.z << Self::SECTION_BITS) + relative.z() as i32
     }
 
-    #[must_use]
     pub const fn section_relative_pos(pos: BlockPos) -> PackedSectionBlockPos {
         PackedSectionBlockPos::from_block_pos(pos)
     }
 
-    #[must_use]
     pub const fn relative_to_block_pos(&self, relative: PackedSectionBlockPos) -> BlockPos {
         BlockPos(IVec3::new(
             self.relative_to_block_x(relative),
@@ -532,17 +487,14 @@ impl SectionPos {
 pub struct PackedChunkPos(i64);
 
 impl PackedChunkPos {
-    #[must_use]
     pub const fn from_raw(raw: i64) -> Self {
         Self(raw)
     }
 
-    #[must_use]
     pub const fn as_raw(self) -> i64 {
         self.0
     }
 
-    #[must_use]
     pub const fn to_chunk_pos(self) -> ChunkPos {
         ChunkPos(IVec2::new(
             (self.0 & 0xFFFF_FFFF) as i32,
@@ -574,17 +526,14 @@ impl PackedBlockPos {
     const XZ_MASK: i64 = (1i64 << Self::HORIZONTAL_BITS) - 1;
     const Y_MASK: i64 = (1i64 << Self::Y_BITS) - 1;
 
-    #[must_use]
     pub const fn from_raw(raw: i64) -> Self {
         Self(raw)
     }
 
-    #[must_use]
     pub const fn as_raw(self) -> i64 {
         self.0
     }
 
-    #[must_use]
     pub const fn to_block_pos(self) -> BlockPos {
         let x = self.0 >> Self::X_OFFSET;
         let y = self.0 & Self::Y_MASK;
@@ -628,17 +577,14 @@ impl PackedSectionPos {
     const XZ_MASK: i64 = (1i64 << Self::XZ_BITS) - 1;
     const Y_MASK: i64 = (1i64 << Self::Y_BITS) - 1;
 
-    #[must_use]
     pub const fn from_raw(raw: i64) -> Self {
         Self(raw)
     }
 
-    #[must_use]
     pub const fn as_raw(self) -> i64 {
         self.0
     }
 
-    #[must_use]
     pub const fn to_section_pos(self) -> SectionPos {
         let x = self.0 >> Self::X_OFFSET;
         let z = (self.0 >> Self::Z_OFFSET) & Self::XZ_MASK;
@@ -677,7 +623,6 @@ pub struct PackedChunkLocalXZ(u8);
 impl PackedChunkLocalXZ {
     const COORD_MASK: u8 = 0x0f;
 
-    #[must_use]
     pub const fn from_block_pos(pos: BlockPos) -> Self {
         Self::from_local_unchecked(
             (pos.0.x & SectionPos::SECTION_MASK) as u8,
@@ -685,7 +630,6 @@ impl PackedChunkLocalXZ {
         )
     }
 
-    #[must_use]
     pub const fn from_local_xz(x: u8, z: u8) -> Option<Self> {
         if x < 16 && z < 16 {
             Some(Self::from_local_unchecked(x, z))
@@ -694,22 +638,18 @@ impl PackedChunkLocalXZ {
         }
     }
 
-    #[must_use]
     pub const fn from_raw(raw: u8) -> Self {
         Self(raw)
     }
 
-    #[must_use]
     pub const fn as_u8(self) -> u8 {
         self.0
     }
 
-    #[must_use]
     pub const fn x(self) -> u8 {
         (self.0 >> 4) & Self::COORD_MASK
     }
 
-    #[must_use]
     pub const fn z(self) -> u8 {
         self.0 & Self::COORD_MASK
     }
@@ -732,7 +672,6 @@ impl PackedSectionBlockPos {
     const COORD_MASK: u16 = 0x0f;
     const RAW_MASK: u16 = 0x0fff;
 
-    #[must_use]
     pub const fn from_block_pos(pos: BlockPos) -> Self {
         Self::from_local_unchecked(
             (pos.0.x & SectionPos::SECTION_MASK) as u8,
@@ -741,7 +680,6 @@ impl PackedSectionBlockPos {
         )
     }
 
-    #[must_use]
     pub const fn from_local_xyz(x: u8, y: u8, z: u8) -> Option<Self> {
         if x < 16 && y < 16 && z < 16 {
             Some(Self::from_local_unchecked(x, y, z))
@@ -750,7 +688,6 @@ impl PackedSectionBlockPos {
         }
     }
 
-    #[must_use]
     pub const fn from_raw(raw: u16) -> Option<Self> {
         if raw & !Self::RAW_MASK == 0 {
             Some(Self(raw))
@@ -759,27 +696,22 @@ impl PackedSectionBlockPos {
         }
     }
 
-    #[must_use]
     pub const fn as_u16(self) -> u16 {
         self.0
     }
 
-    #[must_use]
     pub const fn x(self) -> u8 {
         ((self.0 >> 8) & Self::COORD_MASK) as u8
     }
 
-    #[must_use]
     pub const fn y(self) -> u8 {
         (self.0 & Self::COORD_MASK) as u8
     }
 
-    #[must_use]
     pub const fn z(self) -> u8 {
         ((self.0 >> 4) & Self::COORD_MASK) as u8
     }
 
-    #[must_use]
     pub const fn to_block_pos(self, section_pos: SectionPos) -> BlockPos {
         section_pos.relative_to_block_pos(self)
     }
@@ -809,7 +741,6 @@ pub struct InvalidPackedSectionBlockPos {
 }
 
 impl InvalidPackedSectionBlockPos {
-    #[must_use]
     pub const fn raw(self) -> u16 {
         self.raw
     }

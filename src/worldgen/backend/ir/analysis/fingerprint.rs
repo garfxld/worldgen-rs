@@ -44,7 +44,6 @@ pub fn collect_inline_flat_noises(df: &DensityFunction, out: &mut BTreeMap<u64, 
     }
 }
 
-#[must_use]
 pub const fn is_cse_candidate(df: &DensityFunction) -> bool {
     matches!(
         df,
@@ -54,7 +53,6 @@ pub const fn is_cse_candidate(df: &DensityFunction) -> bool {
     )
 }
 
-#[must_use]
 pub fn collect_expensive_subexprs(df: &DensityFunction) -> FxHashMap<u64, DensityFunction> {
     let mut result = FxHashMap::default();
     collect_expensive_inner(df, &mut result);
@@ -94,7 +92,6 @@ pub(crate) fn collect_expensive_inner(
     }
 }
 
-#[must_use]
 pub fn fingerprint(df: &DensityFunction) -> u64 {
     let mut hasher = FxHasher::default();
     hash_df(df, &mut hasher);

@@ -20,12 +20,10 @@ const ALL_ROTATIONS: [Rotation; 4] = [
 ];
 
 impl Rotation {
-    #[must_use]
     pub fn get_random(rng: &mut RandomSource) -> Self {
         ALL_ROTATIONS[rng.next_i32_bounded(4) as usize]
     }
 
-    #[must_use]
     pub fn get_shuffled(rng: &mut RandomSource) -> [Rotation; 4] {
         let mut rotations = ALL_ROTATIONS;
         for i in (1..4).rev() {
@@ -35,7 +33,6 @@ impl Rotation {
         rotations
     }
 
-    #[must_use]
     pub const fn rotate(self, dir: Direction) -> Direction {
         match self {
             Self::None => dir,
@@ -45,12 +42,10 @@ impl Rotation {
         }
     }
 
-    #[must_use]
     pub const fn then(self, other: Self) -> Self {
         ALL_ROTATIONS[((self as u8 + other as u8) % 4) as usize]
     }
 
-    #[must_use]
     pub const fn transform_pos(self, pos: IVec3, pivot: IVec3) -> IVec3 {
         let (x, y, z) = (pos.x, pos.y, pos.z);
         let (px, pz) = (pivot.x, pivot.z);
@@ -62,7 +57,6 @@ impl Rotation {
         }
     }
 
-    #[must_use]
     pub const fn rotate_size(self, size: IVec3) -> IVec3 {
         match self {
             Self::Clockwise90 | Self::CounterClockwise90 => IVec3::new(size.z, size.y, size.x),
@@ -70,7 +64,6 @@ impl Rotation {
         }
     }
 
-    #[must_use]
     pub const fn transform_pos_mirrored(
         self,
         pos: IVec3,
@@ -82,7 +75,6 @@ impl Rotation {
         self.transform_pos(mirrored_pos, pivot)
     }
 
-    #[must_use]
     pub fn get_bounding_box_full(
         self,
         pos: IVec3,
@@ -99,12 +91,10 @@ impl Rotation {
         BoundingBox::new(c1.min(c2) + pos, c1.max(c2) + pos)
     }
 
-    #[must_use]
     pub fn get_bounding_box_with_pivot(self, pos: IVec3, size: IVec3, pivot: IVec3) -> BoundingBox {
         self.get_bounding_box_full(pos, size, pivot, false)
     }
 
-    #[must_use]
     pub fn get_bounding_box(self, pos: IVec3, size: IVec3) -> BoundingBox {
         self.get_bounding_box_full(pos, size, IVec3::ZERO, false)
     }

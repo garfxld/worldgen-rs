@@ -11,7 +11,6 @@ pub struct TargetPoint {
 }
 
 impl TargetPoint {
-    #[must_use]
     pub const fn new(
         temperature: i64,
         humidity: i64,
@@ -30,7 +29,6 @@ impl TargetPoint {
         }
     }
 
-    #[must_use]
     pub fn from_floats(
         temperature: f64,
         humidity: f64,
@@ -49,7 +47,6 @@ impl TargetPoint {
         }
     }
 
-    #[must_use]
     pub const fn to_parameter_array(self) -> [i64; PARAMETER_COUNT] {
         [
             self.temperature,
@@ -70,17 +67,14 @@ pub struct Parameter {
 }
 
 impl Parameter {
-    #[must_use]
     pub const fn new(min: i64, max: i64) -> Self {
         Self { min, max }
     }
 
-    #[must_use]
     pub fn point(value: f32) -> Self {
         Self::span(value, value)
     }
 
-    #[must_use]
     pub fn span(min: f32, max: f32) -> Self {
         debug_assert!(min <= max, "min > max: {min} > {max}");
         Self {
@@ -89,7 +83,6 @@ impl Parameter {
         }
     }
 
-    #[must_use]
     pub const fn span_params(min: &Parameter, max: &Parameter) -> Self {
         debug_assert!(min.min <= max.max, "span_params: min > max");
         Self {
@@ -99,7 +92,6 @@ impl Parameter {
     }
 
     #[inline]
-    #[must_use]
     pub const fn distance(&self, target: i64) -> i64 {
         let above = target - self.max;
         let below = self.min - target;
@@ -112,7 +104,6 @@ impl Parameter {
         }
     }
 
-    #[must_use]
     pub const fn span_with(&self, other: Option<&Parameter>) -> Self {
         match other {
             Some(o) => Self {
@@ -136,7 +127,6 @@ pub struct ParameterPoint {
 }
 
 impl ParameterPoint {
-    #[must_use]
     pub const fn new(
         temperature: Parameter,
         humidity: Parameter,
@@ -157,11 +147,6 @@ impl ParameterPoint {
         }
     }
 
-    #[must_use]
-    #[expect(
-        clippy::many_single_char_names,
-        reason = "single-letter abbreviations match vanilla's climate parameter names"
-    )]
     pub const fn fitness(&self, target: &TargetPoint) -> i64 {
         let t = self.temperature.distance(target.temperature);
         let h = self.humidity.distance(target.humidity);
@@ -173,7 +158,6 @@ impl ParameterPoint {
         t * t + h * h + c * c + e * e + d * d + w * w + self.offset * self.offset
     }
 
-    #[must_use]
     pub const fn parameter_space(&self) -> [Parameter; PARAMETER_COUNT] {
         [
             self.temperature,

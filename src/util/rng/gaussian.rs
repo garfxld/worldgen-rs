@@ -9,7 +9,6 @@ impl Default for MarsagliaPolarGaussian {
 }
 
 impl MarsagliaPolarGaussian {
-    #[must_use]
     pub const fn new() -> Self {
         Self { cached: None }
     }

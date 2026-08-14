@@ -18,22 +18,18 @@ pub enum BiomeSourceKind {
 }
 
 impl BiomeSourceKind {
-    #[must_use]
     pub const fn overworld(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
         Self::Overworld(MultiNoiseBiomeSource::new(seed, noises, parameters))
     }
 
-    #[must_use]
     pub const fn nether(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
         Self::Nether(MultiNoiseBiomeSource::new(seed, noises, parameters))
     }
 
-    #[must_use]
     pub fn end(seed: u64) -> Self {
         Self::End(Box::new(EndBiomeSource::new(seed)))
     }
 
-    #[must_use]
     pub fn possible_biome_refs(&self) -> Vec<BiomeRef> {
         let biomes: Vec<BiomeRef> = match self {
             Self::Overworld(source) | Self::Nether(source) => source
@@ -48,7 +44,6 @@ impl BiomeSourceKind {
         distinct_biome_refs(biomes)
     }
 
-    #[must_use]
     pub fn possible_biomes(&self) -> FxHashSet<Identifier> {
         self.possible_biome_refs()
             .into_iter()
@@ -56,7 +51,6 @@ impl BiomeSourceKind {
             .collect()
     }
 
-    #[must_use]
     pub fn chunk_sampler(&self) -> ChunkBiomeSampler<'_> {
         match self {
             Self::Overworld(source) | Self::Nether(source) => {
@@ -66,7 +60,6 @@ impl BiomeSourceKind {
         }
     }
 
-    #[must_use]
     pub fn find_biome_horizontal(
         &self,
         origin_x: i32,
@@ -97,7 +90,6 @@ impl BiomeSourceKind {
         result
     }
 
-    #[must_use]
     pub fn initial_spawn_search_origin(&self) -> BlockPos {
         match self {
             Self::Overworld(source) => source.climate_sampler.find_spawn_position(),
@@ -126,7 +118,6 @@ pub struct MultiNoiseBiomeSource {
 }
 
 impl MultiNoiseBiomeSource {
-    #[must_use]
     pub const fn new(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
         Self {
             seed,
@@ -135,12 +126,10 @@ impl MultiNoiseBiomeSource {
         }
     }
 
-    #[must_use]
     pub const fn seed(&self) -> u64 {
         self.seed
     }
 
-    #[must_use]
     pub const fn climate_sampler(&self) -> &ClimateSampler {
         &self.climate_sampler
     }
@@ -180,8 +169,6 @@ impl MultiNoiseChunkBiomeSampler<'_> {
     }
 }
 
-// ── The End ───────────────────────────────────────────────────────────────────
-
 const END_BIOME_PATHS: [&str; 5] = [
     "the_end",
     "end_highlands",
@@ -197,7 +184,6 @@ pub struct EndBiomeSource {
 }
 
 impl EndBiomeSource {
-    #[must_use]
     pub fn new(seed: u64) -> Self {
         let biomes = END_BIOME_PATHS.map(|path| {
             REGISTRY
@@ -213,12 +199,10 @@ impl EndBiomeSource {
         }
     }
 
-    #[must_use]
     pub const fn seed(&self) -> u64 {
         self.seed
     }
 
-    #[must_use]
     pub const fn possible_biomes(&self) -> &[BiomeRef; 5] {
         &self.biomes
     }

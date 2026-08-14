@@ -9,13 +9,11 @@ pub const QUANTIZATION_FACTOR: f32 = 10000.0;
 pub const PARAMETER_COUNT: usize = 7;
 
 #[inline]
-#[must_use]
 pub fn quantize_coord(coord: f64) -> i64 {
     ((coord as f32) * QUANTIZATION_FACTOR) as i64
 }
 
 #[inline]
-#[must_use]
 pub fn unquantize_coord(coord: i64) -> f32 {
     coord as f32 / QUANTIZATION_FACTOR
 }

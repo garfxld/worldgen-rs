@@ -14,7 +14,6 @@ pub struct XoroshiroRandomSource {
 }
 
 impl XoroshiroRandomSource {
-    #[must_use]
     pub const fn from_seed(seed: u64) -> Self {
         let (lo, hi) = Self::upgrade_seed_to_128_bit(seed);
         let lo = mix_stafford_13(lo);
@@ -22,7 +21,6 @@ impl XoroshiroRandomSource {
         Self::new(lo, hi)
     }
 
-    #[must_use]
     pub const fn from_seed_unmixed(seed: u64) -> Self {
         let (lo, hi) = Self::upgrade_seed_to_128_bit(seed);
         Self::new(lo, hi)
@@ -52,20 +50,19 @@ impl XoroshiroRandomSource {
     }
 
     const fn next_random(&mut self) -> u64 {
-        let l = self.seed_lo;
-        let m = self.seed_hi;
-        let n = l.wrapping_add(m).rotate_left(17).wrapping_add(l);
-        let m = m ^ l;
-        self.seed_lo = l.rotate_left(49) ^ m ^ (m << 21);
-        self.seed_hi = m.rotate_left(28);
-        n
+        let s0 = self.seed_lo;
+        let mut s1 = self.seed_hi;
+        let result = s0.wrapping_add(s1).rotate_left(17).wrapping_add(s0);
+        s1 ^= s0;
+        self.seed_lo = s0.rotate_left(49) ^ s1 ^ (s1 << 21);
+        self.seed_hi = s1.rotate_left(28);
+        result
     }
 
     pub const fn set_seed(&mut self, seed: i64) {
         *self = Self::from_seed(seed as u64);
     }
 
-    #[must_use]
     pub const fn fork(&mut self) -> Self {
         Self::new(self.next_random(), self.next_random())
     }
@@ -75,19 +72,20 @@ impl XoroshiroRandomSource {
     }
 
     pub fn next_i32_bounded(&mut self, bound: i32) -> i32 {
-        let mut l = (self.next_i32() as u64) & 0xFFFF_FFFF;
-        let mut m = l.wrapping_mul(bound as u64);
-        let mut n = m & 0xFFFF_FFFF;
-        if n < bound as u64 {
-            let i = u64::from(((!bound as u32).wrapping_add(1)) % bound as u32);
-            while n < i {
-                l = (self.next_i32() as u64) & 0xFFFF_FFFF;
-                m = l.wrapping_mul(bound as u64);
-                n = m & 0xFFFF_FFFF;
+        let mut random_bits = (self.next_i32() as u64) & 0xFFFF_FFFF;
+        let mut multiplied_random_bits = random_bits.wrapping_mul(bound as u64);
+        let mut fractional_part = multiplied_random_bits & 0xFFFF_FFFF;
+        if fractional_part < bound as u64 {
+            let unbiased_buckets_start_index =
+                u64::from(((!bound as u32).wrapping_add(1)) % bound as u32);
+            while fractional_part < unbiased_buckets_start_index {
+                random_bits = (self.next_i32() as u64) & 0xFFFF_FFFF;
+                multiplied_random_bits = random_bits.wrapping_mul(bound as u64);
+                fractional_part = multiplied_random_bits & 0xFFFF_FFFF;
             }
         }
-        let o = m >> 32;
-        o as i32
+        let integer_part = multiplied_random_bits >> 32;
+        integer_part as i32
     }
 
     pub fn next_i32_between(&mut self, min: i32, max: i32) -> i32 {
@@ -156,28 +154,21 @@ pub struct XoroshiroRandomFactory {
 }
 
 impl XoroshiroRandomFactory {
-    #[expect(
-        clippy::many_single_char_names,
-        reason = "matches vanilla's positional seeding math notation"
-    )]
-    #[must_use]
     pub fn at(&self, x: i32, y: i32, z: i32) -> RandomSource {
-        let l = get_seed(x, y, z) as u64;
-        let m = l ^ self.seed_lo;
+        let positional_seed = get_seed(x, y, z) as u64;
+        let random_seed = positional_seed ^ self.seed_lo;
 
-        RandomSource::Xoroshiro(XoroshiroRandomSource::new(m, self.seed_hi))
+        RandomSource::Xoroshiro(XoroshiroRandomSource::new(random_seed, self.seed_hi))
     }
 
-    #[must_use]
     pub const fn with_hash_of(&self, hash: &NameHash) -> RandomSource {
-        let [l, m] = hash.md5;
+        let [hash_lo, hash_hi] = hash.md5_digest;
         RandomSource::Xoroshiro(XoroshiroRandomSource::new(
-            l ^ self.seed_lo,
-            m ^ self.seed_hi,
+            hash_lo ^ self.seed_lo,
+            hash_hi ^ self.seed_hi,
         ))
     }
 
-    #[must_use]
     pub const fn with_seed(&self, seed: u64) -> RandomSource {
         RandomSource::Xoroshiro(XoroshiroRandomSource::new(
             seed ^ self.seed_lo,
@@ -187,12 +178,6 @@ impl XoroshiroRandomFactory {
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::unreadable_literal,
-    clippy::cast_sign_loss,
-    clippy::float_cmp,
-    reason = "test vectors from vanilla Java; raw literals and casts are intentional"
-)]
 mod tests {
     use super::*;
 

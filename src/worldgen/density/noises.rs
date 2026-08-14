@@ -128,57 +128,46 @@ impl Noises {
         })
     }
 
-    #[must_use]
     pub const fn compiled(&self) -> &CompiledDimension {
         &self.compiled
     }
 
-    #[must_use]
     pub const fn cell_width(&self) -> i32 {
         self.cell_width
     }
 
-    #[must_use]
     pub fn noise(&self, id: &str) -> Option<&NormalNoise> {
         self.noises.get(id)
     }
 
-    #[must_use]
     pub const fn random(&self) -> &RandomFactory {
         &self.random
     }
 
-    #[must_use]
     pub const fn aquifer_random(&self) -> &RandomFactory {
         &self.aquifer_random
     }
 
-    #[must_use]
     pub fn end_islands(&self) -> Option<&EndIslands> {
         self.end_islands.as_deref()
     }
 
-    #[must_use]
     pub const fn blended(&self) -> Option<&BlendedNoise> {
         self.blended.as_ref()
     }
 
-    #[must_use]
     pub const fn cell_height(&self) -> i32 {
         self.cell_height
     }
 
-    #[must_use]
     pub const fn min_y(&self) -> i32 {
         self.min_y
     }
 
-    #[must_use]
     pub const fn height(&self) -> i32 {
         self.height
     }
 
-    #[must_use]
     pub const fn sea_level(&self) -> i32 {
         self.sea_level
     }

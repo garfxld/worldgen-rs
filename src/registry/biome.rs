@@ -25,12 +25,10 @@ pub struct Biome {
 }
 
 impl Biome {
-    #[must_use]
     pub fn has_tag(&'static self, tag: &Identifier) -> bool {
         REGISTRY.biomes.is_in_tag(&self.key, tag)
     }
 
-    #[must_use]
     pub fn id(&self) -> usize {
         *self.id.get().expect("biome not registered")
     }
@@ -81,7 +79,6 @@ impl Default for BiomeRegistry {
 }
 
 impl BiomeRegistry {
-    #[must_use]
     pub fn new() -> Self {
         Self {
             registry: Registry::new(),
@@ -95,10 +92,6 @@ impl BiomeRegistry {
         id
     }
 
-    /// Loads every `<namespace>:worldgen/biome/*.json` file under `worldgen_dir` and
-    /// registers each as a biome. Mirrors vanilla's datapack model: a custom datapack
-    /// overriding or adding biomes only needs to ship JSON here, the same mechanism
-    /// used for density functions and noise settings.
     pub fn load_from_datapack(
         &mut self,
         namespace: &str,
@@ -142,17 +135,14 @@ impl BiomeRegistry {
         self.registry.freeze();
     }
 
-    #[must_use]
     pub fn by_id(&self, id: usize) -> Option<BiomeRef> {
         self.registry.by_id(id)
     }
 
-    #[must_use]
     pub fn by_key(&self, key: &Identifier) -> Option<BiomeRef> {
         self.registry.by_key(key)
     }
 
-    #[must_use]
     pub fn is_in_tag(&self, key: &Identifier, tag: &Identifier) -> bool {
         self.registry.is_in_tag(key, tag)
     }
@@ -170,10 +160,6 @@ impl BiomeRegistry {
 #[expect(
     clippy::unwrap_used,
     reason = "biome registry tests assert required vanilla properties are present"
-)]
-#[expect(
-    clippy::float_cmp,
-    reason = "temperature is an exact f32 literal parsed from vanilla JSON, not a computed value"
 )]
 mod tests {
     use std::path::PathBuf;

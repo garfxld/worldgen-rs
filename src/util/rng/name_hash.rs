@@ -1,11 +1,10 @@
 #[derive(Clone, Copy)]
 pub struct NameHash {
-    pub md5: [u64; 2],
-    pub java_hash: i32,
+    pub md5_digest: [u64; 2],
+    pub legacy_hash_code: i32,
 }
 
 impl NameHash {
-    #[must_use]
     pub const fn new(name: &str) -> Self {
         let digest = const_md5(name.as_bytes());
         let lo = u64::from_be_bytes([
@@ -17,8 +16,8 @@ impl NameHash {
         ]);
 
         Self {
-            md5: [lo, hi],
-            java_hash: java_hash_code(name),
+            md5_digest: [lo, hi],
+            legacy_hash_code: java_hash_code(name),
         }
     }
 }
@@ -40,10 +39,6 @@ const S: [u32; 64] = [
     21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
 ];
 
-#[expect(
-    clippy::unreadable_literal,
-    reason = "RFC 1321 precomputed table; separators would obscure the standard values"
-)]
 const T: [u32; 64] = [
     0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
     0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
@@ -55,14 +50,6 @@ const T: [u32; 64] = [
     0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
 ];
 
-#[expect(
-    clippy::many_single_char_names,
-    reason = "matches RFC 1321 algorithm notation"
-)]
-#[expect(
-    clippy::unreadable_literal,
-    reason = "RFC 1321 initial hash values; underscores would obscure the standard constants"
-)]
 const fn const_md5(data: &[u8]) -> [u8; 16] {
     assert!(
         data.len() < 56,
@@ -182,7 +169,7 @@ mod tests {
     #[test]
     fn name_hash_is_evaluable_as_a_const() {
         const HASH: NameHash = NameHash::new("minecraft:offset");
-        assert_ne!(HASH.md5, [0, 0]);
+        assert_ne!(HASH.md5_digest, [0, 0]);
     }
 
     const fn hex_to_bytes(hex: &str) -> [u8; 16] {

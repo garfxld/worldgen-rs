@@ -17,7 +17,6 @@ impl Debug for Identifier {
 impl Identifier {
     pub const VANILLA_NAMESPACE: &'static str = "minecraft";
 
-    #[must_use]
     pub fn new(
         namespace: impl Into<Cow<'static, str>>,
         path: impl Into<Cow<'static, str>>,
@@ -28,7 +27,6 @@ impl Identifier {
         }
     }
 
-    #[must_use]
     pub const fn const_new(namespace: &'static str, path: &'static str) -> Self {
         Identifier {
             namespace: Cow::Borrowed(namespace),
@@ -36,7 +34,6 @@ impl Identifier {
         }
     }
 
-    #[must_use]
     pub const fn vanilla(path: String) -> Self {
         Identifier {
             namespace: Cow::Borrowed(Self::VANILLA_NAMESPACE),
@@ -44,7 +41,6 @@ impl Identifier {
         }
     }
 
-    #[must_use]
     pub const fn const_vanilla(path: &'static str) -> Self {
         Identifier {
             namespace: Cow::Borrowed(Self::VANILLA_NAMESPACE),
@@ -52,7 +48,6 @@ impl Identifier {
         }
     }
 
-    #[must_use]
     pub const fn valid_namespace_char(char: char) -> bool {
         char == '_'
             || char == '-'
@@ -61,22 +56,18 @@ impl Identifier {
             || char == '.'
     }
 
-    #[must_use]
     pub const fn valid_char(char: char) -> bool {
         Self::valid_namespace_char(char) || char == '/'
     }
 
-    #[must_use]
     pub fn validate_namespace(namespace: &str) -> bool {
         namespace != ".." && namespace.chars().all(Self::valid_namespace_char)
     }
 
-    #[must_use]
     pub fn validate_path(path: &str) -> bool {
         path.chars().all(Self::valid_char)
     }
 
-    #[must_use]
     pub fn validate(namespace: &str, path: &str) -> bool {
         Self::validate_namespace(namespace) && Self::validate_path(path)
     }
@@ -114,7 +105,7 @@ impl FromStr for Identifier {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct BlockStateId(pub u16);
+pub struct BlockState(pub u16);
 
 #[cfg(test)]
 mod tests {

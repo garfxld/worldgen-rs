@@ -3,7 +3,7 @@ use std::cell::Cell;
 use glam::IVec3;
 
 use crate::chunk::proto::{GenerationChunk, SurfacePhase};
-use crate::util::ident::BlockStateId;
+use crate::util::ident::BlockState;
 use crate::util::math::lerp2;
 use crate::worldgen::density::{ColumnCache, preliminary_surface_level};
 use crate::worldgen::generator::Generator;
@@ -36,18 +36,6 @@ impl Generator {
         }
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "matches vanilla's build_surface column scan"
-    )]
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "column-local block coordinates always fit their integer types"
-    )]
-    #[expect(
-        clippy::cast_sign_loss,
-        reason = "local_x/local_z/relative_y are always non-negative inside the chunk"
-    )]
     pub fn build_surface(
         &self,
         chunk: GenerationChunk<'_, SurfacePhase>,
@@ -95,20 +83,20 @@ impl Generator {
         let biome_data = surface_needs_biomes.then(|| chunk.read_all_biomes());
         let section_count = chunk.section_count();
 
-        let mut pending_writes: Vec<(usize, BlockStateId)> = Vec::new();
-        let mut column_buf: Vec<BlockStateId> = Vec::new();
+        let mut pending_writes: Vec<(usize, BlockState)> = Vec::new();
+        let mut column_buf: Vec<BlockState> = Vec::new();
         let condition_noise_values: Vec<Cell<f64>> = surface_rules
             .noise_ids()
             .iter()
             .map(|_| Cell::new(0.0))
             .collect();
-        let condition_noise_initialized: Vec<Cell<bool>> = surface_rules
+        let condition_noise_computed_at: Vec<Cell<u64>> = surface_rules
             .noise_ids()
             .iter()
-            .map(|_| Cell::new(false))
+            .map(|_| Cell::new(0))
             .collect();
         let condition_noise_cache =
-            SurfaceConditionNoiseCache::new(&condition_noise_values, &condition_noise_initialized);
+            SurfaceConditionNoiseCache::new(&condition_noise_values, &condition_noise_computed_at);
 
         for local_x in 0..16usize {
             for local_z in 0..16usize {

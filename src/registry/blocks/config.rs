@@ -25,7 +25,6 @@ pub struct BlockConfig {
 }
 
 impl BlockConfig {
-    #[must_use]
     pub const fn new() -> Self {
         Self {
             can_occlude: true,
@@ -41,67 +40,56 @@ impl BlockConfig {
         }
     }
 
-    #[must_use]
     pub const fn can_occlude(mut self, can_occlude: bool) -> Self {
         self.can_occlude = can_occlude;
         self
     }
 
-    #[must_use]
     pub const fn force_solid_off(mut self, force: bool) -> Self {
         self.force_solid_off = force;
         self
     }
 
-    #[must_use]
     pub const fn force_solid_on(mut self, force: bool) -> Self {
         self.force_solid_on = force;
         self
     }
 
-    #[must_use]
     pub const fn dynamic_shape(mut self, dynamic: bool) -> Self {
         self.dynamic_shape = dynamic;
         self
     }
 
-    #[must_use]
     pub const fn offset_type(mut self, offset_type: OffsetType) -> Self {
         self.offset_type = offset_type;
         self
     }
 
-    #[must_use]
     pub const fn max_horizontal_offset(mut self, offset: f32) -> Self {
         self.max_horizontal_offset = offset;
         self
     }
 
-    #[must_use]
     pub const fn max_vertical_offset(mut self, offset: f32) -> Self {
         self.max_vertical_offset = offset;
         self
     }
 
-    #[must_use]
     pub const fn liquid(mut self, liquid: bool) -> Self {
         self.liquid = liquid;
         self
     }
 
-    #[must_use]
     pub const fn set_is_air(mut self, is_air: bool) -> Self {
         self.is_air = is_air;
         self
     }
 
-    #[must_use]
     pub const fn replaceable(mut self, replaceable: bool) -> Self {
         self.replaceable = replaceable;
         self
     }
 
-    #[must_use]
     pub fn offset_at(&self, pos: BlockPos) -> DVec3 {
         let seed = get_seed(pos.x(), 0, pos.z());
         let x = horizontal_offset_component(seed & 15, self.max_horizontal_offset);

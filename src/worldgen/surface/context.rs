@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use crate::util::ident::BlockStateId;
+use crate::util::ident::BlockState;
 use crate::worldgen::surface::system::{SurfaceSystem, TemperatureXzCache};
 
 pub struct SurfaceRuleContext<'a> {
@@ -19,7 +19,7 @@ pub struct SurfaceRuleContext<'a> {
     pub system: &'a SurfaceSystem,
     condition_noises: &'a SurfaceConditionNoiseCache<'a>,
     xz: &'a mut TemperatureXzCache,
-    block_states: &'a [BlockStateId],
+    block_states: &'a [BlockState],
 }
 
 impl<'a> SurfaceRuleContext<'a> {
@@ -43,7 +43,7 @@ impl<'a> SurfaceRuleContext<'a> {
         system: &'a SurfaceSystem,
         condition_noises: &'a SurfaceConditionNoiseCache<'a>,
         xz: &'a mut TemperatureXzCache,
-        block_states: &'a [BlockStateId],
+        block_states: &'a [BlockState],
     ) -> Self {
         Self {
             block_x,
@@ -65,29 +65,24 @@ impl<'a> SurfaceRuleContext<'a> {
         }
     }
 
-    #[must_use]
-    pub const fn block_state(&self, index: usize) -> BlockStateId {
+    pub const fn block_state(&self, index: usize) -> BlockState {
         self.block_states[index]
     }
 
-    #[must_use]
     pub fn condition_noise(&self, noise_index: usize) -> f64 {
         self.condition_noises
             .get(noise_index, self.system, self.block_x, self.block_z)
     }
 
-    #[must_use]
     pub fn condition_noise_3d(&self, noise_index: usize) -> f64 {
         self.system
             .condition_noise_3d(noise_index, self.block_x, self.block_y, self.block_z)
     }
 
-    #[must_use]
     pub const fn known_biome_id(&self) -> Option<u16> {
         self.biome_id
     }
 
-    #[must_use]
     pub fn biome_id(&mut self) -> Option<u16> {
         if self.biome_id.is_some() {
             return self.biome_id;
@@ -99,7 +94,6 @@ impl<'a> SurfaceRuleContext<'a> {
         Some(biome_id)
     }
 
-    #[must_use]
     pub fn cold_enough_to_snow(&mut self) -> bool {
         let Some(biome_id) = self.biome_id() else {
             return false;
@@ -115,34 +109,33 @@ pub trait SurfaceBiomeProvider {
 
 pub struct SurfaceConditionNoiseCache<'a> {
     values: &'a [Cell<f64>],
-    initialized: &'a [Cell<bool>],
+    computed_at_update: &'a [Cell<u64>],
+    last_update: Cell<u64>,
 }
 
 impl<'a> SurfaceConditionNoiseCache<'a> {
-    #[must_use]
-    pub fn new(values: &'a [Cell<f64>], initialized: &'a [Cell<bool>]) -> Self {
-        debug_assert_eq!(values.len(), initialized.len());
+    pub fn new(values: &'a [Cell<f64>], computed_at_update: &'a [Cell<u64>]) -> Self {
+        debug_assert_eq!(values.len(), computed_at_update.len());
         Self {
             values,
-            initialized,
+            computed_at_update,
+            last_update: Cell::new(0),
         }
     }
 
     pub fn reset(&self) {
-        for initialized in self.initialized {
-            initialized.set(false);
-        }
+        self.last_update.set(self.last_update.get() + 1);
     }
 
-    #[must_use]
     pub fn get(&self, noise_index: usize, system: &SurfaceSystem, x: i32, z: i32) -> f64 {
-        if self.initialized[noise_index].get() {
+        let current_update = self.last_update.get();
+        if self.computed_at_update[noise_index].get() == current_update {
             return self.values[noise_index].get();
         }
 
         let value = system.condition_noise(noise_index, x, z);
         self.values[noise_index].set(value);
-        self.initialized[noise_index].set(true);
+        self.computed_at_update[noise_index].set(current_update);
         value
     }
 }

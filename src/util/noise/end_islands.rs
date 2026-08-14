@@ -3,10 +3,7 @@ use crate::util::rng::legacy_random::LegacyRandomSource;
 
 use super::SimplexNoise;
 
-/// Vanilla uses `-0.9F` (float literal) in a `double < float` comparison, which
-/// promotes the float to double. `(double)(-0.9f)` is not the exact double
-/// `-0.9`, so the f32->f64 promotion must be matched exactly.
-const ISLAND_THRESHOLD: f64 = -0.9_f32 as f64;
+const ISLAND_THRESHOLD: f32 = -0.9;
 
 #[derive(Debug, Clone)]
 pub struct EndIslands {
@@ -14,60 +11,55 @@ pub struct EndIslands {
 }
 
 impl EndIslands {
-    #[must_use]
     pub fn new(seed: u64) -> Self {
-        let mut rng = RandomSource::Legacy(LegacyRandomSource::from_seed(seed));
-        rng.consume_count(17292);
-        let island_noise = SimplexNoise::new(&mut rng);
-        Self { island_noise }
+        let mut island_random = RandomSource::Legacy(LegacyRandomSource::from_seed(seed));
+        island_random.consume_count(17292);
+        Self {
+            island_noise: SimplexNoise::new(&mut island_random),
+        }
     }
 
-    #[must_use]
     pub fn sample(&self, block_x: f64, _block_y: f64, block_z: f64) -> f64 {
         let block_x = block_x as i32;
         let block_z = block_z as i32;
-        (f64::from(Self::get_height_value(
-            &self.island_noise,
-            block_x / 8,
-            block_z / 8,
-        )) - 8.0)
-            / 128.0
+        let height = Self::height_at(&self.island_noise, block_x / 8, block_z / 8);
+        (f64::from(height) - 8.0) / 128.0
     }
 
-    fn get_height_value(island_noise: &SimplexNoise, section_x: i32, section_z: i32) -> f32 {
+    fn height_at(island_noise: &SimplexNoise, section_x: i32, section_z: i32) -> f32 {
         let chunk_x = section_x / 2;
         let chunk_z = section_z / 2;
-        let sub_section_x = section_x % 2;
-        let sub_section_z = section_z % 2;
+        let sub_x = section_x % 2;
+        let sub_z = section_z % 2;
 
         let dist_sq = section_x
             .wrapping_mul(section_x)
             .wrapping_add(section_z.wrapping_mul(section_z));
-        let dist = (dist_sq as f32).sqrt();
-        let mut doffs = (100.0_f32 - dist * 8.0).clamp(-100.0, 80.0);
+        let base = 100.0_f32 - (dist_sq as f32).sqrt() * 8.0;
+        let mut doffs = base.clamp(-100.0, 80.0);
 
-        for xo in -12..=12 {
-            for zo in -12..=12 {
-                let total_chunk_x = i64::from(chunk_x) + i64::from(xo);
-                let total_chunk_z = i64::from(chunk_z) + i64::from(zo);
-
-                if total_chunk_x * total_chunk_x + total_chunk_z * total_chunk_z > 4096
-                    && island_noise.get_value_2d(total_chunk_x as f64, total_chunk_z as f64)
-                        < ISLAND_THRESHOLD
+        for dx in -12..=12 {
+            for dz in -12..=12 {
+                let island_x = i64::from(chunk_x) + i64::from(dx);
+                let island_z = i64::from(chunk_z) + i64::from(dz);
+                if island_x * island_x + island_z * island_z <= 4096
+                    || island_noise.get_value_2d(island_x as f64, island_z as f64)
+                        >= f64::from(ISLAND_THRESHOLD)
                 {
-                    let island_size = ((total_chunk_x as f32).abs() * 3439.0
-                        + (total_chunk_z as f32).abs() * 147.0)
-                        % 13.0
-                        + 9.0;
-                    let xd = sub_section_x as f32 - (xo * 2) as f32;
-                    let zd = sub_section_z as f32 - (zo * 2) as f32;
-                    let new_doffs =
-                        (100.0_f32 - (xd * xd + zd * zd).sqrt() * island_size).clamp(-100.0, 80.0);
-                    // Must NOT use f32::max here — Rust's max returns the non-NaN
-                    // argument, while Java's Math.max propagates NaN.
-                    if new_doffs > doffs {
-                        doffs = new_doffs;
-                    }
+                    continue;
+                }
+
+                let island_size = ((island_x as f32).abs() * 3439.0
+                    + (island_z as f32).abs() * 147.0)
+                    % 13.0
+                    + 9.0;
+                let dxf = sub_x as f32 - (dx * 2) as f32;
+                let dzf = sub_z as f32 - (dz * 2) as f32;
+                let candidate = (100.0_f32 - (dxf * dxf + dzf * dzf).sqrt() * island_size)
+                    .clamp(-100.0, 80.0);
+
+                if candidate > doffs {
+                    doffs = candidate;
                 }
             }
         }

@@ -1,21 +1,21 @@
 #[inline]
-#[must_use]
 pub fn find_interval(locations: &[f32], input: f32) -> i32 {
-    let mut lo = 0i32;
-    let mut hi = locations.len() as i32;
-    while lo < hi {
-        let mid = i32::midpoint(lo, hi);
-        if input < locations[mid as usize] {
-            hi = mid;
+    let mut from = 0i32;
+    let mut len = locations.len() as i32;
+    while len > 0 {
+        let half = len / 2;
+        let middle = from + half;
+        if input < locations[middle as usize] {
+            len = half;
         } else {
-            lo = mid + 1;
+            from = middle + 1;
+            len -= half + 1;
         }
     }
-    lo - 1
+    from - 1
 }
 
 #[inline]
-#[must_use]
 pub fn hermite_interpolate(
     x1: f32,
     x2: f32,
@@ -25,13 +25,18 @@ pub fn hermite_interpolate(
     d2: f32,
     input: f32,
 ) -> f32 {
-    let t = (input - x1) / (x2 - x1);
-    let h = x2 - x1;
-    let a = d1 * h - (y2 - y1);
-    let b = -d2 * h + (y2 - y1);
+    let x_diff = x2 - x1;
+    let t = (input - x1) / x_diff;
+    let a = d1 * x_diff - (y2 - y1);
+    let b = -d2 * x_diff + (y2 - y1);
     let lerp_y = y1 + t * (y2 - y1);
-    let lerp_ab = a + t * (b - a);
-    lerp_y + t * (1.0 - t) * lerp_ab
+    let lerp_deriv = a + t * (b - a);
+    lerp_y + t * (1.0 - t) * lerp_deriv
+}
+
+#[inline]
+fn linear_extend(input: f32, location: f32, value: f32, derivative: f32) -> f32 {
+    value + derivative * (input - location)
 }
 
 #[inline]
@@ -45,18 +50,21 @@ pub fn evaluate_spline(
         return 0.0;
     }
 
-    let last = locations.len() - 1;
+    let last_index = locations.len() - 1;
     let start = find_interval(locations, input);
 
     if start < 0 {
-        let value = value_at(0);
-        return value + derivatives[0] * (input - locations[0]);
+        return linear_extend(input, locations[0], value_at(0), derivatives[0]);
     }
 
     let start = start as usize;
-    if start == last {
-        let value = value_at(last);
-        return value + derivatives[last] * (input - locations[last]);
+    if start == last_index {
+        return linear_extend(
+            input,
+            locations[last_index],
+            value_at(last_index),
+            derivatives[last_index],
+        );
     }
 
     let y1 = value_at(start);

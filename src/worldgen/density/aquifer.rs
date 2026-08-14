@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 
 use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_blocks;
-use crate::util::ident::BlockStateId;
+use crate::util::ident::BlockState;
 use crate::util::math::{clamp, map, map_clamped};
 use crate::util::rng::RandomFactory;
 use crate::worldgen::density::{ColumnCache, Noises};
@@ -42,11 +42,11 @@ const SURFACE_SAMPLING_OFFSETS: [[i32; 2]; 13] = [
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct FluidStatus {
     fluid_level: i32,
-    fluid_type: BlockStateId,
+    fluid_type: BlockState,
 }
 
 impl FluidStatus {
-    const fn at(self, block_y: i32) -> Option<BlockStateId> {
+    const fn at(self, block_y: i32) -> Option<BlockState> {
         if block_y < self.fluid_level {
             Some(self.fluid_type)
         } else {
@@ -58,10 +58,10 @@ impl FluidStatus {
 pub enum AquiferResult {
     Solid,
     Air,
-    Fluid(BlockStateId),
+    Fluid(BlockState),
 }
 
-struct AquiferColumnCache {
+struct NeighborCellCache {
     world_x: i32,
     world_z: i32,
     y_anchor: i32,
@@ -70,7 +70,7 @@ struct AquiferColumnCache {
     cell_idx: [u32; 12],
 }
 
-impl Default for AquiferColumnCache {
+impl Default for NeighborCellCache {
     fn default() -> Self {
         Self {
             world_x: 0,
@@ -83,8 +83,6 @@ impl Default for AquiferColumnCache {
     }
 }
 
-/// Noise-based aquifer for a single chunk. Matches vanilla's
-/// `Aquifer.NoiseBasedAquifer`.
 pub struct Aquifer {
     location_cache: Vec<i64>,
     status_cache: Vec<Option<FluidStatus>>,
@@ -99,11 +97,11 @@ pub struct Aquifer {
     aquifers_enabled: bool,
     sea_level: i32,
     lava_floor: i32,
-    water_id: BlockStateId,
-    lava_id: BlockStateId,
-    default_fluid_id: BlockStateId,
+    water_id: BlockState,
+    lava_id: BlockState,
+    default_fluid_id: BlockState,
     should_schedule_fluid_update: bool,
-    col_cache: AquiferColumnCache,
+    neighbor_cache: NeighborCellCache,
     prelim_cache: FxHashMap<(i32, i32), i32>,
 }
 
@@ -174,8 +172,8 @@ const fn global_fluid(
     y: i32,
     lava_floor: i32,
     sea_level: i32,
-    lava_id: BlockStateId,
-    default_fluid_id: BlockStateId,
+    lava_id: BlockState,
+    default_fluid_id: BlockState,
 ) -> FluidStatus {
     if y < lava_floor {
         FluidStatus {
@@ -191,7 +189,6 @@ const fn global_fluid(
 }
 
 impl Aquifer {
-    #[must_use]
     #[expect(
         clippy::too_many_arguments,
         reason = "mirrors vanilla's Aquifer.create shape"
@@ -203,7 +200,7 @@ impl Aquifer {
         y_block_size: i32,
         aquifer_random: &RandomFactory,
         aquifers_enabled: bool,
-        default_fluid_id: BlockStateId,
+        default_fluid_id: BlockState,
         noises: &Noises,
         cache: ColumnCache,
     ) -> Self {
@@ -235,7 +232,7 @@ impl Aquifer {
         y_block_size: i32,
         aquifer_random: &RandomFactory,
         aquifers_enabled: bool,
-        default_fluid_id: BlockStateId,
+        default_fluid_id: BlockState,
         noises: &Noises,
         mut cache: ColumnCache,
     ) -> Self {
@@ -249,7 +246,7 @@ impl Aquifer {
                 status_cache: Vec::new(),
                 aquifer_random: aquifer_random.clone(),
                 cache,
-                col_cache: AquiferColumnCache::default(),
+                neighbor_cache: NeighborCellCache::default(),
                 min_grid_x: 0,
                 min_grid_y: 0,
                 min_grid_z: 0,
@@ -305,7 +302,7 @@ impl Aquifer {
             status_cache,
             aquifer_random: aquifer_random.clone(),
             cache,
-            col_cache: AquiferColumnCache::default(),
+            neighbor_cache: NeighborCellCache::default(),
             min_grid_x,
             min_grid_y,
             min_grid_z,
@@ -356,7 +353,7 @@ impl Aquifer {
         ((y * self.grid_size_z + z) * self.grid_size_x + x) as usize
     }
 
-    fn refill_col_cache(&mut self, world_x: i32, world_y: i32, world_z: i32) -> i32 {
+    fn refill_neighbor_cache(&mut self, world_x: i32, world_y: i32, world_z: i32) -> i32 {
         let x_anchor = grid_x(world_x + SAMPLE_OFFSET_X);
         let y_anchor = grid_y(world_y + SAMPLE_OFFSET_Y);
         let z_anchor = grid_z(world_z + SAMPLE_OFFSET_Z);
@@ -386,24 +383,20 @@ impl Aquifer {
 
                     let dx = unpack_x(loc) - world_x;
                     let dz = unpack_z(loc) - world_z;
-                    self.col_cache.cell_loc_y[i] = unpack_y(loc);
-                    self.col_cache.cell_xz_dist_sq[i] = dx * dx + dz * dz;
-                    self.col_cache.cell_idx[i] = idx as u32;
+                    self.neighbor_cache.cell_loc_y[i] = unpack_y(loc);
+                    self.neighbor_cache.cell_xz_dist_sq[i] = dx * dx + dz * dz;
+                    self.neighbor_cache.cell_idx[i] = idx as u32;
                     i += 1;
                 }
             }
         }
 
-        self.col_cache.world_x = world_x;
-        self.col_cache.world_z = world_z;
-        self.col_cache.y_anchor = y_anchor;
+        self.neighbor_cache.world_x = world_x;
+        self.neighbor_cache.world_z = world_z;
+        self.neighbor_cache.y_anchor = y_anchor;
         y_anchor
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "splitting would hurt readability of the aquifer sampling logic"
-    )]
     pub fn compute_substance(
         &mut self,
         noises: &Noises,
@@ -454,19 +447,19 @@ impl Aquifer {
         }
 
         let y_anchor = grid_y(world_y + SAMPLE_OFFSET_Y);
-        if self.col_cache.world_x != world_x
-            || self.col_cache.world_z != world_z
-            || self.col_cache.y_anchor != y_anchor
+        if self.neighbor_cache.world_x != world_x
+            || self.neighbor_cache.world_z != world_z
+            || self.neighbor_cache.y_anchor != y_anchor
         {
-            self.refill_col_cache(world_x, world_y, world_z);
+            self.refill_neighbor_cache(world_x, world_y, world_z);
         }
 
         let world_y_v = i32x4::splat(world_y);
         let mut dists = [0i32; 12];
         for batch in 0..3 {
             let base = batch * 4;
-            let loc_y_v = i32x4::from_slice(&self.col_cache.cell_loc_y[base..base + 4]);
-            let xz_v = i32x4::from_slice(&self.col_cache.cell_xz_dist_sq[base..base + 4]);
+            let loc_y_v = i32x4::from_slice(&self.neighbor_cache.cell_loc_y[base..base + 4]);
+            let xz_v = i32x4::from_slice(&self.neighbor_cache.cell_xz_dist_sq[base..base + 4]);
             let dy = loc_y_v - world_y_v;
             let dist_v = xz_v + dy * dy;
             dists[base..base + 4].copy_from_slice(&dist_v.to_array());
@@ -476,7 +469,7 @@ impl Aquifer {
         let mut closest_idx = [0usize; 4];
 
         for (i, &new_dist) in dists.iter().enumerate() {
-            let index = self.col_cache.cell_idx[i] as usize;
+            let index = self.neighbor_cache.cell_idx[i] as usize;
 
             if dist_sq[0] >= new_dist {
                 dist_sq[3] = dist_sq[2];
@@ -612,7 +605,6 @@ impl Aquifer {
         }
     }
 
-    #[must_use]
     pub const fn should_schedule_fluid_update(&self) -> bool {
         self.should_schedule_fluid_update
     }
@@ -784,7 +776,7 @@ impl Aquifer {
         noises: &Noises,
         gf: FluidStatus,
         fluid_level: i32,
-    ) -> BlockStateId {
+    ) -> BlockState {
         if fluid_level <= -10 && fluid_level != WAY_BELOW_MIN_Y && gf.fluid_type != self.lava_id {
             let cell_x = x.div_euclid(64);
             let cell_y = y.div_euclid(40);
@@ -866,27 +858,16 @@ impl Aquifer {
 #[inline]
 fn quantize(value: f64, quantum: i32) -> i32 {
     let q = f64::from(quantum);
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "surface-level spread values stay in i32 range"
-    )]
-    let quantized = (value / q).floor() as i32 * quantum;
-    quantized
+    (value / q).floor() as i32 * quantum
 }
 
-/// Evaluate preliminary surface level at quart-quantized coordinates.
 pub fn preliminary_surface_level(noises: &Noises, cache: &mut ColumnCache, x: i32, z: i32) -> i32 {
     let qx = (x >> 2) << 2;
     let qz = (z >> 2) << 2;
     cache.ensure(qx, qz, noises);
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "surface level stays in i32 range"
-    )]
-    let level = cache
+    cache
         .router("preliminary_surface_level", qx, 0, qz, noises)
-        .floor() as i32;
-    level
+        .floor() as i32
 }
 
 fn cached_preliminary_surface_level(

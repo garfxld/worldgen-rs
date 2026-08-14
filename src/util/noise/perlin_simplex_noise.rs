@@ -4,6 +4,8 @@ use crate::util::noise::SimplexNoise;
 use crate::util::rng::RandomSource;
 use crate::util::rng::legacy_random::LegacyRandomSource;
 
+const POSITIVE_OCTAVE_SEED_SCALE: f64 = 9.223_372_036_854_776e18;
+
 pub struct PerlinSimplexNoise {
     noise_levels: Vec<Option<SimplexNoise>>,
     highest_freq_input_factor: f64,
@@ -11,82 +13,70 @@ pub struct PerlinSimplexNoise {
 }
 
 impl PerlinSimplexNoise {
-    /// # Panics
-    ///
-    /// Panics if `octaves` is empty.
-    #[must_use]
     pub fn new(random: &mut RandomSource, octaves: &[i32]) -> Self {
         let octave_set: BTreeSet<i32> = octaves.iter().copied().collect();
         assert!(!octave_set.is_empty(), "Need some octaves");
 
-        let first_octave = *octave_set.first().expect("non-empty octave set");
-        let last_octave = *octave_set.last().expect("non-empty octave set");
-        let high_freq_octaves = last_octave;
-        let total = (last_octave - first_octave + 1) as usize;
+        let low_freq_octaves = -*octave_set.first().expect("non-empty octave set");
+        let high_freq_octaves = *octave_set.last().expect("non-empty octave set");
+        let octave_count = (low_freq_octaves + high_freq_octaves + 1) as usize;
 
         let zero_octave = SimplexNoise::new(random);
-        let zero_index = high_freq_octaves;
+        let zero_octave_self_sample =
+            zero_octave.get_value_3d(zero_octave.xo, zero_octave.yo, zero_octave.zo);
+        let zero_octave_index = high_freq_octaves;
 
-        let mut noise_levels: Vec<Option<SimplexNoise>> = vec![None; total];
-
-        let hf_seed = if high_freq_octaves > 0 {
-            Some(
-                (zero_octave.get_value_3d(zero_octave.xo, zero_octave.yo, zero_octave.zo)
-                    * 9.223_372_036_854_776e18) as i64,
-            )
-        } else {
-            None
-        };
-
-        if zero_index >= 0 && (zero_index as usize) < total && octave_set.contains(&0) {
-            noise_levels[zero_index as usize] = Some(zero_octave);
+        let mut noise_levels: Vec<Option<SimplexNoise>> = vec![None; octave_count];
+        if zero_octave_index >= 0
+            && (zero_octave_index as usize) < octave_count
+            && octave_set.contains(&0)
+        {
+            noise_levels[zero_octave_index as usize] = Some(zero_octave);
         }
 
-        let start = (zero_index + 1).max(0) as usize;
-        for (i, level) in noise_levels.iter_mut().enumerate().skip(start) {
-            let octave_level = zero_index - i as i32;
-            if octave_set.contains(&octave_level) {
-                *level = Some(SimplexNoise::new(random));
+        for i in (zero_octave_index + 1)..octave_count as i32 {
+            if i >= 0 && octave_set.contains(&(zero_octave_index - i)) {
+                noise_levels[i as usize] = Some(SimplexNoise::new(random));
             } else {
                 random.consume_count(262);
             }
         }
 
-        if let Some(seed) = hf_seed {
-            let mut hf_random = RandomSource::Legacy(LegacyRandomSource::from_seed(seed as u64));
+        if high_freq_octaves > 0 {
+            let positive_octave_seed = (zero_octave_self_sample * POSITIVE_OCTAVE_SEED_SCALE) as i64;
+            let mut high_freq_random =
+                RandomSource::Legacy(LegacyRandomSource::from_seed(positive_octave_seed as u64));
 
-            for ix in (0..zero_index as usize).rev() {
-                let octave_level = zero_index - ix as i32;
-                if octave_set.contains(&octave_level) {
-                    noise_levels[ix] = Some(SimplexNoise::new(&mut hf_random));
+            for i in (0..zero_octave_index).rev() {
+                if (i as usize) < octave_count && octave_set.contains(&(zero_octave_index - i)) {
+                    noise_levels[i as usize] = Some(SimplexNoise::new(&mut high_freq_random));
                 } else {
-                    hf_random.consume_count(262);
+                    high_freq_random.consume_count(262);
                 }
             }
         }
 
         Self {
             noise_levels,
-            highest_freq_input_factor: 2.0f64.powi(last_octave),
-            highest_freq_value_factor: 1.0 / (2.0f64.powi(total as i32) - 1.0),
+            highest_freq_input_factor: 2.0f64.powi(high_freq_octaves),
+            highest_freq_value_factor: 1.0 / (2.0f64.powi(octave_count as i32) - 1.0),
         }
     }
 
-    #[must_use]
     pub fn get_value(&self, x: f64, z: f64) -> f64 {
-        let mut sum = 0.0;
+        let mut value = 0.0;
         let mut factor = self.highest_freq_input_factor;
-        let mut amplitude = self.highest_freq_value_factor;
+        let mut value_factor = self.highest_freq_value_factor;
 
-        for noise in &self.noise_levels {
-            if let Some(n) = noise {
-                sum += n.get_value_2d(x * factor, z * factor) * amplitude;
+        for noise_level in &self.noise_levels {
+            if let Some(noise) = noise_level {
+                value += noise.get_value_2d(x * factor, z * factor) * value_factor;
             }
             factor /= 2.0;
-            amplitude *= 2.0;
+            value_factor *= 2.0;
         }
 
-        sum
+        value
     }
 }
 

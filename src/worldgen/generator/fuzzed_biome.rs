@@ -125,10 +125,6 @@ impl<'a> FuzzedBiomeColumn<'a> {
     }
 
     #[inline]
-    #[expect(
-        clippy::similar_names,
-        reason = "matches vanilla's local_qx/local_qy/local_qz naming"
-    )]
     pub fn get(&mut self, block_y: i32) -> u16 {
         let abs_y = block_y - 2;
         let parent_y = abs_y >> 2;

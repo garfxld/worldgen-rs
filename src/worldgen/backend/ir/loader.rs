@@ -16,7 +16,6 @@ pub struct DatapackSource {
 }
 
 impl DatapackSource {
-    #[must_use]
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
@@ -25,7 +24,6 @@ impl DatapackSource {
         }
     }
 
-    #[must_use]
     pub fn add_namespace(
         mut self,
         namespace: impl Into<String>,

@@ -33,7 +33,6 @@ pub struct BlendedNoiseSnapshot<'a> {
 }
 
 impl BlendedNoise {
-    #[must_use]
     pub const fn snapshot(&self) -> BlendedNoiseSnapshot<'_> {
         BlendedNoiseSnapshot {
             min_limit_noise: &self.min_limit_noise,
@@ -47,7 +46,6 @@ impl BlendedNoise {
         }
     }
 
-    #[must_use]
     pub fn new(
         random: &mut RandomSource,
         xz_scale: f64,
@@ -77,7 +75,6 @@ impl BlendedNoise {
         }
     }
 
-    #[must_use]
     pub fn compute(&self, block_x: f64, block_y: f64, block_z: f64) -> f64 {
         let limit_x = block_x * self.xz_multiplier;
         let limit_y = block_y * self.y_multiplier;
@@ -89,18 +86,18 @@ impl BlendedNoise {
         let main_smear = limit_smear / self.y_factor;
 
         let mut main_noise_value = 0.0;
-        let mut pow = 1.0;
-        for i in 0..8 {
-            if let Some(noise) = self.main_noise.get_octave_noise(i) {
+        let mut octave_scale = 1.0;
+        for octave in 0..8 {
+            if let Some(noise) = self.main_noise.get_octave_noise(octave) {
                 main_noise_value += noise.noise_with_y_scale(
-                    wrap(main_x * pow),
-                    wrap(main_y * pow),
-                    wrap(main_z * pow),
-                    main_smear * pow,
-                    main_y * pow,
-                ) / pow;
+                    wrap(main_x * octave_scale),
+                    wrap(main_y * octave_scale),
+                    wrap(main_z * octave_scale),
+                    main_smear * octave_scale,
+                    main_y * octave_scale,
+                ) / octave_scale;
             }
-            pow /= 2.0;
+            octave_scale /= 2.0;
         }
 
         let factor = f64::midpoint(main_noise_value / 10.0, 1.0);
@@ -109,7 +106,7 @@ impl BlendedNoise {
 
         let mut blend_min = 0.0;
         let mut blend_max = 0.0;
-        pow = 1.0;
+        let mut pow = 1.0;
         for i in 0..16 {
             let wx = wrap(limit_x * pow);
             let wy = wrap(limit_y * pow);
@@ -131,7 +128,6 @@ impl BlendedNoise {
     }
 
     #[inline]
-    #[must_use]
     pub fn compute_simd<const N: usize>(
         &self,
         block_x: f64,
@@ -234,13 +230,11 @@ impl BlendedNoise {
     }
 
     #[inline]
-    #[must_use]
     pub const fn max_value(&self) -> f64 {
         self.max_value
     }
 
     #[inline]
-    #[must_use]
     pub fn min_value(&self) -> f64 {
         -self.max_value
     }

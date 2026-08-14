@@ -9,7 +9,6 @@ pub struct ColumnCache {
 }
 
 impl ColumnCache {
-    #[must_use]
     pub fn new(noises: &Noises) -> Self {
         Self {
             active: vec![0.0; noises.compiled().slots()],
@@ -93,7 +92,6 @@ impl ColumnCache {
         )
     }
 
-    #[must_use]
     pub fn router(&self, name: &str, x: i32, y: i32, z: i32, noises: &Noises) -> f64 {
         let entry = noises
             .compiled()
@@ -119,10 +117,6 @@ impl ColumnCache {
 #[expect(
     clippy::unwrap_used,
     reason = "test loads the checked-in vanilla datapack"
-)]
-#[expect(
-    clippy::float_cmp,
-    reason = "lazy and grid paths must be bit-exact, not merely close"
 )]
 mod tests {
     use std::path::{Path, PathBuf};

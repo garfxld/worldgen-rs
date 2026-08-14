@@ -7,7 +7,7 @@ use worldgen_rs::worldgen::backend::ir::{
     YClampedGradient,
 };
 use worldgen_rs::worldgen::backend::jit::{CompiledExpr, JitModule};
-use worldgen_rs::worldgen::density::spline_eval;
+use worldgen_rs::worldgen::density::spline;
 
 fn empty_program() -> DensityProgram {
     DensityProgram {
@@ -88,7 +88,7 @@ fn multipoint_spline_matches_evaluator_bit_exactly() {
     for input in probe_inputs(&locations) {
         let coord = input.clamp(0.0, 1.0);
         let expected =
-            spline_eval::evaluate_spline(&locations, &derivatives, coord as f32, |i| values[i]);
+            spline::evaluate_spline(&locations, &derivatives, coord as f32, |i| values[i]);
         let actual = eval_compiled(&compiled, input);
         assert_eq!(
             actual.to_bits(),
@@ -138,10 +138,10 @@ fn nested_spline_matches_evaluator_bit_exactly() {
     for input in probe_inputs(&outer_locations) {
         let coord = (input.clamp(0.0, 1.0)) as f32;
         let expected =
-            spline_eval::evaluate_spline(&outer_locations, &outer_derivatives, coord, |i| {
+            spline::evaluate_spline(&outer_locations, &outer_derivatives, coord, |i| {
                 match &outer_points[i].value {
                     SplineValue::Constant(c) => *c,
-                    SplineValue::Spline(_) => spline_eval::evaluate_spline(
+                    SplineValue::Spline(_) => spline::evaluate_spline(
                         &inner_locations,
                         &inner_derivatives,
                         coord,
@@ -168,7 +168,7 @@ fn single_point_spline_extrapolates_both_directions() {
 
     for input in probe_inputs(&locations) {
         let coord = (input.clamp(0.0, 1.0)) as f32;
-        let expected = spline_eval::evaluate_spline(&locations, &derivatives, coord, |_| 1.25_f32);
+        let expected = spline::evaluate_spline(&locations, &derivatives, coord, |_| 1.25_f32);
         let actual = eval_compiled(&compiled, input);
         assert_eq!(
             actual.to_bits(),

@@ -17,7 +17,6 @@ pub struct DensityProgram {
 }
 
 impl DensityProgram {
-    #[must_use]
     pub fn analyze(&self) -> AnalysisContext {
         let mut ctx = AnalysisContext::new(self.legacy_random_source);
         ctx.analyze(self);

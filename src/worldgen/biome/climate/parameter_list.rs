@@ -1,8 +1,3 @@
-#![expect(
-    clippy::manual_midpoint,
-    reason = "must match vanilla's truncate-toward-zero behavior"
-)]
-
 use std::cmp::Ordering;
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -315,7 +310,6 @@ pub struct ParameterList<T> {
 }
 
 impl<T> ParameterList<T> {
-    #[must_use]
     pub fn new(values: Vec<(ParameterPoint, T)>) -> Self {
         assert!(!values.is_empty(), "Need at least one value");
 
@@ -341,12 +335,10 @@ impl<T> ParameterList<T> {
         }
     }
 
-    #[must_use]
     pub fn values(&self) -> &[(ParameterPoint, T)] {
         &self.values
     }
 
-    #[must_use]
     pub fn find_value(&self, target: &TargetPoint) -> &T {
         let target_array = target.to_parameter_array();
         let root = &self.nodes[0];
@@ -365,7 +357,6 @@ impl<T> ParameterList<T> {
         &self.values[best_idx.expect("R-Tree search should always find a value") as usize].1
     }
 
-    #[must_use]
     pub fn find_value_cached(&self, target: &TargetPoint, cache: &mut Option<usize>) -> &T {
         let target_array = target.to_parameter_array();
 

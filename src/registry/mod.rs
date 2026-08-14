@@ -30,7 +30,6 @@ impl<T: 'static> Default for Registry<T> {
 }
 
 impl<T: 'static> Registry<T> {
-    #[must_use]
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -59,32 +58,26 @@ impl<T: 'static> Registry<T> {
         self.frozen = true;
     }
 
-    #[must_use]
     pub fn by_id(&self, id: usize) -> Option<&'static T> {
         self.entries.get(id).map(|&(_, entry)| entry)
     }
 
-    #[must_use]
     pub fn by_key(&self, key: &Identifier) -> Option<&'static T> {
         self.by_key.get(key).and_then(|&id| self.by_id(id))
     }
 
-    #[must_use]
     pub fn id_from_key(&self, key: &Identifier) -> Option<usize> {
         self.by_key.get(key).copied()
     }
 
-    #[must_use]
     pub fn key_of(&self, id: usize) -> Option<&Identifier> {
         self.entries.get(id).map(|(key, _)| key)
     }
 
-    #[must_use]
     pub const fn len(&self) -> usize {
         self.entries.len()
     }
 
-    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -130,12 +123,10 @@ impl<T: 'static> Registry<T> {
         self.tags.insert(tag.clone(), entry_keys);
     }
 
-    #[must_use]
     pub fn is_in_tag(&self, key: &Identifier, tag: &Identifier) -> bool {
         self.tags.contains(tag, key)
     }
 
-    #[must_use]
     pub fn get_tag(&self, tag: &Identifier) -> Option<Vec<&'static T>> {
         self.tags
             .get(tag)
@@ -154,7 +145,6 @@ impl<T: 'static> Registry<T> {
     }
 }
 
-#[must_use]
 pub fn registry_vanilla_or_custom_tag(key: &'static str) -> Identifier {
     if let Some(key) = key.strip_prefix("c:") {
         Identifier::new(String::from("c"), key)

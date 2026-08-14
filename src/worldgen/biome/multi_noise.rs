@@ -3,7 +3,6 @@ use crate::registry::biome::BiomeRef;
 use crate::worldgen::backend::ir::json::MultiNoiseBiomeParametersJson;
 use crate::worldgen::biome::climate::{Parameter, ParameterList, ParameterPoint};
 
-#[must_use]
 pub fn build_parameter_list(json: &MultiNoiseBiomeParametersJson) -> ParameterList<BiomeRef> {
     let values = json
         .biomes

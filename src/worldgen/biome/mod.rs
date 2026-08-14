@@ -7,7 +7,6 @@ pub use biome_source::BiomeSourceKind;
 
 use sha2::{Digest, Sha256};
 
-#[must_use]
 pub fn obfuscate_biome_seed(seed: i64) -> i64 {
     let mut hasher = Sha256::new();
     hasher.update(seed.to_le_bytes());

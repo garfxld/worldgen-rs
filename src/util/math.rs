@@ -11,7 +11,6 @@ use std::{
 
 #[cfg(not(target_feature = "avx512f"))]
 #[inline]
-#[must_use]
 fn transpose<F>(
     r0: Simd<F, 4>,
     r1: Simd<F, 4>,
@@ -30,17 +29,13 @@ where
     (col0, col1, col2, col3)
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn fast_floor(v: f64) -> i32 {
     let i = v as i32;
     if v < f64::from(i) { i - 1 } else { i }
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn fast_floor_simd<F, I, const N: usize>(v: Simd<F, N>) -> Simd<I, N>
 where
     F: SimdElement + SimdCast,
@@ -56,7 +51,6 @@ where
 }
 
 #[inline]
-#[must_use]
 pub fn fast_lfloor(v: f64) -> i64 {
     let i = v as i64;
     if v < i as f64 { i - 1 } else { i }
@@ -66,7 +60,6 @@ const ROUND_OFF: f64 = 33_554_432.0;
 const HALF_ROUND_OFF: f64 = ROUND_OFF / 2.0;
 
 #[inline]
-#[must_use]
 pub fn wrap_simd<F, const N: usize>(x: Simd<F, N>) -> Simd<F, N>
 where
     F: SimdElement + SimdCast,
@@ -88,7 +81,6 @@ where
 }
 
 #[inline]
-#[must_use]
 pub fn wrap(x: f64) -> f64 {
     if (-HALF_ROUND_OFF..HALF_ROUND_OFF).contains(&x) {
         return x;
@@ -136,14 +128,11 @@ pub const GRADIENT_4: [[f64; 4]; 16] = [
 ];
 
 #[inline]
-#[must_use]
 pub fn dot(g: &[f64; 3], x: f64, y: f64, z: f64) -> f64 {
     g[0] * x + g[1] * y + g[2] * z
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn grad_dot_4x<F>(hashes: [usize; 4], x: Simd<F, 4>, y: Simd<F, 4>, z: Simd<F, 4>) -> Simd<F, 4>
 where
     F: SimdElement + SimdCast,
@@ -171,7 +160,6 @@ where
 }
 
 #[inline]
-#[must_use]
 pub fn grad_dot_simd<F, const N: usize>(
     hashes: [usize; N],
     x: Simd<F, N>,
@@ -213,16 +201,13 @@ where
     }
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn grad_dot(hash: usize, x: f64, y: f64, z: f64) -> f64 {
     let g = &GRADIENT[hash & 15];
     g[0] * x + g[1] * y + g[2] * z
 }
 
 #[inline]
-#[must_use]
 pub fn corner_noise_3d(index: usize, x: f64, y: f64, z: f64, base: f64) -> f64 {
     let t0 = base - x * x - y * y - z * z;
     if t0 < 0.0 {
@@ -234,7 +219,6 @@ pub fn corner_noise_3d(index: usize, x: f64, y: f64, z: f64, base: f64) -> f64 {
 }
 
 #[inline]
-#[must_use]
 pub fn clamped_lerp(min: f64, max: f64, factor: f64) -> f64 {
     if factor < 0.0 {
         min
@@ -246,7 +230,6 @@ pub fn clamped_lerp(min: f64, max: f64, factor: f64) -> f64 {
 }
 
 #[inline]
-#[must_use]
 pub fn clamped_lerp_simd<const N: usize>(
     min: Simd<f64, N>,
     max: Simd<f64, N>,
@@ -264,7 +247,6 @@ pub fn clamped_lerp_simd<const N: usize>(
 }
 
 #[inline]
-#[must_use]
 pub fn clamp(value: f64, min: f64, max: f64) -> f64 {
     if value < min {
         min
@@ -276,7 +258,6 @@ pub fn clamp(value: f64, min: f64, max: f64) -> f64 {
 }
 
 #[inline]
-#[must_use]
 pub const fn clamp_i32(value: i32, min: i32, max: i32) -> i32 {
     if value < min {
         min
@@ -288,21 +269,16 @@ pub const fn clamp_i32(value: i32, min: i32, max: i32) -> i32 {
 }
 
 #[inline]
-#[must_use]
 pub fn inverse_lerp(value: f64, a: f64, b: f64) -> f64 {
     (value - a) / (b - a)
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn lerp(alpha: f64, a: f64, b: f64) -> f64 {
     a + alpha * (b - a)
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn lerp_simd<F, const N: usize>(alpha: Simd<F, N>, a: Simd<F, N>, b: Simd<F, N>) -> Simd<F, N>
 where
     F: SimdElement,
@@ -313,16 +289,12 @@ where
     a + alpha * (b - a)
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn lerp2(a1: f64, a2: f64, x00: f64, x10: f64, x01: f64, x11: f64) -> f64 {
     lerp(a2, lerp(a1, x00, x10), lerp(a1, x01, x11))
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn lerp2_simd<F, const N: usize>(
     a1: Simd<F, N>,
     a2: Simd<F, N>,
@@ -340,9 +312,7 @@ where
     lerp_simd(a2, lerp_simd(a1, x00, x10), lerp_simd(a1, x01, x11))
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 #[expect(
     clippy::too_many_arguments,
     reason = "matches vanilla's Mth.lerp3 signature with 8 grid corner values"
@@ -369,7 +339,6 @@ pub fn lerp3(
 
 #[inline]
 #[expect(clippy::too_many_arguments, reason = "mirrors lerp3 with SIMD vectors")]
-#[must_use]
 pub fn lerp3_simd<F, const N: usize>(
     a1: Simd<F, N>,
     a2: Simd<F, N>,
@@ -397,33 +366,27 @@ where
 }
 
 #[inline]
-#[must_use]
 pub fn map(value: f64, from_min: f64, from_max: f64, to_min: f64, to_max: f64) -> f64 {
     lerp(inverse_lerp(value, from_min, from_max), to_min, to_max)
 }
 
 #[inline]
-#[must_use]
 pub fn map_clamped(value: f64, from_min: f64, from_max: f64, to_min: f64, to_max: f64) -> f64 {
     let t = (value - from_min) / (from_max - from_min);
     clamped_lerp(to_min, to_max, t)
 }
 
-#[expect(clippy::inline_always, reason = "hot-path noise primitive")]
 #[inline(always)]
-#[must_use]
 pub fn smoothstep(x: f64) -> f64 {
     x * x * x * (x * (x * 6.0 - 15.0) + 10.0)
 }
 
 #[inline]
-#[must_use]
 pub fn smoothstep_derivative(x: f64) -> f64 {
     30.0 * x * x * (x - 1.0) * (x - 1.0)
 }
 
 #[inline]
-#[must_use]
 pub fn smoothstep_simd<F, const N: usize>(x: Simd<F, N>) -> Simd<F, N>
 where
     F: SimdElement + SimdCast,
@@ -437,19 +400,16 @@ where
 }
 
 #[inline]
-#[must_use]
 pub fn bias_towards_extreme(noise: f64, factor: f64) -> f64 {
     noise + (PI * noise).sin() * factor / PI
 }
 
 #[inline]
-#[must_use]
 pub fn cube(x: f64) -> f64 {
     x * x * x
 }
 
 #[inline]
-#[must_use]
 pub fn square(x: f64) -> f64 {
     x * x
 }
@@ -470,14 +430,12 @@ static SIN_TABLE: LazyLock<Box<[f32; TRIG_TABLE_LEN]>> = LazyLock::new(|| {
 });
 
 #[inline]
-#[must_use]
 pub fn sin(angle: f64) -> f32 {
     let idx = (((angle * TRIG_INDEX_SCALE) as i64) & TRIG_TABLE_MASK) as usize;
     SIN_TABLE[idx]
 }
 
 #[inline]
-#[must_use]
 pub fn cos(angle: f64) -> f32 {
     let idx = (((angle * TRIG_INDEX_SCALE + 16_384.0) as i64) & TRIG_TABLE_MASK) as usize;
     SIN_TABLE[idx]
@@ -525,13 +483,7 @@ mod tests {
         let inputs = [12.0, -1e9, HALF_ROUND_OFF, ROUND_OFF * 2.5];
         let actual = wrap_simd(f64x4::from_array(inputs)).to_array();
         for (input, lane) in inputs.into_iter().zip(actual) {
-            #[expect(
-                clippy::float_cmp,
-                reason = "SIMD and scalar wrap must produce bit-identical results per lane"
-            )]
-            {
-                assert_eq!(lane, wrap(input));
-            }
+            assert_eq!(lane, wrap(input));
         }
     }
 
