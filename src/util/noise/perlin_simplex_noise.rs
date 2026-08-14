@@ -43,7 +43,8 @@ impl PerlinSimplexNoise {
         }
 
         if high_freq_octaves > 0 {
-            let positive_octave_seed = (zero_octave_self_sample * POSITIVE_OCTAVE_SEED_SCALE) as i64;
+            let positive_octave_seed =
+                (zero_octave_self_sample * POSITIVE_OCTAVE_SEED_SCALE) as i64;
             let mut high_freq_random =
                 RandomSource::Legacy(LegacyRandomSource::from_seed(positive_octave_seed as u64));
 

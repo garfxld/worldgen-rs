@@ -81,7 +81,8 @@ impl ClimateSampler {
         while radius <= max_radius {
             let offset_x = (f64::from(angle).sin() * f64::from(radius)) as i32;
             let offset_z = (f64::from(angle).cos() * f64::from(radius)) as i32;
-            let candidate = self.spawn_candidate(targets, origin.x() + offset_x, origin.z() + offset_z);
+            let candidate =
+                self.spawn_candidate(targets, origin.x() + offset_x, origin.z() + offset_z);
             if candidate.fitness < best.fitness {
                 best = candidate;
             }

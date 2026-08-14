@@ -128,7 +128,9 @@ const GLOBAL_PALETTE_CUTOVER: usize = 64;
 
 impl<V: PackedValue> Packed<V> {
     fn from_values(values: &[V], volume: usize) -> Self {
-        let mut palette = LocalPalette { entries: Vec::new() };
+        let mut palette = LocalPalette {
+            entries: Vec::new(),
+        };
         let mut ids = Vec::with_capacity(volume);
         for &value in values {
             let id = match palette.id_for(value) {
@@ -371,7 +373,12 @@ impl<V: PackedValue + Debug, const DIM: usize> PalettedContainer<V, DIM> {
                 let index = Self::index_of(x, y, z);
                 let old = packed.set(index, value);
                 if let Packed::Local { palette, .. } = packed.as_ref()
-                    && palette.entries.iter().filter(|(_, count)| *count > 0).count() == 1
+                    && palette
+                        .entries
+                        .iter()
+                        .filter(|(_, count)| *count > 0)
+                        .count()
+                        == 1
                 {
                     let (only_value, _) = palette
                         .entries
@@ -398,7 +405,11 @@ impl BlockPalette {
     pub fn non_empty_block_count(&self) -> u16 {
         match self {
             Self::Homogeneous(v) => {
-                if v.0 == 0 { 0 } else { Self::VOLUME as u16 }
+                if v.0 == 0 {
+                    0
+                } else {
+                    Self::VOLUME as u16
+                }
             }
             Self::Heterogeneous(packed) => match packed.as_ref() {
                 Packed::Local { palette, .. } => palette
@@ -407,9 +418,7 @@ impl BlockPalette {
                     .filter(|(v, _)| v.0 != 0)
                     .map(|&(_, count)| count)
                     .sum(),
-                Packed::Global { ids } => {
-                    ids.iter().filter(|&id| id != 0).count() as u16
-                }
+                Packed::Global { ids } => ids.iter().filter(|&id| id != 0).count() as u16,
             },
             Self::Building(cube) => {
                 let mut count: u16 = 0;
@@ -547,7 +556,10 @@ mod tests {
         container.set(0, 0, 0, BlockState(2));
         assert!(matches!(container, BlockPalette::Heterogeneous(_)));
         container.set(0, 0, 0, BlockState(1));
-        assert!(matches!(container, BlockPalette::Homogeneous(BlockState(1))));
+        assert!(matches!(
+            container,
+            BlockPalette::Homogeneous(BlockState(1))
+        ));
     }
 
     #[test]
@@ -577,10 +589,7 @@ mod tests {
             }
         }
         let container = BlockPalette::from_cube(&cube);
-        assert!(matches!(
-            container,
-            BlockPalette::Heterogeneous(_)
-        ));
+        assert!(matches!(container, BlockPalette::Heterogeneous(_)));
         for y in 0..16 {
             for z in 0..16 {
                 for x in 0..16 {

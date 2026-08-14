@@ -626,11 +626,7 @@ impl BlockRegistry {
             .expect("Property not found on this block")
     }
 
-    pub fn try_get_property<P: Property>(
-        &self,
-        id: BlockState,
-        property: &P,
-    ) -> Option<P::Value> {
+    pub fn try_get_property<P: Property>(&self, id: BlockState, property: &P) -> Option<P::Value> {
         let block = self.by_state_id(id).expect("Invalid state ID");
 
         let property_index = block

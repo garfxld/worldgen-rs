@@ -9,6 +9,7 @@ use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_blocks;
 use crate::util::ident::BlockState;
 use crate::util::pos::{BlockPos, ChunkPos};
+use crate::worldgen::carver::CarvingMask;
 
 fn empty_postprocessing(height: i32) -> Box<[Vec<u16>]> {
     let section_count = (height / 16) as usize;
@@ -22,6 +23,7 @@ pub struct Chunk {
     height: i32,
     heightmaps: RwLock<ChunkHeightmaps>,
     postprocessing: Mutex<Box<[Vec<u16>]>>,
+    carving_mask: Mutex<Option<CarvingMask>>,
 }
 
 impl Chunk {
@@ -34,6 +36,7 @@ impl Chunk {
             min_y,
             height,
             heightmaps: RwLock::new(ChunkHeightmaps::empty()),
+            carving_mask: Mutex::new(None),
         }
     }
 
@@ -444,6 +447,13 @@ impl GenerationChunk<'_, CarversPhase> {
     pub fn prime_world_surface_heightmap(self) {
         self.chunk
             .prime_heightmaps(&[HeightmapType::WorldSurfaceWg]);
+    }
+
+    pub fn with_carving_mask<R>(self, f: impl FnOnce(&mut CarvingMask) -> R) -> R {
+        let mut guard = self.chunk.carving_mask.lock();
+        let mask =
+            guard.get_or_insert_with(|| CarvingMask::new(self.chunk.height, self.chunk.min_y));
+        f(mask)
     }
 
     #[inline]

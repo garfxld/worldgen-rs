@@ -6,7 +6,11 @@ pub fn compute_bounds(df: &DensityFunction, program: &DensityProgram) -> (f64, f
     bounds_of(df, program, &mut visiting)
 }
 
-fn bounds_of(df: &DensityFunction, program: &DensityProgram, visiting: &mut Vec<String>) -> (f64, f64) {
+fn bounds_of(
+    df: &DensityFunction,
+    program: &DensityProgram,
+    visiting: &mut Vec<String>,
+) -> (f64, f64) {
     let unbounded = (f64::NEG_INFINITY, f64::INFINITY);
 
     match df {

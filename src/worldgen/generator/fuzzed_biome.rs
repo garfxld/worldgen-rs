@@ -1,5 +1,6 @@
-use glam::IVec3;
+use glam::{DVec3, IVec3};
 
+use crate::util::pos::BlockPos;
 use crate::worldgen::surface::SurfaceBiomeProvider;
 
 #[inline]
@@ -189,4 +190,70 @@ impl SurfaceBiomeProvider for FuzzedBiomeColumn<'_> {
     fn biome_id(&mut self, block_y: i32) -> u16 {
         self.get(block_y)
     }
+}
+
+pub fn fuzzed_biome_at_block<F: FnMut(IVec3) -> u16>(
+    biome_zoom_seed: i64,
+    pos: BlockPos,
+    mut quart_biome: F,
+) -> u16 {
+    let abs = pos.0 - IVec3::splat(2);
+    let parent = IVec3::new(abs.x >> 2, abs.y >> 2, abs.z >> 2);
+    let fract = DVec3::new(
+        f64::from(abs.x & 3),
+        f64::from(abs.y & 3),
+        f64::from(abs.z & 3),
+    ) / 4.0;
+
+    let mut min_i = 0usize;
+    let mut min_dist = f64::INFINITY;
+
+    for i in 0..8usize {
+        let x_even = (i & 4) == 0;
+        let y_even = (i & 2) == 0;
+        let z_even = (i & 1) == 0;
+        let cx = if x_even { parent.x } else { parent.x + 1 };
+        let cy = if y_even { parent.y } else { parent.y + 1 };
+        let cz = if z_even { parent.z } else { parent.z + 1 };
+        let dx = if x_even { fract.x } else { fract.x - 1.0 };
+        let dy = if y_even { fract.y } else { fract.y - 1.0 };
+        let dz = if z_even { fract.z } else { fract.z - 1.0 };
+
+        let mut rval = lcg_next(biome_zoom_seed, i64::from(cx));
+        rval = lcg_next(rval, i64::from(cy));
+        rval = lcg_next(rval, i64::from(cz));
+        rval = lcg_next(rval, i64::from(cx));
+        rval = lcg_next(rval, i64::from(cy));
+        rval = lcg_next(rval, i64::from(cz));
+        let fx = get_fiddle(rval);
+        rval = lcg_next(rval, biome_zoom_seed);
+        let fy = get_fiddle(rval);
+        rval = lcg_next(rval, biome_zoom_seed);
+        let fz = get_fiddle(rval);
+
+        let dist = (dx + fx).powi(2) + (dy + fy).powi(2) + (dz + fz).powi(2);
+        if min_dist > dist {
+            min_i = i;
+            min_dist = dist;
+        }
+    }
+
+    let b = IVec3::new(
+        if (min_i & 4) == 0 {
+            parent.x
+        } else {
+            parent.x + 1
+        },
+        if (min_i & 2) == 0 {
+            parent.y
+        } else {
+            parent.y + 1
+        },
+        if (min_i & 1) == 0 {
+            parent.z
+        } else {
+            parent.z + 1
+        },
+    );
+    quart_biome(b)
 }

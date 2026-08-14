@@ -49,14 +49,13 @@ impl EndIslands {
                     continue;
                 }
 
-                let island_size = ((island_x as f32).abs() * 3439.0
-                    + (island_z as f32).abs() * 147.0)
-                    % 13.0
-                    + 9.0;
+                let island_size =
+                    ((island_x as f32).abs() * 3439.0 + (island_z as f32).abs() * 147.0) % 13.0
+                        + 9.0;
                 let dxf = sub_x as f32 - (dx * 2) as f32;
                 let dzf = sub_z as f32 - (dz * 2) as f32;
-                let candidate = (100.0_f32 - (dxf * dxf + dzf * dzf).sqrt() * island_size)
-                    .clamp(-100.0, 80.0);
+                let candidate =
+                    (100.0_f32 - (dxf * dxf + dzf * dzf).sqrt() * island_size).clamp(-100.0, 80.0);
 
                 if candidate > doffs {
                     doffs = candidate;

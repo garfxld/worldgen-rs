@@ -15,6 +15,7 @@ use crate::worldgen::density::{
 };
 use crate::worldgen::surface::{DatapackSurfaceRules, SurfaceSystem};
 
+mod carver;
 mod fuzzed_biome;
 mod surface;
 
@@ -37,6 +38,7 @@ pub struct Generator {
     surface_system: SurfaceSystem,
     surface_extension_biomes: SurfaceExtensionBiomes,
     biome_zoom_seed: i64,
+    seed: i64,
 }
 
 #[derive(Clone, Copy)]
@@ -143,6 +145,7 @@ impl Generator {
             surface_system,
             surface_extension_biomes,
             biome_zoom_seed,
+            seed: seed as i64,
         })
     }
 

@@ -131,6 +131,11 @@ impl ChunkStore {
                 self.generator
                     .build_surface(GenerationChunk::from_chunk(chunk), &neighbor_biomes);
             }
+            ChunkStatus::Carvers => {
+                let chunk = chunk_at(slot, pos);
+                self.generator
+                    .apply_carvers(GenerationChunk::from_chunk(chunk));
+            }
             other => unimplemented!("ChunkStatus::{other:?} not ported yet"),
         }
     }
@@ -291,5 +296,34 @@ mod tests {
                 "water top mismatch at ({x}, {z})"
             );
         }
+    }
+
+    #[test]
+    fn generates_overworld_chunk_to_carvers_without_panicking() {
+        init_global_registry();
+
+        let source = DatapackSource::new(datapack_root());
+        let generator = Generator::new(
+            &source,
+            "overworld",
+            "Overworld",
+            BiomeSourceDimension::Overworld,
+            42,
+        )
+        .expect("generator should build");
+        let store = ChunkStore::new(generator);
+
+        let pos = ChunkPos::new(0, 0);
+        store.generate_to(&[pos], ChunkStatus::Carvers);
+
+        let slot = store
+            .get(pos)
+            .expect("chunk (0,0) should exist after generate_to");
+        assert_eq!(slot.status(), Some(ChunkStatus::Carvers));
+
+        let neighbor_slot = store
+            .get(ChunkPos::new(4, 0))
+            .expect("structure-starts neighbor should be allocated at radius 8");
+        assert_eq!(neighbor_slot.status(), Some(ChunkStatus::StructureStarts));
     }
 }

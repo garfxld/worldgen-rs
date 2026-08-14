@@ -137,18 +137,16 @@ fn nested_spline_matches_evaluator_bit_exactly() {
 
     for input in probe_inputs(&outer_locations) {
         let coord = (input.clamp(0.0, 1.0)) as f32;
-        let expected =
-            spline::evaluate_spline(&outer_locations, &outer_derivatives, coord, |i| {
-                match &outer_points[i].value {
-                    SplineValue::Constant(c) => *c,
-                    SplineValue::Spline(_) => spline::evaluate_spline(
-                        &inner_locations,
-                        &inner_derivatives,
-                        coord,
-                        |j| inner_values[j],
-                    ),
+        let expected = spline::evaluate_spline(&outer_locations, &outer_derivatives, coord, |i| {
+            match &outer_points[i].value {
+                SplineValue::Constant(c) => *c,
+                SplineValue::Spline(_) => {
+                    spline::evaluate_spline(&inner_locations, &inner_derivatives, coord, |j| {
+                        inner_values[j]
+                    })
                 }
-            });
+            }
+        });
         let actual = eval_compiled(&compiled, input);
         assert_eq!(
             actual.to_bits(),

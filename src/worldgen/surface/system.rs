@@ -221,7 +221,8 @@ impl SurfaceSystem {
         let modified_temp = match biome.temperature_modifier {
             TemperatureModifier::None => base_temp,
             TemperatureModifier::Frozen => {
-                let combined = self.frozen_ground_large_variation(xz) + self.frozen_ground_edge_variation(xz);
+                let combined =
+                    self.frozen_ground_large_variation(xz) + self.frozen_ground_edge_variation(xz);
                 if combined < 0.3 {
                     if self.frozen_ground_small_variation(xz) < 0.8 {
                         0.2

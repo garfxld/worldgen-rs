@@ -1,5 +1,6 @@
 pub mod backend;
 pub mod biome;
+pub mod carver;
 pub mod density;
 pub mod generator;
 pub mod scheduler;
@@ -78,7 +79,7 @@ impl Worldgen {
         status: ChunkStatus,
         read: impl FnOnce(&ChunkView<'_>) -> T,
     ) -> Result<T> {
-        if status > ChunkStatus::Surface {
+        if status > ChunkStatus::Carvers {
             return Err(Error::Unsupported(status));
         }
 

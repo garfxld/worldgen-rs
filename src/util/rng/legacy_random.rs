@@ -94,7 +94,11 @@ impl LegacyRandomSource {
             loop {
                 let sample = self.next(31);
                 let modulo = sample % bound;
-                if sample.wrapping_sub(modulo).wrapping_add(bound.wrapping_sub(1)) >= 0 {
+                if sample
+                    .wrapping_sub(modulo)
+                    .wrapping_add(bound.wrapping_sub(1))
+                    >= 0
+                {
                     return modulo;
                 }
             }

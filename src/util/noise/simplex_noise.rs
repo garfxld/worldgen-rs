@@ -65,8 +65,7 @@ impl SimplexNoise {
         let ii = i & 0xFF;
         let jj = j & 0xFF;
         let gi0 = (self.permutation_at(ii + self.permutation_at(jj)) % 12) as usize;
-        let gi1 =
-            (self.permutation_at(ii + i1 + self.permutation_at(jj + j1)) % 12) as usize;
+        let gi1 = (self.permutation_at(ii + i1 + self.permutation_at(jj + j1)) % 12) as usize;
         let gi2 = (self.permutation_at(ii + 1 + self.permutation_at(jj + 1)) % 12) as usize;
 
         let corner0 = corner_noise_3d(gi0, x0, y0, 0.0, 0.5);
@@ -115,14 +114,14 @@ impl SimplexNoise {
         let ii = i & 0xFF;
         let jj = j & 0xFF;
         let kk = k & 0xFF;
-        let gi0 = (self.permutation_at(ii + self.permutation_at(jj + self.permutation_at(kk)))
+        let gi0 = (self.permutation_at(ii + self.permutation_at(jj + self.permutation_at(kk))) % 12)
+            as usize;
+        let gi1 = (self
+            .permutation_at(ii + i1 + self.permutation_at(jj + j1 + self.permutation_at(kk + k1)))
             % 12) as usize;
-        let gi1 = (self.permutation_at(
-            ii + i1 + self.permutation_at(jj + j1 + self.permutation_at(kk + k1)),
-        ) % 12) as usize;
-        let gi2 = (self.permutation_at(
-            ii + i2 + self.permutation_at(jj + j2 + self.permutation_at(kk + k2)),
-        ) % 12) as usize;
+        let gi2 = (self
+            .permutation_at(ii + i2 + self.permutation_at(jj + j2 + self.permutation_at(kk + k2)))
+            % 12) as usize;
         let gi3 = (self
             .permutation_at(ii + 1 + self.permutation_at(jj + 1 + self.permutation_at(kk + 1)))
             % 12) as usize;

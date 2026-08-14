@@ -19,7 +19,14 @@ pub struct BlockLocalAabb {
 impl BlockLocalAabb {
     pub const FULL_BLOCK: Self = Self::new(0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
 
-    pub const fn new(min_x: f64, min_y: f64, min_z: f64, max_x: f64, max_y: f64, max_z: f64) -> Self {
+    pub const fn new(
+        min_x: f64,
+        min_y: f64,
+        min_z: f64,
+        max_x: f64,
+        max_y: f64,
+        max_z: f64,
+    ) -> Self {
         let (min_x, max_x) = ordered_pair(min_x, max_x);
         let (min_y, max_y) = ordered_pair(min_y, max_y);
         let (min_z, max_z) = ordered_pair(min_z, max_z);

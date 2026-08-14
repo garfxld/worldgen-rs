@@ -584,37 +584,34 @@ mod tests {
         let values: Vec<Cell<f64>> = (0..rules.noise_ids().len())
             .map(|_| Cell::new(0.0))
             .collect();
-        let computed_at: Vec<Cell<u64>> = (0..rules.noise_ids().len())
-            .map(|_| Cell::new(0))
-            .collect();
+        let computed_at: Vec<Cell<u64>> =
+            (0..rules.noise_ids().len()).map(|_| Cell::new(0)).collect();
 
-        let resolve = |block_y: i32,
-                       stone_depth_above: i32,
-                       stone_depth_below: i32|
-         -> Option<BlockState> {
-            let noise_cache = SurfaceConditionNoiseCache::new(&values, &computed_at);
-            noise_cache.reset();
-            let mut xz = TemperatureXzCache::new(0, 0);
-            let mut ctx = SurfaceRuleContext::new(
-                0,
-                0,
-                4,
-                0.0,
-                0,
-                false,
-                block_y,
-                stone_depth_above,
-                stone_depth_below,
-                i32::MIN,
-                Some(plains.id() as u16),
-                None,
-                &system,
-                &noise_cache,
-                &mut xz,
-                rules.block_states(),
-            );
-            rules.try_apply(&mut ctx)
-        };
+        let resolve =
+            |block_y: i32, stone_depth_above: i32, stone_depth_below: i32| -> Option<BlockState> {
+                let noise_cache = SurfaceConditionNoiseCache::new(&values, &computed_at);
+                noise_cache.reset();
+                let mut xz = TemperatureXzCache::new(0, 0);
+                let mut ctx = SurfaceRuleContext::new(
+                    0,
+                    0,
+                    4,
+                    0.0,
+                    0,
+                    false,
+                    block_y,
+                    stone_depth_above,
+                    stone_depth_below,
+                    i32::MIN,
+                    Some(plains.id() as u16),
+                    None,
+                    &system,
+                    &noise_cache,
+                    &mut xz,
+                    rules.block_states(),
+                );
+                rules.try_apply(&mut ctx)
+            };
 
         let surface = resolve(70, 1, 100).expect("topmost dry-land plains block should resolve");
         assert_eq!(block_name(surface), "grass_block");

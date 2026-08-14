@@ -588,7 +588,15 @@ impl ImprovedNoise {
 
 #[cfg(not(target_feature = "avx512f"))]
 #[inline]
-fn permutation_gradient_dot(p: &[u8; 256], px: i32, py: i32, pz: i32, fx: f64, fy: f64, fz: f64) -> f64 {
+fn permutation_gradient_dot(
+    p: &[u8; 256],
+    px: i32,
+    py: i32,
+    pz: i32,
+    fx: f64,
+    fy: f64,
+    fz: f64,
+) -> f64 {
     let qx = (px & 0xFF) as u8;
     let qy = (py & 0xFF) as u8;
     let qz = (pz & 0xFF) as u8;

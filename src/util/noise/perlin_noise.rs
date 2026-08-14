@@ -99,8 +99,8 @@ impl PerlinNoise {
         let octave_count = amplitudes.len();
 
         let lowest_freq_input_factor = 2.0_f64.powi(-(zero_octave_index as i32));
-        let lowest_freq_value_factor = 2.0_f64.powi((octave_count - 1) as i32)
-            / (2.0_f64.powi(octave_count as i32) - 1.0);
+        let lowest_freq_value_factor =
+            2.0_f64.powi((octave_count - 1) as i32) / (2.0_f64.powi(octave_count as i32) - 1.0);
         let max_value = Self::edge_value(amplitudes, lowest_freq_value_factor, 2.0);
 
         let mut active_octaves = Vec::with_capacity(noise_levels.len());
@@ -147,9 +147,10 @@ impl PerlinNoise {
 
         for octave in &self.active_octaves {
             let factor = octave.input_factor;
-            let noise_value = octave
-                .noise
-                .noise(wrap(x * factor), wrap(y * factor), wrap(z * factor));
+            let noise_value =
+                octave
+                    .noise
+                    .noise(wrap(x * factor), wrap(y * factor), wrap(z * factor));
             value += octave.output_factor * noise_value;
         }
 
@@ -313,7 +314,11 @@ impl PerlinNoise {
     }
 
     pub fn max_broken_value(&self, y_scale: f64) -> f64 {
-        Self::edge_value(&self.amplitudes, self.lowest_freq_value_factor, y_scale + 2.0)
+        Self::edge_value(
+            &self.amplitudes,
+            self.lowest_freq_value_factor,
+            y_scale + 2.0,
+        )
     }
 
     pub fn get_octave_noise(&self, index: usize) -> Option<&ImprovedNoise> {
