@@ -13,10 +13,13 @@ use crate::worldgen::biome::{BiomeSourceKind, obfuscate_biome_seed};
 use crate::worldgen::density::{
     Aquifer, AquiferResult, Beardifier, ColumnCache, NoiseChunk, Noises, OreVeinifier,
 };
+use crate::worldgen::feature::features;
+use crate::worldgen::feature::sorter::{StepFeatureData, build_features_per_step};
 use crate::worldgen::surface::{DatapackSurfaceRules, SurfaceSystem};
 
 mod carver;
-mod fuzzed_biome;
+mod feature;
+pub mod fuzzed_biome;
 mod surface;
 
 #[derive(Debug, thiserror::Error)]
@@ -39,6 +42,9 @@ pub struct Generator {
     surface_extension_biomes: SurfaceExtensionBiomes,
     biome_zoom_seed: i64,
     seed: i64,
+    sea_level: i32,
+    features_per_step: Vec<StepFeatureData>,
+    possible_biome_ids: FxHashSet<u16>,
 }
 
 #[derive(Clone, Copy)]
@@ -113,6 +119,7 @@ impl Generator {
             BiomeSourceDimension::End => BiomeSourceKind::end(seed),
         };
 
+        let noises_sea_level = noises.sea_level();
         let ore_veinifier = settings.ore_veins_enabled.then(OreVeinifier::new);
         let default_block_id = resolve_block_state(&settings.default_block.name);
         let default_fluid_id = resolve_block_state(&settings.default_fluid.name);
@@ -134,6 +141,15 @@ impl Generator {
             SurfaceExtensionBiomes::from_possible(&biome_source.possible_biomes());
         let biome_zoom_seed = obfuscate_biome_seed(seed as i64);
 
+        let possible_biome_refs = biome_source.possible_biome_refs();
+        let possible_biome_ids = possible_biome_refs
+            .iter()
+            .map(|biome| biome.id() as u16)
+            .collect();
+        let features_per_step = build_features_per_step(&possible_biome_refs, |biome| {
+            features().features_for_biome(*biome)
+        });
+
         Ok(Self {
             biome_source,
             noises,
@@ -146,6 +162,9 @@ impl Generator {
             surface_extension_biomes,
             biome_zoom_seed,
             seed: seed as i64,
+            sea_level: noises_sea_level,
+            features_per_step,
+            possible_biome_ids,
         })
     }
 
@@ -155,6 +174,18 @@ impl Generator {
 
     pub const fn biome_source(&self) -> &BiomeSourceKind {
         &self.biome_source
+    }
+
+    pub const fn sea_level(&self) -> i32 {
+        self.sea_level
+    }
+
+    pub const fn biome_zoom_seed(&self) -> i64 {
+        self.biome_zoom_seed
+    }
+
+    pub const fn seed(&self) -> i64 {
+        self.seed
     }
 
     pub fn create_biomes(&self, chunk: &Chunk) {

@@ -123,6 +123,21 @@ impl<T: 'static> Registry<T> {
         self.tags.insert(tag.clone(), entry_keys);
     }
 
+    pub fn load_tags_from_datapack(
+        &mut self,
+        namespace: &str,
+        directory: &Path,
+    ) -> Result<(), LoadError> {
+        for (tag, members) in tags::load_tag_directory(namespace, directory)? {
+            let known = members
+                .into_iter()
+                .filter(|key| self.by_key.contains_key(key))
+                .collect();
+            self.tags.insert(tag, known);
+        }
+        Ok(())
+    }
+
     pub fn is_in_tag(&self, key: &Identifier, tag: &Identifier) -> bool {
         self.tags.contains(tag, key)
     }
@@ -187,6 +202,10 @@ fn vanilla_datapack_worldgen_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
 }
 
+fn vanilla_datapack_tags_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/tags")
+}
+
 impl Registries {
     pub fn new_vanilla() -> Result<Self, LoadError> {
         Self::new_with_overlay(None)
@@ -199,10 +218,11 @@ impl Registries {
     fn new_with_overlay(overlay_worldgen_dir: Option<&Path>) -> Result<Self, LoadError> {
         let mut fluids = fluid::FluidRegistry::new();
         fluid::vanilla_fluids::register_fluids(&mut fluids);
+        fluids.load_tags_from_datapack("minecraft", &vanilla_datapack_tags_dir().join("fluid"))?;
 
         let mut blocks = blocks::BlockRegistry::new();
         blocks::vanilla_blocks::register_blocks(&mut blocks);
-        blocks::vanilla_block_tags::register_tags(&mut blocks);
+        blocks.load_tags_from_datapack("minecraft", &vanilla_datapack_tags_dir())?;
 
         let mut biomes = biome::BiomeRegistry::new();
         biomes.load_from_datapack("minecraft", &vanilla_datapack_worldgen_dir())?;

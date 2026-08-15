@@ -44,11 +44,8 @@ impl WorldgenRandom {
         self.source.next_i64() as u64 >> (64 - bits)
     }
 
-    pub const fn fork(&mut self) -> Self {
-        Self {
-            source: self.source.fork(),
-            gaussian: MarsagliaPolarGaussian::new(),
-        }
+    pub const fn fork(&mut self) -> XoroshiroRandomSource {
+        self.source.fork()
     }
 
     pub const fn next_i32(&mut self) -> i32 {

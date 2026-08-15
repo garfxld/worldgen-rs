@@ -31,6 +31,7 @@ pub mod vanilla_blocks {
 }
 
 use std::fmt::{self, Debug, Formatter};
+use std::path::Path;
 use std::sync::OnceLock;
 
 use glam::DVec3;
@@ -40,6 +41,7 @@ use crate::registry::blocks::properties::Property;
 use crate::registry::blocks::shapes::ShapeKind;
 use crate::registry::fluid::{FluidRef, FluidState};
 use crate::registry::{REGISTRY, Registry};
+use crate::util::datapack::LoadError;
 use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 
@@ -430,6 +432,15 @@ impl BlockRegistry {
 
     pub fn register_tag(&mut self, tag: Identifier, keys: &[&'static str]) {
         self.registry.register_tag(tag, keys);
+    }
+
+    pub fn load_tags_from_datapack(
+        &mut self,
+        namespace: &str,
+        tags_dir: &Path,
+    ) -> Result<(), LoadError> {
+        self.registry
+            .load_tags_from_datapack(namespace, &tags_dir.join("block"))
     }
 
     pub fn modify_tag(

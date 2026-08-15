@@ -6,11 +6,13 @@ pub mod xoroshiro;
 
 use legacy_random::{LegacyRandomFactory, LegacyRandomSource};
 use name_hash::NameHash;
+use worldgen_random::WorldgenRandom;
 use xoroshiro::{XoroshiroRandomFactory, XoroshiroRandomSource};
 
 pub enum RandomSource {
     Xoroshiro(XoroshiroRandomSource),
     Legacy(LegacyRandomSource),
+    Worldgen(WorldgenRandom),
 }
 
 impl RandomSource {
@@ -18,6 +20,29 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => Self::Xoroshiro(r.fork()),
             Self::Legacy(r) => Self::Legacy(r.fork()),
+            Self::Worldgen(r) => Self::Xoroshiro(r.fork()),
+        }
+    }
+
+    pub const fn set_seed(&mut self, seed: i64) {
+        match self {
+            Self::Xoroshiro(r) => r.set_seed(seed),
+            Self::Legacy(r) => r.set_seed(seed),
+            Self::Worldgen(r) => r.set_seed(seed),
+        }
+    }
+
+    pub fn set_decoration_seed(&mut self, seed: i64, block_x: i32, block_z: i32) -> i64 {
+        match self {
+            Self::Worldgen(r) => r.set_decoration_seed(seed, block_x, block_z),
+            _ => panic!("decoration seeds require a WorldgenRandom source"),
+        }
+    }
+
+    pub fn set_feature_seed(&mut self, decoration_seed: i64, feature_index: i32, step: i32) {
+        match self {
+            Self::Worldgen(r) => r.set_feature_seed(decoration_seed, feature_index, step),
+            _ => panic!("feature seeds require a WorldgenRandom source"),
         }
     }
 
@@ -25,6 +50,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.next_i32(),
             Self::Legacy(r) => r.next_i32(),
+            Self::Worldgen(r) => r.next_i32(),
         }
     }
 
@@ -32,6 +58,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.next_i32_bounded(bound),
             Self::Legacy(r) => r.next_i32_bounded(bound),
+            Self::Worldgen(r) => r.next_i32_bounded(bound),
         }
     }
 
@@ -47,6 +74,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.next_i64(),
             Self::Legacy(r) => r.next_i64(),
+            Self::Worldgen(r) => r.next_i64(),
         }
     }
 
@@ -54,6 +82,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.next_f32(),
             Self::Legacy(r) => r.next_f32(),
+            Self::Worldgen(r) => r.next_f32(),
         }
     }
 
@@ -61,6 +90,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.next_f64(),
             Self::Legacy(r) => r.next_f64(),
+            Self::Worldgen(r) => r.next_f64(),
         }
     }
 
@@ -68,6 +98,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.next_bool(),
             Self::Legacy(r) => r.next_bool(),
+            Self::Worldgen(r) => r.next_bool(),
         }
     }
 
@@ -75,6 +106,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.next_gaussian(),
             Self::Legacy(r) => r.next_gaussian(),
+            Self::Worldgen(r) => r.next_gaussian(),
         }
     }
 
@@ -90,6 +122,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.next_positional(),
             Self::Legacy(r) => r.next_positional(),
+            Self::Worldgen(r) => r.next_positional(),
         }
     }
 
@@ -97,6 +130,7 @@ impl RandomSource {
         match self {
             Self::Xoroshiro(r) => r.consume_count(count),
             Self::Legacy(r) => r.consume_count(count),
+            Self::Worldgen(r) => r.consume_count(count),
         }
     }
 }

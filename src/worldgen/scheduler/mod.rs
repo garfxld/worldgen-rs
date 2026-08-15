@@ -11,6 +11,7 @@ use crate::chunk::section::{ChunkSection, Sections};
 use crate::chunk::status::ChunkStatus;
 use crate::util::pos::ChunkPos;
 use crate::worldgen::generator::Generator;
+use crate::worldgen::region::WorldGenRegion;
 
 pub struct ChunkSlot {
     chunk: OnceLock<Chunk>,
@@ -135,6 +136,35 @@ impl ChunkStore {
                 let chunk = chunk_at(slot, pos);
                 self.generator
                     .apply_carvers(GenerationChunk::from_chunk(chunk));
+            }
+            ChunkStatus::Features => {
+                let neighbor_slots: Vec<Arc<ChunkSlot>> = (-1..=1)
+                    .flat_map(|dz| (-1..=1).map(move |dx| (dx, dz)))
+                    .map(|(dx, dz)| self.slot(ChunkPos::new(pos.0.x + dx, pos.0.y + dz)))
+                    .collect();
+                let chunks: Vec<&Chunk> = neighbor_slots
+                    .iter()
+                    .map(|neighbor| {
+                        neighbor
+                            .chunk()
+                            .unwrap_or_else(|| panic!("neighbor of {pos:?} not allocated"))
+                    })
+                    .collect();
+                let chunks: [&Chunk; 9] = chunks
+                    .try_into()
+                    .unwrap_or_else(|_| panic!("feature region for {pos:?} needs nine chunks"));
+
+                let center = chunk_at(slot, pos);
+                let region = WorldGenRegion::new(
+                    pos,
+                    chunks,
+                    center.min_y(),
+                    center.height(),
+                    self.generator.sea_level(),
+                    self.generator.seed(),
+                    self.generator.biome_zoom_seed(),
+                );
+                self.generator.apply_biome_decoration(&region);
             }
             other => unimplemented!("ChunkStatus::{other:?} not ported yet"),
         }
@@ -296,6 +326,30 @@ mod tests {
                 "water top mismatch at ({x}, {z})"
             );
         }
+    }
+
+    #[test]
+    fn generates_overworld_chunk_to_features_without_panicking() {
+        init_global_registry();
+
+        let source = DatapackSource::new(datapack_root());
+        let generator = Generator::new(
+            &source,
+            "overworld",
+            "Overworld",
+            BiomeSourceDimension::Overworld,
+            42,
+        )
+        .expect("generator should build");
+        let store = ChunkStore::new(generator);
+
+        let pos = ChunkPos::new(0, 0);
+        store.generate_to(&[pos], ChunkStatus::Features);
+
+        let slot = store
+            .get(pos)
+            .expect("chunk (0,0) should exist after generate_to");
+        assert_eq!(slot.status(), Some(ChunkStatus::Features));
     }
 
     #[test]

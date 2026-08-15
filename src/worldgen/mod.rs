@@ -1,8 +1,14 @@
 pub mod backend;
 pub mod biome;
+pub mod block_predicate;
+pub mod block_survival;
 pub mod carver;
 pub mod density;
+pub mod feature;
 pub mod generator;
+pub mod json;
+pub mod placement;
+pub mod region;
 pub mod scheduler;
 pub mod surface;
 
@@ -79,7 +85,7 @@ impl Worldgen {
         status: ChunkStatus,
         read: impl FnOnce(&ChunkView<'_>) -> T,
     ) -> Result<T> {
-        if status > ChunkStatus::Carvers {
+        if status > ChunkStatus::Features {
             return Err(Error::Unsupported(status));
         }
 

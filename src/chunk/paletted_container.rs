@@ -127,6 +127,21 @@ pub enum Packed<V> {
 const GLOBAL_PALETTE_CUTOVER: usize = 64;
 
 impl<V: PackedValue> Packed<V> {
+    fn for_each_distinct(&self, visitor: &mut impl FnMut(V)) {
+        match self {
+            Self::Local { palette, .. } => {
+                for &(value, _) in &palette.entries {
+                    visitor(value);
+                }
+            }
+            Self::Global { ids } => {
+                for id in ids.iter() {
+                    visitor(V::from_global_id(id as u16));
+                }
+            }
+        }
+    }
+
     fn from_values(values: &[V], volume: usize) -> Self {
         let mut palette = LocalPalette {
             entries: Vec::new(),
@@ -298,6 +313,18 @@ impl<V: PackedValue + Debug, const DIM: usize> PalettedContainer<V, DIM> {
                 .flatten()
                 .flatten()
                 .any(|value| predicate(*value)),
+        }
+    }
+
+    pub fn for_each_distinct(&self, visitor: &mut impl FnMut(V)) {
+        match self {
+            Self::Homogeneous(value) => visitor(*value),
+            Self::Heterogeneous(packed) => packed.for_each_distinct(visitor),
+            Self::Building(cube) => {
+                for value in cube.iter().flatten().flatten() {
+                    visitor(*value);
+                }
+            }
         }
     }
 

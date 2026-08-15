@@ -103,6 +103,12 @@ impl Sections {
         }
     }
 
+    pub fn for_each_biome_palette_entry(&self, mut visitor: impl FnMut(u16)) {
+        for section in &self.sections {
+            section.read().biomes.for_each_distinct(&mut visitor);
+        }
+    }
+
     pub fn section_emptiness_map(&self) -> Box<[bool]> {
         self.sections
             .iter()

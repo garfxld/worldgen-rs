@@ -1,6 +1,6 @@
 mod float;
-mod height;
-mod int;
+pub mod height;
+pub mod int;
 mod vertical_anchor;
 
 pub use float::FloatProvider;
