@@ -13,6 +13,9 @@ use crate::util::pos::ChunkPos;
 use crate::worldgen::generator::Generator;
 use crate::worldgen::region::WorldGenRegion;
 
+const FEATURE_REGION_READ_RADIUS: i32 = 8;
+const STRUCTURE_REGION_RADIUS: i32 = 8;
+
 pub struct ChunkSlot {
     chunk: OnceLock<Chunk>,
     status: Mutex<Option<ChunkStatus>>,
@@ -134,14 +137,49 @@ impl ChunkStore {
                     .set(self.build_empty_chunk(pos))
                     .unwrap_or_else(|_| panic!("chunk {pos:?} generated to Empty twice"));
             }
-            ChunkStatus::StructureStarts | ChunkStatus::StructureReferences => {}
+            ChunkStatus::StructureStarts => {
+                self.generator.create_structures(chunk_at(slot, pos));
+            }
+            ChunkStatus::StructureReferences => {
+                let center = chunk_at(slot, pos);
+                let neighbor_slots: Vec<Arc<ChunkSlot>> = (-STRUCTURE_REGION_RADIUS
+                    ..=STRUCTURE_REGION_RADIUS)
+                    .flat_map(|dz| {
+                        (-STRUCTURE_REGION_RADIUS..=STRUCTURE_REGION_RADIUS)
+                            .map(move |dx| (dx, dz))
+                    })
+                    .map(|(dx, dz)| self.slot(ChunkPos::new(pos.0.x + dx, pos.0.y + dz)))
+                    .collect();
+                let neighbors: Vec<&Chunk> = neighbor_slots
+                    .iter()
+                    .map(|neighbor| {
+                        neighbor
+                            .chunk()
+                            .unwrap_or_else(|| panic!("neighbor of {pos:?} not allocated"))
+                    })
+                    .collect();
+                self.generator.create_references(center, &neighbors);
+            }
             ChunkStatus::Biomes => {
                 self.generator.create_biomes(chunk_at(slot, pos));
             }
             ChunkStatus::Noise => {
                 let chunk = chunk_at(slot, pos);
+                let neighbor_slots: Vec<Arc<ChunkSlot>> = (-STRUCTURE_REGION_RADIUS
+                    ..=STRUCTURE_REGION_RADIUS)
+                    .flat_map(|dz| {
+                        (-STRUCTURE_REGION_RADIUS..=STRUCTURE_REGION_RADIUS)
+                            .map(move |dx| (dx, dz))
+                    })
+                    .map(|(dx, dz)| self.slot(ChunkPos::new(pos.0.x + dx, pos.0.y + dz)))
+                    .collect();
+                let neighbors: Vec<&Chunk> = neighbor_slots
+                    .iter()
+                    .filter_map(|neighbor| neighbor.chunk())
+                    .collect();
+                let beardifier = self.generator.beardifier_for_chunk(chunk, &neighbors);
                 self.generator
-                    .fill_from_noise(GenerationChunk::from_chunk(chunk), None);
+                    .fill_from_noise(GenerationChunk::from_chunk(chunk), Some(&beardifier));
             }
             ChunkStatus::Surface => {
                 let chunk = chunk_at(slot, pos);
@@ -172,8 +210,9 @@ impl ChunkStore {
                     .apply_carvers(GenerationChunk::from_chunk(chunk));
             }
             ChunkStatus::Features => {
-                let neighbor_slots: Vec<Arc<ChunkSlot>> = (-1..=1)
-                    .flat_map(|dz| (-1..=1).map(move |dx| (dx, dz)))
+                let read_radius = FEATURE_REGION_READ_RADIUS;
+                let neighbor_slots: Vec<Arc<ChunkSlot>> = (-read_radius..=read_radius)
+                    .flat_map(|dz| (-read_radius..=read_radius).map(move |dx| (dx, dz)))
                     .map(|(dx, dz)| self.slot(ChunkPos::new(pos.0.x + dx, pos.0.y + dz)))
                     .collect();
                 let chunks: Vec<&Chunk> = neighbor_slots
@@ -184,13 +223,11 @@ impl ChunkStore {
                             .unwrap_or_else(|| panic!("neighbor of {pos:?} not allocated"))
                     })
                     .collect();
-                let chunks: [&Chunk; 9] = chunks
-                    .try_into()
-                    .unwrap_or_else(|_| panic!("feature region for {pos:?} needs nine chunks"));
 
                 let center = chunk_at(slot, pos);
                 let region = WorldGenRegion::new(
                     pos,
+                    read_radius,
                     chunks,
                     center.min_y(),
                     center.height(),
@@ -350,6 +387,39 @@ mod tests {
         (15, 8, 50, 62),
         (15, 15, 48, 62),
     ];
+
+    #[test]
+    fn base_height_column_matches_filled_chunk_heightmap() {
+        use crate::chunk::heightmap::HeightmapType;
+
+        init_global_registry();
+
+        let source = DatapackSource::new(datapack_root());
+        let generator = Generator::new(
+            &source,
+            "overworld",
+            "Overworld",
+            BiomeSourceDimension::Overworld,
+            42,
+        )
+        .expect("generator should build");
+
+        let pos = ChunkPos::new(0, 0);
+        let store = ChunkStore::new(generator);
+        store.generate_to(&[pos], ChunkStatus::Noise);
+        let slot = store.get(pos).expect("chunk should exist");
+        let chunk = slot.chunk().expect("chunk allocated at Empty");
+
+        for (x, z) in [(0usize, 0usize), (3, 11), (8, 8), (15, 15)] {
+            let expected = chunk.generation_height_at(HeightmapType::WorldSurfaceWg, x, z);
+            let actual = store.generator().get_base_height(
+                x as i32,
+                z as i32,
+                HeightmapType::WorldSurfaceWg,
+            );
+            assert_eq!(actual, expected, "base height mismatch at ({x}, {z})");
+        }
+    }
 
     #[test]
     fn generates_overworld_chunk_to_noise_matching_old_tree_seed_42() {
@@ -578,5 +648,252 @@ mod tests {
         assert!(stem_count > 0, "expected at least one huge mushroom stem block");
         assert!(lichen_count > 0, "expected at least one glow lichen block");
         assert!(fallen_log_count > 0, "expected at least one fallen oak log segment");
+    }
+}
+
+#[cfg(test)]
+mod structure_tests {
+    use std::path::{Path, PathBuf};
+    use std::sync::Once;
+
+    use super::*;
+    use crate::util::pos::BlockPos;
+    use crate::registry::{REGISTRY, Registries};
+    use crate::worldgen::backend::ir::loader::DatapackSource;
+    use crate::worldgen::generator::BiomeSourceDimension;
+
+    fn datapack_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
+    }
+
+    fn init_global_registry() {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            let registries = Registries::new_vanilla().expect("vanilla datapack should load");
+            let _ = REGISTRY.init(registries);
+        });
+    }
+
+    fn overworld_store(seed: u64) -> ChunkStore {
+        let source = DatapackSource::new(datapack_root());
+        let generator = Generator::new(
+            &source,
+            "overworld",
+            "Overworld",
+            BiomeSourceDimension::Overworld,
+            seed,
+        )
+        .expect("generator should build");
+        ChunkStore::new(generator)
+    }
+
+    #[test]
+    fn structure_pieces_on_dry_land_are_not_waterlogged() {
+        init_global_registry();
+        let store = overworld_store(42);
+
+        let pos = ChunkPos::new(-122, 19);
+        store.generate_to(&[pos], ChunkStatus::Features);
+        let slot = store.get(pos).expect("slot");
+        let chunk = slot.chunk().expect("chunk");
+
+        let mut waterlogged = 0;
+        for relative_y in 0..chunk.height() as usize {
+            for x in 0..16 {
+                for z in 0..16 {
+                    let Some(state) = chunk.get_relative_block(x, relative_y, z) else {
+                        continue;
+                    };
+                    let y = chunk.min_y() + relative_y as i32;
+                    if y < 60 {
+                        continue;
+                    }
+                    if REGISTRY
+                        .blocks
+                        .get_properties(state)
+                        .iter()
+                        .any(|(property, value)| *property == "waterlogged" && *value == "true")
+                    {
+                        waterlogged += 1;
+                    }
+                }
+            }
+        }
+
+        let mut waterloggable = 0;
+        for relative_y in 0..chunk.height() as usize {
+            for x in 0..16 {
+                for z in 0..16 {
+                    let Some(state) = chunk.get_relative_block(x, relative_y, z) else {
+                        continue;
+                    };
+                    if chunk.min_y() + relative_y as i32 >= 60
+                        && REGISTRY
+                            .blocks
+                            .get_properties(state)
+                            .iter()
+                            .any(|(property, _)| *property == "waterlogged")
+                    {
+                        waterloggable += 1;
+                    }
+                }
+            }
+        }
+
+        assert!(
+            waterloggable > 10,
+            "test needs waterloggable village blocks to be meaningful, found {waterloggable}"
+        );
+        assert_eq!(
+            waterlogged, 0,
+            "village blocks above sea level must not be waterlogged"
+        );
+    }
+
+    #[test]
+    fn beardifier_raises_terrain_under_a_village_piece() {
+        use crate::chunk::heightmap::HeightmapType;
+
+        init_global_registry();
+        let store = overworld_store(42);
+
+        let pos = ChunkPos::new(-122, 19);
+        store.generate_to(&[pos], ChunkStatus::Noise);
+        let slot = store.get(pos).expect("slot");
+        let chunk = slot.chunk().expect("chunk");
+
+        let neighbor_slots: Vec<Arc<ChunkSlot>> = (-8..=8)
+            .flat_map(|dz| (-8..=8).map(move |dx| (dx, dz)))
+            .map(|(dx, dz)| store.slot(ChunkPos::new(pos.0.x + dx, pos.0.y + dz)))
+            .collect();
+        let neighbors: Vec<&Chunk> = neighbor_slots
+            .iter()
+            .filter_map(|neighbor| neighbor.chunk())
+            .collect();
+        let beardifier = store.generator().beardifier_for_chunk(chunk, &neighbors);
+        assert!(
+            !beardifier.is_empty(),
+            "village chunk should have beard-affected structure pieces"
+        );
+
+        let starts = chunk.structure_starts();
+        let start = starts
+            .get(&"minecraft:village_plains".parse().expect("valid id"))
+            .expect("village start");
+        let piece_box = start.pieces()[0].bounding_box();
+        let center = piece_box.center();
+        assert_ne!(
+            beardifier.compute(center.x(), piece_box.min_y(), center.z()),
+            0.0,
+            "beard density must be non-zero inside a rigid village piece"
+        );
+
+        let local_x = (center.x() - pos.0.x * 16).clamp(0, 15) as usize;
+        let local_z = (center.z() - pos.0.y * 16).clamp(0, 15) as usize;
+        let surface = chunk.generation_height_at(HeightmapType::WorldSurfaceWg, local_x, local_z);
+        assert!(
+            (surface - piece_box.min_y()).abs() <= 6,
+            "terrain under the village should sit near the piece floor: surface {surface}, piece {}",
+            piece_box.min_y()
+        );
+    }
+
+    #[test]
+    fn random_spread_placement_selects_one_chunk_per_grid_cell() {
+        use crate::worldgen::structure;
+
+        init_global_registry();
+        let store = overworld_store(42);
+        let set = structure::registry()
+            .sets()
+            .iter()
+            .find(|set| set.key.to_string() == "minecraft:villages")
+            .copied()
+            .expect("villages set");
+
+        let mut candidates = Vec::new();
+        for x in -40..40 {
+            for z in -40..40 {
+                if set.placement.is_placement_chunk(store.generator().seed(), x, z, None) {
+                    candidates.push(ChunkPos::new(x, z));
+                }
+            }
+        }
+
+        assert_eq!(
+            candidates,
+            vec![
+                ChunkPos::new(-29, -21),
+                ChunkPos::new(-19, 10),
+                ChunkPos::new(9, 11),
+                ChunkPos::new(10, -27),
+                ChunkPos::new(36, 25),
+            ]
+        );
+    }
+
+    #[test]
+    fn jigsaw_start_assembles_a_plains_village() {
+        init_global_registry();
+        let store = overworld_store(42);
+
+        let pos = ChunkPos::new(-122, 19);
+        store.generate_to(&[pos], ChunkStatus::StructureStarts);
+        let slot = store.get(pos).expect("slot");
+        let chunk = slot.chunk().expect("chunk");
+        let starts = chunk.structure_starts();
+        let start = starts
+            .get(&"minecraft:village_plains".parse().expect("valid id"))
+            .expect("village_plains start at (-122, 19)");
+
+        assert!(start.is_valid());
+        assert!(
+            start.pieces().len() > 1,
+            "village should expand past its town centre, got {} pieces",
+            start.pieces().len()
+        );
+        assert!(start.bounding_box().is_inside(BlockPos::new(
+            pos.0.x * 16 + 8,
+            start.bounding_box().min_y(),
+            pos.0.y * 16 + 8
+        )));
+    }
+
+    #[test]
+    fn structure_pieces_are_written_during_the_features_step() {
+        init_global_registry();
+        let store = overworld_store(42);
+
+        let pos = ChunkPos::new(-122, 19);
+        store.generate_to(&[pos], ChunkStatus::Features);
+        let slot = store.get(pos).expect("slot");
+        let chunk = slot.chunk().expect("chunk");
+
+        let mut village_blocks = 0;
+        let mut jigsaw_blocks = 0;
+        for relative_y in 0..chunk.height() as usize {
+            for x in 0..16 {
+                for z in 0..16 {
+                    let Some(state) = chunk.get_relative_block(x, relative_y, z) else {
+                        continue;
+                    };
+                    let Some(block) = REGISTRY.blocks.by_state_id(state) else {
+                        continue;
+                    };
+                    match block.key.path.as_ref() {
+                        "jigsaw" => jigsaw_blocks += 1,
+                        "oak_planks" | "cobblestone" | "oak_log" | "oak_stairs" | "dirt_path"
+                        | "oak_fence" | "cobblestone_stairs" => village_blocks += 1,
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        assert_eq!(jigsaw_blocks, 0, "jigsaw blocks must be replaced on place");
+        assert!(
+            village_blocks > 50,
+            "expected village blocks in the chunk, found {village_blocks}"
+        );
     }
 }

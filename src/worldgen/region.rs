@@ -10,11 +10,11 @@ use crate::util::pos::{BlockPos, ChunkPos};
 use crate::util::rng::RandomSource;
 
 pub const FEATURE_REGION_RADIUS: i32 = 1;
-const FEATURE_REGION_SIZE: usize = 3;
 
 pub struct WorldGenRegion<'a> {
     center: ChunkPos,
-    chunks: [&'a Chunk; FEATURE_REGION_SIZE * FEATURE_REGION_SIZE],
+    read_radius: i32,
+    chunks: Vec<&'a Chunk>,
     min_y: i32,
     height: i32,
     sea_level: i32,
@@ -30,7 +30,8 @@ impl<'a> WorldGenRegion<'a> {
     )]
     pub const fn new(
         center: ChunkPos,
-        chunks: [&'a Chunk; FEATURE_REGION_SIZE * FEATURE_REGION_SIZE],
+        read_radius: i32,
+        chunks: Vec<&'a Chunk>,
         min_y: i32,
         height: i32,
         sea_level: i32,
@@ -40,6 +41,7 @@ impl<'a> WorldGenRegion<'a> {
     ) -> Self {
         Self {
             center,
+            read_radius,
             chunks,
             min_y,
             height,
@@ -82,18 +84,18 @@ impl<'a> WorldGenRegion<'a> {
         y >= self.min_y && y < self.min_y + self.height
     }
 
-    pub const fn chunk(&self, pos: ChunkPos) -> Option<&'a Chunk> {
+    pub fn chunk(&self, pos: ChunkPos) -> Option<&'a Chunk> {
         let dx = pos.0.x - self.center.0.x;
         let dz = pos.0.y - self.center.0.y;
-        if dx.abs() > FEATURE_REGION_RADIUS || dz.abs() > FEATURE_REGION_RADIUS {
+        if dx.abs() > self.read_radius || dz.abs() > self.read_radius {
             return None;
         }
-        let index = (dz + FEATURE_REGION_RADIUS) as usize * FEATURE_REGION_SIZE
-            + (dx + FEATURE_REGION_RADIUS) as usize;
+        let size = (self.read_radius * 2 + 1) as usize;
+        let index = (dz + self.read_radius) as usize * size + (dx + self.read_radius) as usize;
         Some(self.chunks[index])
     }
 
-    const fn chunk_at_block(&self, pos: BlockPos) -> Option<&'a Chunk> {
+    fn chunk_at_block(&self, pos: BlockPos) -> Option<&'a Chunk> {
         self.chunk(ChunkPos::new(pos.0.x >> 4, pos.0.z >> 4))
     }
 

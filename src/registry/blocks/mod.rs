@@ -551,6 +551,24 @@ impl BlockRegistry {
         ))
     }
 
+    pub fn parse_for_block(&self, input: &str) -> Option<BlockState> {
+        let (name, properties) = match input.split_once('[') {
+            Some((name, rest)) => (name, rest.strip_suffix(']')?),
+            None => (input, ""),
+        };
+        let key: Identifier = name.trim().parse().ok()?;
+        let block = self.by_key(&key)?;
+        let entries: Vec<(&str, &str)> = properties
+            .split(',')
+            .filter(|entry| !entry.trim().is_empty())
+            .filter_map(|entry| {
+                let (property, value) = entry.split_once('=')?;
+                Some((property.trim(), value.trim()))
+            })
+            .collect();
+        self.state_id_from_block_defaulted_properties(block, entries)
+    }
+
     pub fn state_id_from_block_defaulted_properties<'a>(
         &self,
         block: BlockRef,

@@ -11,6 +11,7 @@ pub mod noise;
 pub mod pos;
 pub mod rng;
 pub mod rotation;
+pub mod shapes;
 pub mod value_providers;
 
 use crate::util::rng::RandomSource;

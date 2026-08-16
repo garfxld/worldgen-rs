@@ -1,5 +1,8 @@
 use serde::Deserialize;
 
+use crate::chunk::heightmap::HeightmapType;
+use crate::registry::REGISTRY;
+use crate::registry::blocks::vanilla_blocks;
 use crate::util::shuffle;
 use crate::util::axis::Axis;
 use crate::util::ident::BlockState;
@@ -170,6 +173,19 @@ pub enum StructureProcessor {
         delegate: Box<StructureProcessor>,
         limit: IntProvider,
     },
+    #[serde(rename = "minecraft:gravity")]
+    Gravity {
+        #[serde(default = "default_gravity_heightmap")]
+        heightmap: HeightmapType,
+        #[serde(default)]
+        offset: i32,
+    },
+    #[serde(rename = "minecraft:jigsaw_replacement")]
+    JigsawReplacement,
+}
+
+const fn default_gravity_heightmap() -> HeightmapType {
+    HeightmapType::WorldSurfaceWg
 }
 
 impl StructureProcessor {
@@ -239,6 +255,45 @@ impl StructureProcessor {
                     }
                 }
                 Some(processed)
+            }
+            Self::Gravity { heightmap, offset } => {
+                let pos = processed.pos;
+                let height = region.get_height(*heightmap, pos.x(), pos.z()) + offset;
+                let delta = template_relative_pos.y();
+                Some(StructureBlockInfo {
+                    pos: BlockPos::new(pos.x(), height + delta, pos.z()),
+                    state: processed.state,
+                    nbt: processed.nbt,
+                })
+            }
+            Self::JigsawReplacement => {
+                let is_jigsaw = REGISTRY
+                    .blocks
+                    .by_state_id(processed.state)
+                    .is_some_and(|block| block.key == vanilla_blocks::JIGSAW.key);
+                if !is_jigsaw {
+                    return Some(processed);
+                }
+                let Some(nbt) = processed.nbt.as_ref() else {
+                    return Some(processed);
+                };
+                let final_state = nbt
+                    .string("final_state")
+                    .map_or_else(|| String::from("minecraft:air"), |value| value.to_string());
+                let state = REGISTRY.blocks.parse_for_block(&final_state)?;
+                let is_void = REGISTRY
+                    .blocks
+                    .by_state_id(state)
+                    .is_some_and(|block| block.key == vanilla_blocks::STRUCTURE_VOID.key);
+                if is_void {
+                    None
+                } else {
+                    Some(StructureBlockInfo {
+                        pos: processed.pos,
+                        state,
+                        nbt: None,
+                    })
+                }
             }
         }
     }

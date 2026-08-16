@@ -5,10 +5,10 @@ use crate::util::pos::{BlockPos, ChunkPos};
 use crate::util::rng::RandomSource;
 use crate::util::rng::worldgen_random::WorldgenRandom;
 use crate::worldgen::feature::features;
-use crate::worldgen::generator::Generator;
+use crate::worldgen::generator::{GENERATION_STEPS, Generator};
 use crate::worldgen::region::WorldGenRegion;
 
-const GENERATION_STEPS: usize = 11;
+
 
 impl Generator {
     pub fn apply_biome_decoration(&self, region: &WorldGenRegion<'_>) {
@@ -37,6 +37,8 @@ impl Generator {
 
         let mut features_this_step: Vec<usize> = Vec::new();
         for step in 0..generation_steps {
+            self.place_structures_for_step(region, &mut random, decoration_seed, step);
+
             if step >= feature_step_count {
                 continue;
             }

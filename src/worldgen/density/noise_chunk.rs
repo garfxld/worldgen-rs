@@ -68,6 +68,108 @@ impl NoiseChunk {
         }
     }
 
+    pub fn new_column(block_x: i32, block_z: i32, noises: &Noises) -> Self {
+        let cell_width = noises.cell_width();
+        let mut chunk = Self::new(
+            block_x.div_euclid(cell_width) * cell_width,
+            block_z.div_euclid(cell_width) * cell_width,
+            noises,
+        );
+        chunk.cell_count_xz = 1;
+        chunk
+    }
+
+    pub fn iterate_column<F>(
+        &mut self,
+        noises: &Noises,
+        cache: &mut ColumnCache,
+        block_x: i32,
+        block_z: i32,
+        mut visit: F,
+    ) -> Option<i32>
+    where
+        F: FnMut(i32, f64, &[f64], &mut ColumnCache) -> bool,
+    {
+        let cell_width = noises.cell_width();
+        let cell_height = noises.cell_height();
+        let corners_y = self.corners_y;
+        let interp_count = self.interp_count;
+        let combine_final = noises.compiled().combine_final();
+
+        let mut local_blended = vec![0.0f64; corners_y];
+        for cx_off in 0..=self.cell_count_xz {
+            let cell_x = self.first_cell_x + cx_off as i32;
+            Self::fill_column_slice(
+                &mut self.slices[cx_off],
+                cell_x,
+                &self.block_ys,
+                &mut local_blended,
+                interp_count,
+                corners_y,
+                self.cell_count_xz,
+                self.first_cell_z,
+                noises,
+                cache,
+            );
+        }
+
+        let zero_cache = vec![0.0f64; noises.compiled().slots()];
+        let mut interpolated = [0.0f64; MAX_INTERP];
+        let factor_x = f64::from(block_x.rem_euclid(cell_width)) / f64::from(cell_width);
+        let factor_z = f64::from(block_z.rem_euclid(cell_width)) / f64::from(cell_width);
+
+        for cell_y_idx in (0..self.cell_count_y).rev() {
+            for y_in_cell in (0..cell_height).rev() {
+                let factor_y = f64::from(y_in_cell) / f64::from(cell_height);
+                let world_y = (self.cell_min_y + cell_y_idx as i32) * cell_height + y_in_cell;
+
+                let i0_base = cell_y_idx * MAX_INTERP;
+                let i1_base = (corners_y + cell_y_idx) * MAX_INTERP;
+                let i0_next = i0_base + MAX_INTERP;
+                let i1_next = i1_base + MAX_INTERP;
+                let s0 = &*self.slices[0];
+                let s1 = &*self.slices[1];
+
+                for ch in 0..interp_count {
+                    let n000 = s0[i0_base + ch];
+                    let n001 = s0[i1_base + ch];
+                    let n100 = s1[i0_base + ch];
+                    let n101 = s1[i1_base + ch];
+                    let n010 = s0[i0_next + ch];
+                    let n011 = s0[i1_next + ch];
+                    let n110 = s1[i0_next + ch];
+                    let n111 = s1[i1_next + ch];
+
+                    let d00 = lerp(factor_y, n000, n010);
+                    let d10 = lerp(factor_y, n100, n110);
+                    let d01 = lerp(factor_y, n001, n011);
+                    let d11 = lerp(factor_y, n101, n111);
+                    let d0 = lerp(factor_x, d00, d10);
+                    let d1 = lerp(factor_x, d01, d11);
+                    interpolated[ch] = lerp(factor_z, d0, d1);
+                }
+
+                // SAFETY: `combine_final` was compiled with `Shape::Combine`'s
+                // signature, matching `(cache, interpolated_ptr, x, y, z) -> f64`.
+                let density = unsafe {
+                    combine_final(
+                        zero_cache.as_ptr(),
+                        interpolated[..interp_count].as_ptr(),
+                        0.0,
+                        f64::from(world_y),
+                        0.0,
+                    )
+                };
+
+                if visit(world_y, density, &interpolated[..interp_count], cache) {
+                    return Some(world_y + 1);
+                }
+            }
+        }
+
+        None
+    }
+
     fn fill_blended_column(noises: &Noises, x: i32, block_ys: &[i32], z: i32, out: &mut [f64]) {
         match noises.blended() {
             Some(blended) => {

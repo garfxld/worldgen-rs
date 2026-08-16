@@ -278,6 +278,14 @@ impl BiomeRegistry {
         self.registry.by_key(key)
     }
 
+    pub fn load_tags_from_datapack(
+        &mut self,
+        namespace: &str,
+        directory: &std::path::Path,
+    ) -> Result<(), crate::util::datapack::DatapackError> {
+        self.registry.load_tags_from_datapack(namespace, directory)
+    }
+
     pub fn is_in_tag(&self, key: &Identifier, tag: &Identifier) -> bool {
         self.registry.is_in_tag(key, tag)
     }

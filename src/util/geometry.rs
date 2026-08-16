@@ -88,6 +88,36 @@ impl BlockLocalAabb {
         self.min.x >= self.max.x || self.min.y >= self.max.y || self.min.z >= self.max.z
     }
 
+    pub const fn of(box_: BoundingBox) -> Self {
+        Self {
+            min: DVec3::new(
+                box_.min.x as f64,
+                box_.min.y as f64,
+                box_.min.z as f64,
+            ),
+            max: DVec3::new(
+                (box_.max.x + 1) as f64,
+                (box_.max.y + 1) as f64,
+                (box_.max.z + 1) as f64,
+            ),
+        }
+    }
+
+    pub fn inflate(self, x_add: f64, y_add: f64, z_add: f64) -> Self {
+        Self::new(
+            self.min.x - x_add,
+            self.min.y - y_add,
+            self.min.z - z_add,
+            self.max.x + x_add,
+            self.max.y + y_add,
+            self.max.z + z_add,
+        )
+    }
+
+    pub fn deflate(self, amount: f64) -> Self {
+        self.inflate(-amount, -amount, -amount)
+    }
+
     pub fn height(self) -> f64 {
         self.max.y - self.min.y
     }
@@ -182,6 +212,65 @@ impl BoundingBox {
                 }
             }
         }
+    }
+
+    pub const fn infinite() -> Self {
+        Self {
+            min: IVec3::new(i32::MIN, i32::MIN, i32::MIN),
+            max: IVec3::new(i32::MAX, i32::MAX, i32::MAX),
+        }
+    }
+
+    pub const fn inflated_by(self, amount: i32) -> Self {
+        self.inflated_by_xyz(amount, amount, amount)
+    }
+
+    pub const fn intersects(self, other: Self) -> bool {
+        self.max.x >= other.min.x
+            && self.min.x <= other.max.x
+            && self.max.z >= other.min.z
+            && self.min.z <= other.max.z
+            && self.max.y >= other.min.y
+            && self.min.y <= other.max.y
+    }
+
+    pub const fn intersects_xz(self, min_x: i32, min_z: i32, max_x: i32, max_z: i32) -> bool {
+        self.max.x >= min_x && self.min.x <= max_x && self.max.z >= min_z && self.min.z <= max_z
+    }
+
+    pub const fn encapsulate_box(self, other: Self) -> Self {
+        Self {
+            min: IVec3::new(
+                if self.min.x < other.min.x { self.min.x } else { other.min.x },
+                if self.min.y < other.min.y { self.min.y } else { other.min.y },
+                if self.min.z < other.min.z { self.min.z } else { other.min.z },
+            ),
+            max: IVec3::new(
+                if self.max.x > other.max.x { self.max.x } else { other.max.x },
+                if self.max.y > other.max.y { self.max.y } else { other.max.y },
+                if self.max.z > other.max.z { self.max.z } else { other.max.z },
+            ),
+        }
+    }
+
+    pub const fn x_span(self) -> i32 {
+        self.max.x - self.min.x + 1
+    }
+
+    pub const fn y_span(self) -> i32 {
+        self.max.y - self.min.y + 1
+    }
+
+    pub const fn z_span(self) -> i32 {
+        self.max.z - self.min.z + 1
+    }
+
+    pub const fn center(self) -> BlockPos {
+        BlockPos::new(
+            self.min.x + (self.max.x - self.min.x + 1) / 2,
+            self.min.y + (self.max.y - self.min.y + 1) / 2,
+            self.min.z + (self.max.z - self.min.z + 1) / 2,
+        )
     }
 
     pub const fn is_inside(self, pos: BlockPos) -> bool {

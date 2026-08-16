@@ -1,9 +1,12 @@
-use rustc_hash::FxHashSet;
+use std::sync::OnceLock;
+
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::chunk::heightmap::{Heightmap, HeightmapType};
 use crate::chunk::proto::{Chunk, GenerationChunk, NoisePhase};
 use crate::registry::REGISTRY;
 use crate::registry::biome::BiomeRef;
+use crate::registry::blocks::vanilla_blocks;
 use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::{BlockPos, ChunkPos};
 use crate::util::rng::RandomSource;
@@ -17,12 +20,16 @@ use crate::worldgen::density::{
 };
 use crate::worldgen::feature::features;
 use crate::worldgen::feature::sorter::{StepFeatureData, build_features_per_step};
+use crate::worldgen::structure::structure::Structure;
+use crate::worldgen::structure::structure_set::StructureSet;
 use crate::worldgen::surface::{DatapackSurfaceRules, SurfaceSystem};
 
 const WORLDGEN_REGION_RANDOM: &str = "minecraft:worldgen_region_random";
+pub const GENERATION_STEPS: usize = 11;
 
 mod carver;
 mod feature;
+mod structure;
 pub mod fuzzed_biome;
 mod surface;
 
@@ -49,6 +56,10 @@ pub struct Generator {
     sea_level: i32,
     features_per_step: Vec<StepFeatureData>,
     possible_biome_ids: FxHashSet<u16>,
+    possible_biomes: Vec<BiomeRef>,
+    possible_structure_sets: OnceLock<Vec<&'static StructureSet>>,
+    structures_by_step: OnceLock<Vec<Vec<(Identifier, &'static Structure)>>>,
+    ring_positions: OnceLock<FxHashMap<Identifier, Vec<ChunkPos>>>,
 }
 
 #[derive(Clone, Copy)]
@@ -169,6 +180,10 @@ impl Generator {
             sea_level: noises_sea_level,
             features_per_step,
             possible_biome_ids,
+            possible_biomes: possible_biome_refs,
+            possible_structure_sets: OnceLock::new(),
+            structures_by_step: OnceLock::new(),
+            ring_positions: OnceLock::new(),
         })
     }
 
@@ -190,6 +205,54 @@ impl Generator {
 
     pub const fn seed(&self) -> i64 {
         self.seed
+    }
+
+    pub fn get_base_height(&self, x: i32, z: i32, heightmap: HeightmapType) -> i32 {
+        let noises = &self.noises;
+        let min_y = noises.min_y();
+        let cell_width = noises.cell_width();
+
+        let mut noise_chunk = NoiseChunk::new_column(x, z, noises);
+        let mut column_cache = ColumnCache::new(noises);
+        column_cache.init_grid(
+            x.div_euclid(cell_width) * cell_width,
+            z.div_euclid(cell_width) * cell_width,
+            noises,
+        );
+
+        let mut aquifer = Aquifer::new_sized(
+            x.div_euclid(cell_width) * cell_width,
+            z.div_euclid(cell_width) * cell_width,
+            cell_width,
+            cell_width,
+            min_y,
+            noises.height(),
+            noises.aquifer_random(),
+            self.aquifers_enabled,
+            self.default_fluid_id,
+            noises,
+            ColumnCache::new(noises),
+        );
+
+        let default_block_id = self.default_block_id;
+        noise_chunk
+            .iterate_column(noises, &mut column_cache, x, z, |world_y, density, _, _| {
+                let state = match aquifer.compute_substance(noises, x, world_y, z, density) {
+                    AquiferResult::Solid => default_block_id,
+                    AquiferResult::Fluid(state) => state,
+                    AquiferResult::Air => REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR),
+                };
+                heightmap.is_opaque(state)
+            })
+            .unwrap_or(min_y)
+    }
+
+    pub fn get_first_free_height(&self, x: i32, z: i32, heightmap: HeightmapType) -> i32 {
+        self.get_base_height(x, z, heightmap)
+    }
+
+    pub fn get_first_occupied_height(&self, x: i32, z: i32, heightmap: HeightmapType) -> i32 {
+        self.get_base_height(x, z, heightmap) - 1
     }
 
     pub fn region_random(&self, pos: ChunkPos) -> RandomSource {

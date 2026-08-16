@@ -226,6 +226,10 @@ impl Registries {
 
         let mut biomes = biome::BiomeRegistry::new();
         biomes.load_from_datapack("minecraft", &vanilla_datapack_worldgen_dir())?;
+        biomes.load_tags_from_datapack(
+            "minecraft",
+            &vanilla_datapack_tags_dir().join("worldgen/biome"),
+        )?;
         if let Some(overlay) = overlay_worldgen_dir {
             biomes.load_from_datapack("minecraft", overlay)?;
         }

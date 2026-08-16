@@ -280,6 +280,29 @@ pub enum FrontAndTop {
     SouthUp,
 }
 
+impl FrontAndTop {
+    pub const fn front(&self) -> Direction {
+        match self {
+            Self::DownEast | Self::DownNorth | Self::DownSouth | Self::DownWest => Direction::Down,
+            Self::UpEast | Self::UpNorth | Self::UpSouth | Self::UpWest => Direction::Up,
+            Self::WestUp => Direction::West,
+            Self::EastUp => Direction::East,
+            Self::NorthUp => Direction::North,
+            Self::SouthUp => Direction::South,
+        }
+    }
+
+    pub const fn top(&self) -> Direction {
+        match self {
+            Self::DownEast | Self::UpEast => Direction::East,
+            Self::DownNorth | Self::UpNorth => Direction::North,
+            Self::DownSouth | Self::UpSouth => Direction::South,
+            Self::DownWest | Self::UpWest => Direction::West,
+            Self::WestUp | Self::EastUp | Self::NorthUp | Self::SouthUp => Direction::Up,
+        }
+    }
+}
+
 impl PropertyEnum for FrontAndTop {
     fn as_str(&self) -> &str {
         match self {

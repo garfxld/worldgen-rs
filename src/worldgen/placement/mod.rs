@@ -472,14 +472,16 @@ mod tests {
             .iter()
             .map(|slot| slot.chunk().expect("chunk allocated"))
             .collect();
-        let chunks: [&Chunk; 9] = chunks.try_into().unwrap_or_else(|_| panic!("nine chunks"));
+        let min_y = chunks[4].min_y();
+        let height = chunks[4].height();
 
         let generator = store.generator();
         let region = WorldGenRegion::new(
             center,
+            1,
             chunks,
-            chunks[4].min_y(),
-            chunks[4].height(),
+            min_y,
+            height,
             generator.sea_level(),
             generator.seed(),
             generator.biome_zoom_seed(),

@@ -1,15 +1,17 @@
 use std::marker::PhantomData;
 
-use parking_lot::{Mutex, RwLock, RwLockReadGuard};
+use parking_lot::{Mutex, MutexGuard, RwLock, RwLockReadGuard};
+use rustc_hash::FxHashMap;
 
 use crate::chunk::heightmap::{ChunkHeightmaps, Heightmap, HeightmapType};
 use crate::chunk::section::Sections;
 use crate::chunk::status::ChunkStatus;
 use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_blocks;
-use crate::util::ident::BlockState;
+use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::{BlockPos, ChunkPos};
 use crate::worldgen::carver::CarvingMask;
+use crate::worldgen::structure::structure_start::StructureStart;
 
 fn empty_postprocessing(height: i32) -> Box<[Vec<u16>]> {
     let section_count = (height / 16) as usize;
@@ -24,6 +26,8 @@ pub struct Chunk {
     heightmaps: RwLock<ChunkHeightmaps>,
     postprocessing: Mutex<Box<[Vec<u16>]>>,
     carving_mask: Mutex<Option<CarvingMask>>,
+    structure_starts: Mutex<FxHashMap<Identifier, StructureStart>>,
+    structure_references: Mutex<FxHashMap<Identifier, Vec<i64>>>,
 }
 
 impl Chunk {
@@ -37,7 +41,17 @@ impl Chunk {
             height,
             heightmaps: RwLock::new(ChunkHeightmaps::empty()),
             carving_mask: Mutex::new(None),
+            structure_starts: Mutex::new(FxHashMap::default()),
+            structure_references: Mutex::new(FxHashMap::default()),
         }
+    }
+
+    pub fn structure_starts(&self) -> MutexGuard<'_, FxHashMap<Identifier, StructureStart>> {
+        self.structure_starts.lock()
+    }
+
+    pub fn structure_references(&self) -> MutexGuard<'_, FxHashMap<Identifier, Vec<i64>>> {
+        self.structure_references.lock()
     }
 
     #[must_use]

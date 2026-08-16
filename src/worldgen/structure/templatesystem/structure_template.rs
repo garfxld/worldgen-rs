@@ -3,8 +3,10 @@ use simdnbt::owned::{NbtCompound, NbtList, NbtTag};
 
 use crate::registry::REGISTRY;
 use crate::registry::blocks::shapes::is_shape_full_block;
+use crate::registry::blocks::properties::Properties;
 use crate::registry::blocks::transform;
 use crate::registry::blocks::vanilla_blocks;
+use crate::registry::fluid::{FluidState, vanilla_fluids};
 use crate::util::direction::Direction;
 use crate::util::geometry::BoundingBox;
 use crate::util::ident::{BlockState, Identifier};
@@ -29,14 +31,116 @@ pub struct StructureEntityInfo {
     pub nbt: NbtCompound,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JointType {
+    Rollable,
+    Aligned,
+}
+
+#[derive(Debug, Clone)]
+pub struct JigsawBlockInfo {
+    pub info: StructureBlockInfo,
+    pub joint_type: JointType,
+    pub name: Identifier,
+    pub pool: Identifier,
+    pub target: Identifier,
+    pub placement_priority: i32,
+    pub selection_priority: i32,
+}
+
+impl JigsawBlockInfo {
+    pub fn of(info: StructureBlockInfo) -> Self {
+        let nbt = info.nbt.clone().unwrap_or_default();
+        let joint_type = joint_type(&nbt, info.state);
+        Self {
+            joint_type,
+            name: nbt_identifier(&nbt, "name").unwrap_or_else(empty_jigsaw_id),
+            pool: nbt_identifier(&nbt, "pool").unwrap_or_else(empty_pool_id),
+            target: nbt_identifier(&nbt, "target").unwrap_or_else(empty_jigsaw_id),
+            placement_priority: nbt.int("placement_priority").unwrap_or_default(),
+            selection_priority: nbt.int("selection_priority").unwrap_or_default(),
+            info,
+        }
+    }
+
+    pub fn with_info(&self, info: StructureBlockInfo) -> Self {
+        Self {
+            info,
+            joint_type: self.joint_type,
+            name: self.name.clone(),
+            pool: self.pool.clone(),
+            target: self.target.clone(),
+            placement_priority: self.placement_priority,
+            selection_priority: self.selection_priority,
+        }
+    }
+}
+
+const fn empty_jigsaw_id() -> Identifier {
+    Identifier::const_vanilla("empty")
+}
+
+const fn empty_pool_id() -> Identifier {
+    Identifier::const_vanilla("empty")
+}
+
+fn nbt_identifier(nbt: &NbtCompound, key: &str) -> Option<Identifier> {
+    nbt.string(key)
+        .and_then(|value| value.to_str().parse().ok())
+}
+
+fn joint_type(nbt: &NbtCompound, state: BlockState) -> JointType {
+    match nbt.string("joint").map(|value| value.to_string()).as_deref() {
+        Some("rollable") => JointType::Rollable,
+        Some("aligned") => JointType::Aligned,
+        _ => {
+            if front_facing(state).axis().is_horizontal() {
+                JointType::Aligned
+            } else {
+                JointType::Rollable
+            }
+        }
+    }
+}
+
+pub fn front_facing(state: BlockState) -> Direction {
+    REGISTRY
+        .blocks
+        .get_property(state, &Properties::ORIENTATION)
+        .front()
+}
+
+pub fn top_facing(state: BlockState) -> Direction {
+    REGISTRY
+        .blocks
+        .get_property(state, &Properties::ORIENTATION)
+        .top()
+}
+
+pub fn can_attach(source: &JigsawBlockInfo, target: &JigsawBlockInfo) -> bool {
+    let source_front = front_facing(source.info.state);
+    let target_front = front_facing(target.info.state);
+    let source_top = top_facing(source.info.state);
+    let target_top = top_facing(target.info.state);
+    let rollable = source.joint_type == JointType::Rollable;
+    source_front == target_front.opposite()
+        && (rollable || source_top == target_top)
+        && source.target == target.name
+}
+
 #[derive(Debug, Default)]
 pub struct Palette {
     blocks: Vec<StructureBlockInfo>,
+    jigsaws: Vec<JigsawBlockInfo>,
 }
 
 impl Palette {
     pub fn blocks(&self) -> &[StructureBlockInfo] {
         &self.blocks
+    }
+
+    pub fn jigsaws(&self) -> &[JigsawBlockInfo] {
+        &self.jigsaws
     }
 
     pub fn blocks_of(&self, block: &Identifier) -> impl Iterator<Item = &StructureBlockInfo> {
@@ -148,6 +252,46 @@ impl StructureTemplate {
         template
     }
 
+    pub fn get_jigsaws(
+        &self,
+        position: BlockPos,
+        rotation: Rotation,
+        shared: &mut RandomSource,
+    ) -> Vec<JigsawBlockInfo> {
+        if self.palettes.is_empty() {
+            return Vec::new();
+        }
+
+        let settings = StructurePlaceSettings::new().set_rotation(rotation);
+        let palette_index = settings.random_palette(self.palettes.len(), position, shared);
+        self.palettes[palette_index]
+            .jigsaws()
+            .iter()
+            .map(|jigsaw| {
+                let info = &jigsaw.info;
+                jigsaw.with_info(StructureBlockInfo {
+                    pos: offset(calculate_relative_position(&settings, info.pos), position),
+                    state: transform::rotate(info.state, settings.rotation()),
+                    nbt: info.nbt.clone(),
+                })
+            })
+            .collect()
+    }
+
+    pub const fn get_bounding_box(
+        &self,
+        settings: &StructurePlaceSettings,
+        position: BlockPos,
+    ) -> BoundingBox {
+        bounding_box_of(
+            position,
+            settings.rotation(),
+            settings.rotation_pivot(),
+            settings.mirror(),
+            self.size,
+        )
+    }
+
     pub fn filter_blocks(
         &self,
         position: BlockPos,
@@ -226,14 +370,12 @@ impl StructureTemplate {
             if region.set_block(info.pos, state)
                 && let Some(previous_fluid_state) = previous_fluid_state
             {
-                {
-                    if state.get_fluid_state().is_source() {
-                        locked_fluids.push(info.pos);
-                    } else if can_place_liquid(state) {
-                        place_liquid(region, info.pos, state);
-                        if !previous_fluid_state.is_source() {
-                            to_fill.push(info.pos);
-                        }
+                if state.get_fluid_state().is_source() {
+                    locked_fluids.push(info.pos);
+                } else if is_liquid_block_container(state) {
+                    place_liquid(region, info.pos, state, previous_fluid_state);
+                    if !previous_fluid_state.is_source() {
+                        to_fill.push(info.pos);
                     }
                 }
             }
@@ -252,21 +394,21 @@ impl StructureTemplate {
             let mut index = 0;
             while index < to_fill.len() {
                 let pos = to_fill[index];
-                let mut source = region.get_block(pos).get_fluid_state().is_source();
+                let mut to_place = region.get_block(pos).get_fluid_state();
                 for direction in neighbours {
-                    if source {
+                    if to_place.is_source() {
                         break;
                     }
                     let neighbour_pos = direction.relative(pos);
                     let neighbour = region.get_block(neighbour_pos).get_fluid_state();
                     if neighbour.is_source() && !locked_fluids.contains(&neighbour_pos) {
-                        source = true;
+                        to_place = neighbour;
                     }
                 }
-                if source {
+                if to_place.is_source() {
                     let state = region.get_block(pos);
-                    if can_place_liquid(state) {
-                        place_liquid(region, pos, state);
+                    if is_liquid_block_container(state) {
+                        place_liquid(region, pos, state, to_place);
                         filled = true;
                         to_fill.remove(index);
                         continue;
@@ -336,9 +478,19 @@ fn load_palette(entries: &[NbtCompound], block_list: &[&NbtCompound]) -> Palette
         );
     }
 
-    Palette {
-        blocks: build_info_list(full_blocks, block_entities, other_blocks),
-    }
+    let blocks = build_info_list(full_blocks, block_entities, other_blocks);
+    let jigsaws = blocks
+        .iter()
+        .filter(|info| {
+            REGISTRY
+                .blocks
+                .by_state_id(info.state)
+                .is_some_and(|block| block.key == vanilla_blocks::JIGSAW.key)
+        })
+        .map(|info| JigsawBlockInfo::of(info.clone()))
+        .collect();
+
+    Palette { blocks, jigsaws }
 }
 
 fn parse_block_state(entry: &NbtCompound) -> BlockState {
@@ -575,19 +727,33 @@ const fn offset(pos: BlockPos, by: BlockPos) -> BlockPos {
     pos.offset(by.x(), by.y(), by.z())
 }
 
-fn can_place_liquid(state: BlockState) -> bool {
+fn is_liquid_block_container(state: BlockState) -> bool {
     REGISTRY
         .blocks
         .get_properties(state)
         .iter()
-        .any(|(property, value)| *property == "waterlogged" && *value == "false")
+        .any(|(property, _)| *property == "waterlogged")
 }
 
-fn place_liquid(region: &WorldGenRegion<'_>, pos: BlockPos, state: BlockState) {
+fn place_liquid(
+    region: &WorldGenRegion<'_>,
+    pos: BlockPos,
+    state: BlockState,
+    fluid: FluidState,
+) {
+    if fluid.fluid_id.key != vanilla_fluids::WATER.key {
+        return;
+    }
     let Some(block) = REGISTRY.blocks.by_state_id(state) else {
         return;
     };
     let mut properties = REGISTRY.blocks.get_properties(state);
+    if properties
+        .iter()
+        .any(|(property, value)| *property == "waterlogged" && *value == "true")
+    {
+        return;
+    }
     for entry in &mut properties {
         if entry.0 == "waterlogged" {
             entry.1 = "true";
