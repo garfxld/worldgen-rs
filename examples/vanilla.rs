@@ -10,11 +10,26 @@ use cerium::event::player::{
     CommandResultEvent, PlayerConfigEvent, PlayerEvent, PlayerRequestGameModeEvent,
     PlayerSpawnEvent,
 };
+use cerium::registry::RegistryKey;
+use cerium::world::biome::Biome as CeriumBiome;
 use cerium::world::block::BlockState;
 use cerium::world::chunk::Chunk;
 use cerium::world::{DimensionType, World};
 use worldgen_rs::registry::REGISTRY;
 use worldgen_rs::{ChunkPos, ChunkStatus, Identifier, Worldgen, WorldgenSettings};
+
+fn build_biome_id_table(server: &cerium::Server) -> std::collections::HashMap<u16, i32> {
+    let registries = server.registries();
+    REGISTRY
+        .biomes
+        .iter()
+        .filter_map(|(id, biome)| {
+            let key = format!("{}:{}", biome.key.namespace, biome.key.path);
+            let cerium_id = registries.biome.get_id(RegistryKey::<CeriumBiome>::of(key))?;
+            Some((id as u16, i32::from(cerium_id)))
+        })
+        .collect()
+}
 
 const SPAWN: (f64, f64, f64) = (0.5, 150.0, 0.5);
 
@@ -26,14 +41,36 @@ const MAX_FLY_MULTIPLIER: f32 = 20.0;
     clippy::similar_names,
     reason = "world_x0/world_z0 are the chunk's block-space origin, x vs z"
 )]
-fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk) {
+fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk, biome_ids: &std::collections::HashMap<u16, i32>) {
     let pos = ChunkPos::new(chunk.x(), chunk.z());
     worldgen
-        .generate(pos, ChunkStatus::Surface, |view| {
+        .generate(pos, ChunkStatus::Features, |view| {
             let min_y = view.min_y();
             let height = view.height();
             let world_x0 = chunk.x() * 16;
             let world_z0 = chunk.z() * 16;
+
+            for relative_y in (0..height as usize).step_by(4) {
+                let world_y = min_y + relative_y as i32;
+                for local_x in (0..16usize).step_by(4) {
+                    for local_z in (0..16usize).step_by(4) {
+                        let Some(worldgen_biome) =
+                            view.get_relative_biome(local_x, relative_y, local_z)
+                        else {
+                            continue;
+                        };
+                        let Some(&cerium_biome) = biome_ids.get(&worldgen_biome) else {
+                            continue;
+                        };
+                        chunk.set_biome(
+                            world_x0 + local_x as i32,
+                            world_y,
+                            world_z0 + local_z as i32,
+                            cerium_biome,
+                        );
+                    }
+                }
+            }
 
             for relative_y in 0..height as usize {
                 let world_y = min_y + relative_y as i32;
@@ -46,11 +83,7 @@ fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk) {
                         if state.is_air() {
                             continue;
                         }
-                        let Some(block) = REGISTRY.blocks.by_state_id(state) else {
-                            continue;
-                        };
-                        let key = format!("{}:{}", block.key.namespace, block.key.path);
-                        let Some(cerium_state) = BlockState::from_key(key) else {
+                        let Some(cerium_state) = BlockState::from_id(state.0) else {
                             continue;
                         };
                         chunk.set_block(
@@ -76,8 +109,9 @@ fn main() {
     );
 
     let server = Server::new(AuthMode::Offline);
+    let biome_ids = Arc::new(build_biome_id_table(&server));
     let world = World::with_generator(DimensionType::OVERWORLD, move |chunk: &Chunk| {
-        fill_chunk(&worldgen, chunk);
+        fill_chunk(&worldgen, chunk, &biome_ids);
     });
 
     let dispatcher = server.command_dispatcher();

@@ -50,6 +50,30 @@ where
     b.select(i - Simd::splat(1).cast(), i)
 }
 
+#[inline(always)]
+pub fn floor_f32(v: f32) -> i32 {
+    let i = v as i32;
+    if v < i as f32 { i - 1 } else { i }
+}
+
+#[inline(always)]
+pub fn ceil_f32(v: f32) -> i32 {
+    let i = v as i32;
+    if v > i as f32 { i + 1 } else { i }
+}
+
+#[inline(always)]
+pub fn floor_f64(v: f64) -> i32 {
+    let i = v as i32;
+    if v < f64::from(i) { i - 1 } else { i }
+}
+
+#[inline(always)]
+pub fn ceil_f64(v: f64) -> i32 {
+    let i = v as i32;
+    if v > f64::from(i) { i + 1 } else { i }
+}
+
 #[inline]
 pub fn fast_lfloor(v: f64) -> i64 {
     let i = v as i64;
@@ -414,9 +438,9 @@ pub fn square(x: f64) -> f64 {
     x * x
 }
 
-const TRIG_INDEX_SCALE: f64 = 10_430.378_350_470_453;
+const TRIG_INDEX_SCALE: f32 = 10_430.378;
 const TRIG_TABLE_LEN: usize = 65_536;
-const TRIG_TABLE_MASK: i64 = 0xFFFF;
+const TRIG_TABLE_MASK: i32 = 0xFFFF;
 
 static SIN_TABLE: LazyLock<Box<[f32; TRIG_TABLE_LEN]>> = LazyLock::new(|| {
     let mut table: Box<[f32; TRIG_TABLE_LEN]> = vec![0.0_f32; TRIG_TABLE_LEN]
@@ -424,20 +448,20 @@ static SIN_TABLE: LazyLock<Box<[f32; TRIG_TABLE_LEN]>> = LazyLock::new(|| {
         .try_into()
         .expect("65536-element vec");
     for (i, slot) in table.iter_mut().enumerate() {
-        *slot = (i as f64 / TRIG_INDEX_SCALE).sin() as f32;
+        *slot = (i as f64 * std::f64::consts::PI * 2.0 / 65_536.0).sin() as f32;
     }
     table
 });
 
 #[inline]
-pub fn sin(angle: f64) -> f32 {
-    let idx = (((angle * TRIG_INDEX_SCALE) as i64) & TRIG_TABLE_MASK) as usize;
+pub fn sin(angle: f32) -> f32 {
+    let idx = (((angle * TRIG_INDEX_SCALE) as i32) & TRIG_TABLE_MASK) as usize;
     SIN_TABLE[idx]
 }
 
 #[inline]
-pub fn cos(angle: f64) -> f32 {
-    let idx = (((angle * TRIG_INDEX_SCALE + 16_384.0) as i64) & TRIG_TABLE_MASK) as usize;
+pub fn cos(angle: f32) -> f32 {
+    let idx = (((angle * TRIG_INDEX_SCALE + 16_384.0) as i32) & TRIG_TABLE_MASK) as usize;
     SIN_TABLE[idx]
 }
 
@@ -522,23 +546,26 @@ mod tests {
     #[test]
     fn sin_cos_match_known_angles_within_table_resolution() {
         let tolerance = 1e-4;
+        const PI_F: f32 = core::f32::consts::PI;
         assert!((f64::from(sin(0.0))).abs() < tolerance);
         assert!((f64::from(cos(0.0)) - 1.0).abs() < tolerance);
-        assert!((f64::from(sin(PI / 2.0)) - 1.0).abs() < tolerance);
-        assert!((f64::from(cos(PI)) + 1.0).abs() < tolerance);
+        assert!((f64::from(sin(PI_F / 2.0)) - 1.0).abs() < tolerance);
+        assert!((f64::from(cos(PI_F)) + 1.0).abs() < tolerance);
     }
 
     #[test]
     fn cos_is_sin_quarter_turn_ahead() {
-        for angle in [0.2, 1.3, 2.5, -0.8] {
-            assert!((f64::from(cos(angle)) - f64::from(sin(angle + PI / 2.0))).abs() < 1e-6);
+        for angle in [0.2_f32, 1.3, 2.5, -0.8] {
+            assert!(
+                (f64::from(cos(angle)) - f64::from(sin(angle + core::f32::consts::FRAC_PI_2))).abs() < 1e-6
+            );
         }
     }
 
     #[test]
     fn sin_is_periodic_over_a_full_turn() {
-        for angle in [0.4, 1.1, 3.0] {
-            let full_turn = 2.0 * PI;
+        for angle in [0.4_f32, 1.1, 3.0] {
+            let full_turn = 2.0 * core::f32::consts::PI;
             assert!((f64::from(sin(angle)) - f64::from(sin(angle + full_turn))).abs() < 1e-4);
         }
     }

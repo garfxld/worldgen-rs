@@ -36,4 +36,14 @@ impl<'a> ChunkView<'a> {
     pub fn get_block_state(&self, pos: BlockPos) -> BlockState {
         self.chunk.get_block_state(pos)
     }
+
+    pub fn get_relative_biome(
+        &self,
+        relative_x: usize,
+        relative_y: usize,
+        relative_z: usize,
+    ) -> Option<u16> {
+        self.chunk
+            .get_relative_biome(relative_x, relative_y, relative_z)
+    }
 }

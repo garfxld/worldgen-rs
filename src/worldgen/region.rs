@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::chunk::heightmap::HeightmapType;
 use crate::chunk::proto::Chunk;
 use crate::chunk::status::ChunkStatus;
@@ -5,6 +7,7 @@ use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_blocks;
 use crate::util::ident::BlockState;
 use crate::util::pos::{BlockPos, ChunkPos};
+use crate::util::rng::RandomSource;
 
 pub const FEATURE_REGION_RADIUS: i32 = 1;
 const FEATURE_REGION_SIZE: usize = 3;
@@ -17,9 +20,14 @@ pub struct WorldGenRegion<'a> {
     sea_level: i32,
     seed: i64,
     biome_zoom_seed: i64,
+    random: RefCell<RandomSource>,
 }
 
 impl<'a> WorldGenRegion<'a> {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla WorldGenRegion construction"
+    )]
     pub const fn new(
         center: ChunkPos,
         chunks: [&'a Chunk; FEATURE_REGION_SIZE * FEATURE_REGION_SIZE],
@@ -28,6 +36,7 @@ impl<'a> WorldGenRegion<'a> {
         sea_level: i32,
         seed: i64,
         biome_zoom_seed: i64,
+        random: RandomSource,
     ) -> Self {
         Self {
             center,
@@ -37,7 +46,12 @@ impl<'a> WorldGenRegion<'a> {
             sea_level,
             seed,
             biome_zoom_seed,
+            random: RefCell::new(random),
         }
+    }
+
+    pub fn with_random<R>(&self, f: impl FnOnce(&mut RandomSource) -> R) -> R {
+        f(&mut self.random.borrow_mut())
     }
 
     pub const fn biome_zoom_seed(&self) -> i64 {
@@ -83,7 +97,13 @@ impl<'a> WorldGenRegion<'a> {
         self.chunk(ChunkPos::new(pos.0.x >> 4, pos.0.z >> 4))
     }
 
-    pub fn get_block_state(&self, pos: BlockPos) -> BlockState {
+    pub const fn ensure_can_write(&self, pos: BlockPos) -> bool {
+        let dx = (pos.0.x >> 4) - self.center.0.x;
+        let dz = (pos.0.z >> 4) - self.center.0.y;
+        dx.abs() <= FEATURE_REGION_RADIUS && dz.abs() <= FEATURE_REGION_RADIUS
+    }
+
+    pub fn get_block(&self, pos: BlockPos) -> BlockState {
         match self.chunk_at_block(pos) {
             Some(chunk) if self.is_inside_build_height(pos.0.y) => chunk.get_block_state(pos),
             _ => REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR),

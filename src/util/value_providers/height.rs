@@ -1,10 +1,11 @@
-use serde::{Deserialize, Deserializer, de::Error as _};
+use serde::Deserialize;
 
 use crate::util::rng::RandomSource;
 
 use super::VerticalAnchor;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(from = "RawHeightProvider")]
 pub enum HeightProvider {
     Constant(VerticalAnchor),
     Uniform {
@@ -98,94 +99,93 @@ impl HeightProvider {
     }
 }
 
-impl<'de> Deserialize<'de> for HeightProvider {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(tag = "type", deny_unknown_fields)]
-        enum Tagged {
-            #[serde(rename = "minecraft:constant")]
-            Constant { value: VerticalAnchor },
-            #[serde(rename = "minecraft:uniform")]
-            Uniform {
-                min_inclusive: VerticalAnchor,
-                max_inclusive: VerticalAnchor,
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum RawHeightProvider {
+    Tagged(TaggedHeightProvider),
+    Constant(VerticalAnchor),
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", deny_unknown_fields)]
+pub enum TaggedHeightProvider {
+    #[serde(rename = "minecraft:constant")]
+    Constant { value: VerticalAnchor },
+    #[serde(rename = "minecraft:uniform")]
+    Uniform {
+        min_inclusive: VerticalAnchor,
+        max_inclusive: VerticalAnchor,
+    },
+    #[serde(rename = "minecraft:trapezoid")]
+    Trapezoid {
+        min_inclusive: VerticalAnchor,
+        max_inclusive: VerticalAnchor,
+        #[serde(default)]
+        plateau: i32,
+    },
+    #[serde(rename = "minecraft:biased_to_bottom")]
+    BiasedToBottom {
+        min_inclusive: VerticalAnchor,
+        max_inclusive: VerticalAnchor,
+        #[serde(default = "default_inner")]
+        inner: i32,
+    },
+    #[serde(rename = "minecraft:very_biased_to_bottom")]
+    VeryBiasedToBottom {
+        min_inclusive: VerticalAnchor,
+        max_inclusive: VerticalAnchor,
+        #[serde(default = "default_inner")]
+        inner: i32,
+    },
+}
+
+const fn default_inner() -> i32 {
+    1
+}
+
+impl From<RawHeightProvider> for HeightProvider {
+    fn from(raw: RawHeightProvider) -> Self {
+        let tagged = match raw {
+            RawHeightProvider::Constant(anchor) => return Self::Constant(anchor),
+            RawHeightProvider::Tagged(tagged) => tagged,
+        };
+        match tagged {
+            TaggedHeightProvider::Constant { value } => Self::Constant(value),
+            TaggedHeightProvider::Uniform {
+                min_inclusive,
+                max_inclusive,
+            } => Self::Uniform {
+                min_inclusive,
+                max_inclusive,
             },
-            #[serde(rename = "minecraft:trapezoid")]
-            Trapezoid {
-                min_inclusive: VerticalAnchor,
-                max_inclusive: VerticalAnchor,
-                #[serde(default)]
-                plateau: i32,
+            TaggedHeightProvider::Trapezoid {
+                min_inclusive,
+                max_inclusive,
+                plateau,
+            } => Self::Trapezoid {
+                min_inclusive,
+                max_inclusive,
+                plateau,
             },
-            #[serde(rename = "minecraft:biased_to_bottom")]
-            BiasedToBottom {
-                min_inclusive: VerticalAnchor,
-                max_inclusive: VerticalAnchor,
-                #[serde(default = "default_inner")]
-                inner: i32,
+            TaggedHeightProvider::BiasedToBottom {
+                min_inclusive,
+                max_inclusive,
+                inner,
+            } => Self::BiasedToBottom {
+                min_inclusive,
+                max_inclusive,
+                inner,
             },
-            #[serde(rename = "minecraft:very_biased_to_bottom")]
-            VeryBiasedToBottom {
-                min_inclusive: VerticalAnchor,
-                max_inclusive: VerticalAnchor,
-                #[serde(default = "default_inner")]
-                inner: i32,
+            TaggedHeightProvider::VeryBiasedToBottom {
+                min_inclusive,
+                max_inclusive,
+                inner,
+            } => Self::VeryBiasedToBottom {
+                min_inclusive,
+                max_inclusive,
+                inner,
             },
         }
-
-        const fn default_inner() -> i32 {
-            1
-        }
-
-        let value = serde_json::Value::deserialize(d)?;
-        let has_type = value
-            .as_object()
-            .is_some_and(|object| object.contains_key("type"));
-
-        if !has_type {
-            let anchor = VerticalAnchor::deserialize(value).map_err(D::Error::custom)?;
-            return Ok(Self::Constant(anchor));
-        }
-
-        Ok(
-            match serde_json::from_value(value).map_err(D::Error::custom)? {
-                Tagged::Constant { value } => Self::Constant(value),
-                Tagged::Uniform {
-                    min_inclusive,
-                    max_inclusive,
-                } => Self::Uniform {
-                    min_inclusive,
-                    max_inclusive,
-                },
-                Tagged::Trapezoid {
-                    min_inclusive,
-                    max_inclusive,
-                    plateau,
-                } => Self::Trapezoid {
-                    min_inclusive,
-                    max_inclusive,
-                    plateau,
-                },
-                Tagged::BiasedToBottom {
-                    min_inclusive,
-                    max_inclusive,
-                    inner,
-                } => Self::BiasedToBottom {
-                    min_inclusive,
-                    max_inclusive,
-                    inner,
-                },
-                Tagged::VeryBiasedToBottom {
-                    min_inclusive,
-                    max_inclusive,
-                    inner,
-                } => Self::VeryBiasedToBottom {
-                    min_inclusive,
-                    max_inclusive,
-                    inner,
-                },
-            },
-        )
     }
 }
 

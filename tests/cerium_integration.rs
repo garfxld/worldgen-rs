@@ -6,17 +6,16 @@ use cerium::auth::AuthMode;
 use cerium::world::block::{Block, BlockState};
 use cerium::world::chunk::Chunk;
 use cerium::world::{DimensionType, World};
-use worldgen_rs::registry::REGISTRY;
 use worldgen_rs::{ChunkPos, ChunkStatus, Identifier, Worldgen, WorldgenSettings};
 
 #[expect(
     clippy::similar_names,
     reason = "world_x0/world_z0 are the chunk's block-space origin, x vs z"
 )]
-fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk) {
+fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk, status: ChunkStatus) {
     let pos = ChunkPos::new(chunk.x(), chunk.z());
     worldgen
-        .generate(pos, ChunkStatus::Surface, |view| {
+        .generate(pos, status, |view| {
             let min_y = view.min_y();
             let height = view.height();
             let world_x0 = chunk.x() * 16;
@@ -33,11 +32,7 @@ fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk) {
                         if state.is_air() {
                             continue;
                         }
-                        let Some(block) = REGISTRY.blocks.by_state_id(state) else {
-                            continue;
-                        };
-                        let key = format!("{}:{}", block.key.namespace, block.key.path);
-                        let Some(cerium_state) = BlockState::from_key(key) else {
+                        let Some(cerium_state) = BlockState::from_id(state.0) else {
                             continue;
                         };
                         chunk.set_block(
@@ -66,7 +61,12 @@ fn cerium_world_generator_hook_fills_terrain() {
     .expect("worldgen should build");
 
     let world = World::with_generator(DimensionType::OVERWORLD, move |chunk: &Chunk| {
-        fill_chunk(&worldgen, chunk);
+        let status = if chunk.x() == 0 && chunk.z() == 0 {
+            ChunkStatus::Surface
+        } else {
+            ChunkStatus::Features
+        };
+        fill_chunk(&worldgen, chunk, status);
     });
 
     let chunk = world.load_chunk(0, 0);
@@ -84,4 +84,35 @@ fn cerium_world_generator_hook_fills_terrain() {
     // Near the top of the world, nothing was generated -> still air.
     let sky = world.get_block(0, 300, 0);
     assert_eq!(sky.as_block(), Block::Air);
+
+    // A dark_forest patch on seed 42: fallen oak logs there give a
+    // property-bearing block (axis) to check survives the worldgen-rs ->
+    // cerium bridge, regressing the by-key bridge that silently dropped
+    // every property and collapsed blocks to their default state.
+    let default_oak_log_state_id = Block::OakLog.default_state().state_id();
+    let mut found_non_default_oak_log = false;
+    'search: for dx in -2..10 {
+        for dz in -8..4 {
+            let cx = -18 + dx;
+            let cz = -11 + dz;
+            world.load_chunk(cx, cz);
+            let world_x0 = cx * 16;
+            let world_z0 = cz * 16;
+            for local_x in 0..16 {
+                for local_z in 0..16 {
+                    for world_y in 60..100 {
+                        let state = world.get_block(world_x0 + local_x, world_y, world_z0 + local_z);
+                        if state.as_block() == Block::OakLog && state.state_id() != default_oak_log_state_id {
+                            found_non_default_oak_log = true;
+                            break 'search;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        found_non_default_oak_log,
+        "expected a horizontal-axis oak_log (fallen tree) to survive the cerium bridge"
+    );
 }

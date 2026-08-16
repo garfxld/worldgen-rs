@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-pub use crate::util::datapack::LoadError;
+pub use crate::util::datapack::DatapackError;
 use crate::util::datapack::{collect_json_files, path_to_id, read_and_parse_normalized};
 use crate::worldgen::backend::ir::DensityProgram;
 use crate::worldgen::backend::ir::json::{
@@ -36,7 +36,7 @@ impl DatapackSource {
 
     pub fn density_function_registry(
         &self,
-    ) -> Result<BTreeMap<String, DensityFunction>, LoadError> {
+    ) -> Result<BTreeMap<String, DensityFunction>, DatapackError> {
         let mut registry = BTreeMap::new();
         Self::read_density_functions(&self.namespace, &self.root, &mut registry)?;
         for (namespace, worldgen_dir) in &self.extra_namespaces {
@@ -49,7 +49,7 @@ impl DatapackSource {
         namespace: &str,
         worldgen_dir: &Path,
         registry: &mut BTreeMap<String, DensityFunction>,
-    ) -> Result<(), LoadError> {
+    ) -> Result<(), DatapackError> {
         let dir = worldgen_dir.join("density_function");
         for file in collect_json_files(&dir) {
             let df: DensityFunction = read_and_parse_normalized(&file)?;
@@ -58,7 +58,7 @@ impl DatapackSource {
         Ok(())
     }
 
-    pub fn noise_settings(&self, dimension: &str) -> Result<NoiseSettingsJson, LoadError> {
+    pub fn noise_settings(&self, dimension: &str) -> Result<NoiseSettingsJson, DatapackError> {
         let path = self.root.join(format!("noise_settings/{dimension}.json"));
         read_and_parse_normalized(&path)
     }
@@ -66,14 +66,14 @@ impl DatapackSource {
     pub fn multi_noise_biome_parameters(
         &self,
         dimension: &str,
-    ) -> Result<MultiNoiseBiomeParametersJson, LoadError> {
+    ) -> Result<MultiNoiseBiomeParametersJson, DatapackError> {
         let path = self.root.join(format!(
             "multi_noise_biome_source_parameter_list/{dimension}.json"
         ));
         read_and_parse_normalized(&path)
     }
 
-    pub fn noise_parameters(&self) -> Result<BTreeMap<String, NoiseParameters>, LoadError> {
+    pub fn noise_parameters(&self) -> Result<BTreeMap<String, NoiseParameters>, DatapackError> {
         let mut params = BTreeMap::new();
         Self::read_noise_parameters(&self.namespace, &self.root, &mut params)?;
         for (namespace, worldgen_dir) in &self.extra_namespaces {
@@ -86,7 +86,7 @@ impl DatapackSource {
         namespace: &str,
         worldgen_dir: &Path,
         params: &mut BTreeMap<String, NoiseParameters>,
-    ) -> Result<(), LoadError> {
+    ) -> Result<(), DatapackError> {
         let dir = worldgen_dir.join("noise");
         for file in collect_json_files(&dir) {
             let noise: NoiseParameters = read_and_parse_normalized(&file)?;
@@ -100,7 +100,7 @@ impl DatapackSource {
         dimension: &str,
         prefix: &str,
         registry: &BTreeMap<String, DensityFunction>,
-    ) -> Result<(DensityProgram, NoiseSettingsJson), LoadError> {
+    ) -> Result<(DensityProgram, NoiseSettingsJson), DatapackError> {
         let settings = self.noise_settings(dimension)?;
         let program = DensityProgram {
             registry: registry.clone(),

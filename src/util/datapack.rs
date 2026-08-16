@@ -6,8 +6,10 @@ use std::path::{Path, PathBuf};
 
 use serde::de::DeserializeOwned;
 
+use crate::util::ident::Identifier;
+
 #[derive(Debug)]
-pub enum LoadError {
+pub enum DatapackError {
     Read {
         path: PathBuf,
         source: io::Error,
@@ -18,7 +20,7 @@ pub enum LoadError {
     },
 }
 
-impl Display for LoadError {
+impl Display for DatapackError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Read { path, source } => write!(f, "failed to read {}: {source}", path.display()),
@@ -29,7 +31,7 @@ impl Display for LoadError {
     }
 }
 
-impl StdError for LoadError {
+impl StdError for DatapackError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Self::Read { source, .. } => Some(source),
@@ -38,8 +40,8 @@ impl StdError for LoadError {
     }
 }
 
-pub fn read(path: &Path) -> Result<String, LoadError> {
-    fs::read_to_string(path).map_err(|source| LoadError::Read {
+pub fn read(path: &Path) -> Result<String, DatapackError> {
+    fs::read_to_string(path).map_err(|source| DatapackError::Read {
         path: path.to_path_buf(),
         source,
     })
@@ -51,9 +53,9 @@ pub fn parse_normalized<T: DeserializeOwned>(content: &str) -> Result<T, serde_j
     serde_json::from_value(value)
 }
 
-pub fn read_and_parse_normalized<T: DeserializeOwned>(path: &Path) -> Result<T, LoadError> {
+pub fn read_and_parse_normalized<T: DeserializeOwned>(path: &Path) -> Result<T, DatapackError> {
     let content = read(path)?;
-    parse_normalized(&content).map_err(|source| LoadError::Parse {
+    parse_normalized(&content).map_err(|source| DatapackError::Parse {
         path: path.to_path_buf(),
         source,
     })
@@ -62,10 +64,12 @@ pub fn read_and_parse_normalized<T: DeserializeOwned>(path: &Path) -> Result<T, 
 fn normalize_type_tags(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(map) => {
-            if let Some(serde_json::Value::String(type_name)) = map.get_mut("type")
-                && !type_name.contains(':')
-            {
-                *type_name = format!("minecraft:{type_name}");
+            for key in ["type", "predicate_type"] {
+                if let Some(serde_json::Value::String(type_name)) = map.get_mut(key)
+                    && !type_name.contains(':')
+                {
+                    *type_name = format!("minecraft:{type_name}");
+                }
             }
             for entry in map.values_mut() {
                 normalize_type_tags(entry);
@@ -108,4 +112,25 @@ pub fn path_to_id(namespace: &str, path: &Path, base_dir: &Path) -> String {
         .collect::<Vec<_>>()
         .join("/");
     format!("{namespace}:{id_path}")
+}
+
+const EMPTY_LIST: &[serde_json::Value] = &[];
+
+pub fn parse_id(raw: &str) -> Identifier {
+    raw.parse()
+        .unwrap_or_else(|e| panic!("invalid identifier {raw}: {e}"))
+}
+
+pub fn type_of(value: &serde_json::Value) -> &str {
+    value["type"]
+        .as_str()
+        .unwrap_or_else(|| panic!("missing type field in {value}"))
+}
+
+pub fn value_list(value: &serde_json::Value) -> &[serde_json::Value] {
+    value.as_array().map_or(EMPTY_LIST, Vec::as_slice)
+}
+
+pub fn parse_json<T: DeserializeOwned>(value: &serde_json::Value) -> T {
+    T::deserialize(value).unwrap_or_else(|e| panic!("invalid json {value}: {e}"))
 }

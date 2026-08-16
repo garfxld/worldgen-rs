@@ -71,6 +71,16 @@ impl Chunk {
             .get_relative_block(relative_x, relative_y, relative_z)
     }
 
+    pub fn get_relative_biome(
+        &self,
+        relative_x: usize,
+        relative_y: usize,
+        relative_z: usize,
+    ) -> Option<u16> {
+        self.sections
+            .get_relative_biome(relative_x, relative_y, relative_z)
+    }
+
     #[must_use]
     pub fn get_block_state(&self, pos: BlockPos) -> BlockState {
         let y = pos.0.y;

@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 
 use rustc_hash::FxHashMap;
 
-use crate::util::datapack::LoadError;
+use crate::util::datapack::DatapackError;
 use crate::util::ident::Identifier;
 
 pub use tags::RegistryTags;
@@ -127,7 +127,7 @@ impl<T: 'static> Registry<T> {
         &mut self,
         namespace: &str,
         directory: &Path,
-    ) -> Result<(), LoadError> {
+    ) -> Result<(), DatapackError> {
         for (tag, members) in tags::load_tag_directory(namespace, directory)? {
             let known = members
                 .into_iter()
@@ -207,15 +207,15 @@ fn vanilla_datapack_tags_dir() -> PathBuf {
 }
 
 impl Registries {
-    pub fn new_vanilla() -> Result<Self, LoadError> {
+    pub fn new_vanilla() -> Result<Self, DatapackError> {
         Self::new_with_overlay(None)
     }
 
-    pub fn new_with_datapack(overlay_worldgen_dir: &Path) -> Result<Self, LoadError> {
+    pub fn new_with_datapack(overlay_worldgen_dir: &Path) -> Result<Self, DatapackError> {
         Self::new_with_overlay(Some(overlay_worldgen_dir))
     }
 
-    fn new_with_overlay(overlay_worldgen_dir: Option<&Path>) -> Result<Self, LoadError> {
+    fn new_with_overlay(overlay_worldgen_dir: Option<&Path>) -> Result<Self, DatapackError> {
         let mut fluids = fluid::FluidRegistry::new();
         fluid::vanilla_fluids::register_fluids(&mut fluids);
         fluids.load_tags_from_datapack("minecraft", &vanilla_datapack_tags_dir().join("fluid"))?;

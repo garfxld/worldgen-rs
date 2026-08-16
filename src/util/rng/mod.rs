@@ -39,6 +39,13 @@ impl RandomSource {
         }
     }
 
+    pub fn draw_count(&self) -> i32 {
+        match self {
+            Self::Worldgen(r) => r.count(),
+            _ => -1,
+        }
+    }
+
     pub fn set_feature_seed(&mut self, decoration_seed: i64, feature_index: i32, step: i32) {
         match self {
             Self::Worldgen(r) => r.set_feature_seed(decoration_seed, feature_index, step),

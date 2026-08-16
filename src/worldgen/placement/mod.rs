@@ -1,12 +1,14 @@
 use std::sync::LazyLock;
 
-use serde_json::Value;
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer};
 
 use smallvec::SmallVec;
 
 use crate::chunk::heightmap::HeightmapType;
 use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_blocks;
+use crate::util::axis::Axis;
 use crate::util::direction::Direction;
 use crate::util::ident::BlockState;
 use crate::util::noise::perlin_simplex_noise::PerlinSimplexNoise;
@@ -18,9 +20,6 @@ use crate::util::value_providers::int::IntProvider;
 use crate::worldgen::block_predicate::BlockPredicate;
 use crate::worldgen::feature::{PlacedFeature, features};
 use crate::worldgen::generator::fuzzed_biome::fuzzed_biome_at_block;
-use crate::worldgen::json::{
-    parse_direction, parse_heightmap_type, parse_json, type_of, value_list,
-};
 use crate::worldgen::region::WorldGenRegion;
 
 static BIOME_INFO_NOISE: LazyLock<PerlinSimplexNoise> = LazyLock::new(|| {
@@ -63,7 +62,7 @@ impl<'a, 'b> PlacementContext<'a, 'b> {
     }
 
     pub fn get_block_state(&self, pos: BlockPos) -> BlockState {
-        self.region.get_block_state(pos)
+        self.region.get_block(pos)
     }
 
     pub fn get_biome(&self, pos: BlockPos) -> u16 {
@@ -73,109 +72,105 @@ impl<'a, 'b> PlacementContext<'a, 'b> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaveSurface {
+    Ceiling,
+    Floor,
+}
+
+impl CaveSurface {
+    pub const fn direction(self) -> Direction {
+        match self {
+            Self::Ceiling => Direction::Up,
+            Self::Floor => Direction::Down,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum PlacementModifier {
-    Count(IntProvider),
+    #[serde(rename = "minecraft:count")]
+    Count { count: IntProvider },
+    #[serde(rename = "minecraft:noise_threshold_count")]
     NoiseThresholdCount {
         noise_level: f64,
         below_noise: i32,
         above_noise: i32,
     },
+    #[serde(rename = "minecraft:noise_based_count")]
     NoiseBasedCount {
         noise_to_count_ratio: i32,
         noise_factor: f64,
+        #[serde(default)]
         noise_offset: f64,
     },
+    #[serde(rename = "minecraft:in_square")]
     InSquare,
-    HeightRange(HeightProvider),
-    Heightmap(HeightmapType),
+    #[serde(rename = "minecraft:height_range")]
+    HeightRange { height: HeightProvider },
+    #[serde(rename = "minecraft:heightmap")]
+    Heightmap { heightmap: HeightmapType },
+    #[serde(rename = "minecraft:random_offset")]
     RandomOffset {
         xz_spread: IntProvider,
         y_spread: IntProvider,
     },
-    CountOnEveryLayer(IntProvider),
+    #[serde(rename = "minecraft:count_on_every_layer")]
+    CountOnEveryLayer { count: IntProvider },
+    #[serde(rename = "minecraft:environment_scan")]
     EnvironmentScan {
+        #[serde(deserialize_with = "vertical_direction")]
         direction_of_search: Direction,
         target_condition: BlockPredicate,
+        #[serde(default = "always_true")]
         allowed_search_condition: BlockPredicate,
         max_steps: i32,
     },
-    FixedPlacement(Vec<BlockPos>),
+    #[serde(rename = "minecraft:fixed_placement")]
+    FixedPlacement { positions: Vec<BlockPos> },
+    #[serde(rename = "minecraft:biome")]
     BiomeFilter,
-    RarityFilter(i32),
-    BlockPredicateFilter(BlockPredicate),
-    SurfaceWaterDepthFilter(i32),
+    #[serde(rename = "minecraft:rarity_filter")]
+    RarityFilter { chance: i32 },
+    #[serde(rename = "minecraft:block_predicate_filter")]
+    BlockPredicateFilter { predicate: BlockPredicate },
+    #[serde(rename = "minecraft:surface_water_depth_filter")]
+    SurfaceWaterDepthFilter { max_water_depth: i32 },
+    #[serde(rename = "minecraft:surface_relative_threshold_filter")]
     SurfaceRelativeThresholdFilter {
         heightmap: HeightmapType,
+        #[serde(default = "i32_min")]
         min_inclusive: i32,
+        #[serde(default = "i32_max")]
         max_inclusive: i32,
     },
 }
 
-impl PlacementModifier {
-    pub fn parse(value: &Value) -> Self {
-        match type_of(value) {
-            "minecraft:count" => Self::Count(parse_json(&value["count"])),
-            "minecraft:noise_threshold_count" => Self::NoiseThresholdCount {
-                noise_level: as_f64(value, "noise_level"),
-                below_noise: as_i32(value, "below_noise"),
-                above_noise: as_i32(value, "above_noise"),
-            },
-            "minecraft:noise_based_count" => Self::NoiseBasedCount {
-                noise_to_count_ratio: as_i32(value, "noise_to_count_ratio"),
-                noise_factor: as_f64(value, "noise_factor"),
-                noise_offset: value
-                    .get("noise_offset")
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0),
-            },
-            "minecraft:in_square" => Self::InSquare,
-            "minecraft:height_range" => Self::HeightRange(parse_json(&value["height"])),
-            "minecraft:heightmap" => Self::Heightmap(parse_heightmap_type(&value["heightmap"])),
-            "minecraft:random_offset" => Self::RandomOffset {
-                xz_spread: parse_json(&value["xz_spread"]),
-                y_spread: parse_json(&value["y_spread"]),
-            },
-            "minecraft:count_on_every_layer" => {
-                Self::CountOnEveryLayer(parse_json(&value["count"]))
-            }
-            "minecraft:environment_scan" => Self::EnvironmentScan {
-                direction_of_search: parse_direction(value.get("direction_of_search")),
-                target_condition: BlockPredicate::parse(&value["target_condition"]),
-                allowed_search_condition: value
-                    .get("allowed_search_condition")
-                    .map_or(BlockPredicate::AlwaysTrue, BlockPredicate::parse),
-                max_steps: as_i32(value, "max_steps"),
-            },
-            "minecraft:fixed_placement" => Self::FixedPlacement(
-                value_list(&value["positions"])
-                    .iter()
-                    .map(parse_block_pos)
-                    .collect(),
-            ),
-            "minecraft:biome" => Self::BiomeFilter,
-            "minecraft:rarity_filter" => Self::RarityFilter(as_i32(value, "chance")),
-            "minecraft:block_predicate_filter" => {
-                Self::BlockPredicateFilter(BlockPredicate::parse(&value["predicate"]))
-            }
-            "minecraft:surface_water_depth_filter" => {
-                Self::SurfaceWaterDepthFilter(as_i32(value, "max_water_depth"))
-            }
-            "minecraft:surface_relative_threshold_filter" => Self::SurfaceRelativeThresholdFilter {
-                heightmap: parse_heightmap_type(&value["heightmap"]),
-                min_inclusive: value
-                    .get("min_inclusive")
-                    .and_then(Value::as_i64)
-                    .unwrap_or(i64::from(i32::MIN)) as i32,
-                max_inclusive: value
-                    .get("max_inclusive")
-                    .and_then(Value::as_i64)
-                    .unwrap_or(i64::from(i32::MAX)) as i32,
-            },
-            other => panic!("unknown placement modifier type {other}"),
-        }
-    }
+const fn always_true() -> BlockPredicate {
+    BlockPredicate::AlwaysTrue
+}
 
+const fn i32_min() -> i32 {
+    i32::MIN
+}
+
+const fn i32_max() -> i32 {
+    i32::MAX
+}
+
+fn vertical_direction<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Direction, D::Error> {
+    let direction = Direction::deserialize(deserializer)?;
+    if direction.get_axis() == Axis::Y {
+        return Ok(direction);
+    }
+    Err(D::Error::custom(format!(
+        "{direction:?} is not a vertical direction"
+    )))
+}
+
+impl PlacementModifier {
     pub fn positions(
         &self,
         context: &PlacementContext<'_, '_>,
@@ -184,7 +179,7 @@ impl PlacementModifier {
         out: &mut Positions,
     ) {
         match self {
-            Self::Count(count) => repeat(count.sample(random), origin, out),
+            Self::Count { count } => repeat(count.sample(random), origin, out),
             Self::NoiseThresholdCount {
                 noise_level,
                 below_noise,
@@ -217,12 +212,12 @@ impl PlacementModifier {
                 let z = random.next_i32_bounded(16) + origin.0.z;
                 out.push(BlockPos::new(x, origin.0.y, z));
             }
-            Self::HeightRange(height) => {
+            Self::HeightRange { height } => {
                 let y = height.sample(random, context.min_y(), context.gen_depth());
                 out.push(origin.at_y(y));
             }
-            Self::Heightmap(heightmap_type) => {
-                let height = context.get_height(*heightmap_type, origin.0.x, origin.0.z);
+            Self::Heightmap { heightmap } => {
+                let height = context.get_height(*heightmap, origin.0.x, origin.0.z);
                 if height > context.min_y() {
                     out.push(BlockPos::new(origin.0.x, height, origin.0.z));
                 }
@@ -236,7 +231,7 @@ impl PlacementModifier {
                 let z = origin.0.z + xz_spread.sample(random);
                 out.push(BlockPos::new(x, y, z));
             }
-            Self::CountOnEveryLayer(count) => {
+            Self::CountOnEveryLayer { count } => {
                 count_on_every_layer(context, random, origin, count, out);
             }
             Self::EnvironmentScan {
@@ -255,7 +250,7 @@ impl PlacementModifier {
                     out,
                 );
             }
-            Self::FixedPlacement(positions) => {
+            Self::FixedPlacement { positions } => {
                 let chunk_x = origin.0.x >> 4;
                 let chunk_z = origin.0.z >> 4;
                 let in_chunk = |pos: &&BlockPos| pos.0.x >> 4 == chunk_x && pos.0.z >> 4 == chunk_z;
@@ -264,25 +259,25 @@ impl PlacementModifier {
                 }
             }
             Self::BiomeFilter => {
-                let top_feature = context
-                    .top_feature
-                    .expect("biome filter on a feature without a top-level placed feature");
-                let biome = context.get_biome(origin);
-                if biome_has_feature(biome, top_feature) {
+                let place = match context.top_feature {
+                    Some(top_feature) => biome_has_feature(context.get_biome(origin), top_feature),
+                    None => true,
+                };
+                if place {
                     out.push(origin);
                 }
             }
-            Self::RarityFilter(chance) => {
+            Self::RarityFilter { chance } => {
                 if random.next_f32() < 1.0 / *chance as f32 {
                     out.push(origin);
                 }
             }
-            Self::BlockPredicateFilter(predicate) => {
+            Self::BlockPredicateFilter { predicate } => {
                 if predicate.test(context.region, origin) {
                     out.push(origin);
                 }
             }
-            Self::SurfaceWaterDepthFilter(max_water_depth) => {
+            Self::SurfaceWaterDepthFilter { max_water_depth } => {
                 let ocean_floor =
                     context.get_height(HeightmapType::OceanFloor, origin.0.x, origin.0.z);
                 let world_surface =
@@ -418,29 +413,6 @@ fn is_bedrock(state: BlockState) -> bool {
     state.get_block() == &vanilla_blocks::BEDROCK
 }
 
-fn parse_block_pos(value: &Value) -> BlockPos {
-    let components = value_list(value);
-    let component = |index: usize| {
-        components
-            .get(index)
-            .and_then(Value::as_i64)
-            .unwrap_or_default() as i32
-    };
-    BlockPos::new(component(0), component(1), component(2))
-}
-
-fn as_i32(value: &Value, key: &str) -> i32 {
-    value[key]
-        .as_i64()
-        .unwrap_or_else(|| panic!("missing integer field {key} in {value}")) as i32
-}
-
-fn as_f64(value: &Value, key: &str) -> f64 {
-    value[key]
-        .as_f64()
-        .unwrap_or_else(|| panic!("missing float field {key} in {value}"))
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
@@ -511,6 +483,7 @@ mod tests {
             generator.sea_level(),
             generator.seed(),
             generator.biome_zoom_seed(),
+            generator.region_random(center),
         );
 
         let feature = features()

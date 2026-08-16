@@ -41,7 +41,7 @@ use crate::registry::blocks::properties::Property;
 use crate::registry::blocks::shapes::ShapeKind;
 use crate::registry::fluid::{FluidRef, FluidState};
 use crate::registry::{REGISTRY, Registry};
-use crate::util::datapack::LoadError;
+use crate::util::datapack::DatapackError;
 use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 
@@ -438,7 +438,7 @@ impl BlockRegistry {
         &mut self,
         namespace: &str,
         tags_dir: &Path,
-    ) -> Result<(), LoadError> {
+    ) -> Result<(), DatapackError> {
         self.registry
             .load_tags_from_datapack(namespace, &tags_dir.join("block"))
     }
@@ -1360,6 +1360,43 @@ mod tests {
 
         let air = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR);
         assert!(!air.blocks_motion());
+    }
+
+    #[test]
+    fn oak_log_axis_set_value_roundtrips() {
+        init_global_registry();
+
+        let default_log = vanilla_blocks::OAK_LOG.default_state();
+        assert_eq!(default_log.get_value(&Properties::AXIS), crate::util::axis::Axis::Y);
+
+        let x_log = default_log.set_value(&Properties::AXIS, crate::util::axis::Axis::X);
+        assert_eq!(x_log.get_value(&Properties::AXIS), crate::util::axis::Axis::X);
+        assert_eq!(
+            REGISTRY
+                .blocks
+                .get_properties(x_log)
+                .iter()
+                .find(|(name, _)| *name == "axis")
+                .map(|&(_, value)| value),
+            Some("x")
+        );
+
+        let z_log = default_log.set_value(&Properties::AXIS, crate::util::axis::Axis::Z);
+        assert_eq!(z_log.get_value(&Properties::AXIS), crate::util::axis::Axis::Z);
+    }
+
+    #[test]
+    fn vine_single_face_set_value_does_not_light_up_other_faces() {
+        init_global_registry();
+
+        let vine = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::VINE);
+        let north_only = vine.set_value(&Properties::NORTH, true);
+
+        assert!(north_only.get_value(&Properties::NORTH));
+        assert!(!north_only.get_value(&Properties::SOUTH));
+        assert!(!north_only.get_value(&Properties::EAST));
+        assert!(!north_only.get_value(&Properties::WEST));
+        assert!(!north_only.get_value(&Properties::UP));
     }
 
     #[test]

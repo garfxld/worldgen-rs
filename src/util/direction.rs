@@ -1,10 +1,12 @@
 use glam::IVec3;
+use serde::Deserialize;
 
 use crate::util::axis::Axis;
 use crate::util::pos::BlockPos;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[derive_const(PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum Direction {
     Down,
     Up,

@@ -61,6 +61,13 @@ impl ChunkPos {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BlockPos(pub IVec3);
 
+impl<'de> serde::Deserialize<'de> for BlockPos {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let [x, y, z] = <[i32; 3]>::deserialize(deserializer)?;
+        Ok(Self::new(x, y, z))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TraversalNodeStatus {
     Accept,

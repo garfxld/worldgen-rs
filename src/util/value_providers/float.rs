@@ -1,8 +1,9 @@
-use serde::{Deserialize, Deserializer, de::Error as _};
+use serde::Deserialize;
 
 use crate::util::rng::RandomSource;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(from = "RawFloatProvider")]
 pub enum FloatProvider {
     Constant(f32),
     Uniform {
@@ -65,60 +66,64 @@ impl FloatProvider {
     }
 }
 
-impl<'de> Deserialize<'de> for FloatProvider {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(tag = "type", deny_unknown_fields)]
-        enum Tagged {
-            #[serde(rename = "minecraft:constant")]
-            Constant { value: f32 },
-            #[serde(rename = "minecraft:uniform")]
-            Uniform {
-                min_inclusive: f32,
-                max_exclusive: f32,
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum RawFloatProvider {
+    Constant(f32),
+    Tagged(TaggedFloatProvider),
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", deny_unknown_fields)]
+pub enum TaggedFloatProvider {
+    #[serde(rename = "minecraft:constant")]
+    Constant { value: f32 },
+    #[serde(rename = "minecraft:uniform")]
+    Uniform {
+        min_inclusive: f32,
+        max_exclusive: f32,
+    },
+    #[serde(rename = "minecraft:trapezoid")]
+    Trapezoid { min: f32, max: f32, plateau: f32 },
+    #[serde(rename = "minecraft:clamped_normal")]
+    ClampedNormal {
+        mean: f32,
+        deviation: f32,
+        min: f32,
+        max: f32,
+    },
+}
+
+impl From<RawFloatProvider> for FloatProvider {
+    fn from(raw: RawFloatProvider) -> Self {
+        let tagged = match raw {
+            RawFloatProvider::Constant(value) => return Self::Constant(value),
+            RawFloatProvider::Tagged(tagged) => tagged,
+        };
+        match tagged {
+            TaggedFloatProvider::Constant { value } => Self::Constant(value),
+            TaggedFloatProvider::Uniform {
+                min_inclusive,
+                max_exclusive,
+            } => Self::Uniform {
+                min_inclusive,
+                max_exclusive,
             },
-            #[serde(rename = "minecraft:trapezoid")]
-            Trapezoid { min: f32, max: f32, plateau: f32 },
-            #[serde(rename = "minecraft:clamped_normal")]
-            ClampedNormal {
-                mean: f32,
-                deviation: f32,
-                min: f32,
-                max: f32,
+            TaggedFloatProvider::Trapezoid { min, max, plateau } => {
+                Self::Trapezoid { min, max, plateau }
+            }
+            TaggedFloatProvider::ClampedNormal {
+                mean,
+                deviation,
+                min,
+                max,
+            } => Self::ClampedNormal {
+                mean,
+                deviation,
+                min,
+                max,
             },
         }
-
-        let value = serde_json::Value::deserialize(d)?;
-        if value.is_number() {
-            return Ok(Self::Constant(
-                f32::deserialize(value).map_err(D::Error::custom)?,
-            ));
-        }
-
-        Ok(
-            match serde_json::from_value(value).map_err(D::Error::custom)? {
-                Tagged::Constant { value: v } => Self::Constant(v),
-                Tagged::Uniform {
-                    min_inclusive,
-                    max_exclusive,
-                } => Self::Uniform {
-                    min_inclusive,
-                    max_exclusive,
-                },
-                Tagged::Trapezoid { min, max, plateau } => Self::Trapezoid { min, max, plateau },
-                Tagged::ClampedNormal {
-                    mean,
-                    deviation,
-                    min,
-                    max,
-                } => Self::ClampedNormal {
-                    mean,
-                    deviation,
-                    min,
-                    max,
-                },
-            },
-        )
     }
 }
 

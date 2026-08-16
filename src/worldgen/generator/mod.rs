@@ -5,8 +5,10 @@ use crate::chunk::proto::{Chunk, GenerationChunk, NoisePhase};
 use crate::registry::REGISTRY;
 use crate::registry::biome::BiomeRef;
 use crate::util::ident::{BlockState, Identifier};
-use crate::util::pos::BlockPos;
-use crate::worldgen::backend::ir::loader::{DatapackSource, LoadError};
+use crate::util::pos::{BlockPos, ChunkPos};
+use crate::util::rng::RandomSource;
+use crate::util::rng::name_hash::NameHash;
+use crate::worldgen::backend::ir::loader::{DatapackError, DatapackSource};
 use crate::worldgen::backend::jit::CompileError;
 use crate::worldgen::biome::multi_noise::build_parameter_list;
 use crate::worldgen::biome::{BiomeSourceKind, obfuscate_biome_seed};
@@ -17,6 +19,8 @@ use crate::worldgen::feature::features;
 use crate::worldgen::feature::sorter::{StepFeatureData, build_features_per_step};
 use crate::worldgen::surface::{DatapackSurfaceRules, SurfaceSystem};
 
+const WORLDGEN_REGION_RANDOM: &str = "minecraft:worldgen_region_random";
+
 mod carver;
 mod feature;
 pub mod fuzzed_biome;
@@ -25,7 +29,7 @@ mod surface;
 #[derive(Debug, thiserror::Error)]
 pub enum GeneratorError {
     #[error(transparent)]
-    Load(#[from] LoadError),
+    Datapack(#[from] DatapackError),
     #[error(transparent)]
     Compile(#[from] CompileError),
 }
@@ -186,6 +190,14 @@ impl Generator {
 
     pub const fn seed(&self) -> i64 {
         self.seed
+    }
+
+    pub fn region_random(&self, pos: ChunkPos) -> RandomSource {
+        self.noises
+            .random()
+            .with_hash_of(&NameHash::new(WORLDGEN_REGION_RANDOM))
+            .next_positional()
+            .at(pos.0.x * 16, 0, pos.0.y * 16)
     }
 
     pub fn create_biomes(&self, chunk: &Chunk) {

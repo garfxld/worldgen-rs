@@ -1,61 +1,43 @@
-use serde_json::Value;
+use serde::Deserialize;
 
 use crate::registry::REGISTRY;
 use crate::util::ident::{BlockState, Identifier};
 use crate::util::rng::RandomSource;
-use crate::worldgen::json::{parse_block_state, parse_id, type_of};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "predicate_type", deny_unknown_fields)]
 pub enum RuleTest {
+    #[serde(rename = "minecraft:always_true")]
     AlwaysTrue,
-    BlockMatch(Identifier),
-    BlockStateMatch(BlockState),
-    TagMatch(Identifier),
+    #[serde(rename = "minecraft:block_match")]
+    BlockMatch { block: Identifier },
+    #[serde(rename = "minecraft:blockstate_match")]
+    BlockStateMatch { block_state: BlockState },
+    #[serde(rename = "minecraft:tag_match")]
+    TagMatch { tag: Identifier },
+    #[serde(rename = "minecraft:random_block_match")]
     RandomBlockMatch { block: Identifier, probability: f32 },
-    RandomBlockStateMatch { state: BlockState, probability: f32 },
+    #[serde(rename = "minecraft:random_blockstate_match")]
+    RandomBlockStateMatch {
+        block_state: BlockState,
+        probability: f32,
+    },
 }
 
 impl RuleTest {
-    pub fn parse(value: &Value) -> Self {
-        let predicate_type = value["predicate_type"]
-            .as_str()
-            .map_or_else(|| type_of(value).to_owned(), str::to_owned);
-        match predicate_type.as_str() {
-            "minecraft:always_true" => Self::AlwaysTrue,
-            "minecraft:block_match" => Self::BlockMatch(parse_id(block_field(value))),
-            "minecraft:blockstate_match" => {
-                Self::BlockStateMatch(parse_block_state(&value["block_state"]))
-            }
-            "minecraft:tag_match" => Self::TagMatch(parse_id(
-                value["tag"]
-                    .as_str()
-                    .unwrap_or_else(|| panic!("tag_match without tag: {value}")),
-            )),
-            "minecraft:random_block_match" => Self::RandomBlockMatch {
-                block: parse_id(block_field(value)),
-                probability: probability(value),
-            },
-            "minecraft:random_blockstate_match" => Self::RandomBlockStateMatch {
-                state: parse_block_state(&value["block_state"]),
-                probability: probability(value),
-            },
-            other => panic!("unknown rule test type {other}"),
-        }
-    }
-
     pub fn test(&self, state: BlockState, random: &mut RandomSource) -> bool {
         match self {
             Self::AlwaysTrue => true,
-            Self::BlockMatch(block) => is_block(state, block),
-            Self::BlockStateMatch(expected) => state == *expected,
-            Self::TagMatch(tag) => state.get_block().has_tag(tag),
+            Self::BlockMatch { block } => is_block(state, block),
+            Self::BlockStateMatch { block_state } => state == *block_state,
+            Self::TagMatch { tag } => state.get_block().has_tag(tag),
             Self::RandomBlockMatch { block, probability } => {
                 is_block(state, block) && random.next_f32() < *probability
             }
             Self::RandomBlockStateMatch {
-                state: expected,
+                block_state,
                 probability,
-            } => state == *expected && random.next_f32() < *probability,
+            } => state == *block_state && random.next_f32() < *probability,
         }
     }
 }
@@ -67,21 +49,11 @@ fn is_block(state: BlockState, block: &Identifier) -> bool {
         .is_some_and(|actual| actual.key == *block)
 }
 
-fn block_field(value: &Value) -> &str {
-    value["block"]
-        .as_str()
-        .unwrap_or_else(|| panic!("rule test without block: {value}"))
-}
-
-fn probability(value: &Value) -> f32 {
-    value["probability"].as_f64().unwrap_or(1.0) as f32
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Once;
 
-    use serde_json::json;
+    use serde_json::{from_value, json};
 
     use super::*;
     use crate::registry::Registries;
@@ -105,17 +77,19 @@ mod tests {
         let stone = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::STONE);
         let dirt = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::DIRT);
 
-        let tag_match = RuleTest::parse(&json!({
+        let tag_match = from_value::<RuleTest>(json!({
             "predicate_type": "minecraft:tag_match",
             "tag": "minecraft:base_stone_overworld"
-        }));
+        }))
+        .expect("test value");
         assert!(tag_match.test(stone, &mut random));
         assert!(!tag_match.test(dirt, &mut random));
 
-        let block_match = RuleTest::parse(&json!({
+        let block_match = from_value::<RuleTest>(json!({
             "predicate_type": "minecraft:block_match",
             "block": "minecraft:stone"
-        }));
+        }))
+        .expect("test value");
         assert!(block_match.test(stone, &mut random));
         assert!(!block_match.test(dirt, &mut random));
     }

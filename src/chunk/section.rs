@@ -73,6 +73,21 @@ impl Sections {
         }
     }
 
+    pub fn get_relative_biome(
+        &self,
+        relative_x: usize,
+        relative_y: usize,
+        relative_z: usize,
+    ) -> Option<u16> {
+        let (section_index, relative_y) = split_by_section(relative_y);
+        self.sections.get(section_index).map(|section| {
+            section
+                .read()
+                .biomes
+                .get(relative_x / 4, relative_y / 4, relative_z / 4)
+        })
+    }
+
     pub fn read_all_biomes(&self) -> Box<[u16]> {
         let total = self.sections.len() * 64;
         let mut biomes = vec![0u16; total];

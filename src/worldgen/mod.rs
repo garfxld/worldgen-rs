@@ -3,10 +3,10 @@ pub mod biome;
 pub mod block_predicate;
 pub mod block_survival;
 pub mod carver;
+pub mod column;
 pub mod density;
 pub mod feature;
 pub mod generator;
-pub mod json;
 pub mod placement;
 pub mod region;
 pub mod scheduler;
@@ -24,7 +24,7 @@ use crate::util::ident::Identifier;
 use crate::util::pos::ChunkPos;
 use crate::worldgen::backend::ir::loader::DatapackSource;
 use crate::worldgen::generator::{BiomeSourceDimension, Generator};
-use crate::worldgen::scheduler::ChunkStore;
+use crate::worldgen::scheduler::{ChunkStore, chebyshev_neighbors};
 
 pub type Result<T> = StdResult<T, Error>;
 
@@ -89,7 +89,12 @@ impl Worldgen {
             return Err(Error::Unsupported(status));
         }
 
-        self.store.generate_to(&[pos], status);
+        if status == ChunkStatus::Features {
+            let neighbors: Vec<ChunkPos> = chebyshev_neighbors(pos, 1).collect();
+            self.store.generate_to(&neighbors, status);
+        } else {
+            self.store.generate_to(&[pos], status);
+        }
 
         let slot = self.store.get(pos).ok_or(Error::NotReady(pos))?;
         let chunk = slot.chunk().ok_or(Error::NotReady(pos))?;

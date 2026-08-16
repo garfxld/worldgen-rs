@@ -1,6 +1,7 @@
 use glam::{DVec3, IVec3};
 
 use crate::util::axis::Axis;
+use crate::util::pos::BlockPos;
 
 const fn ordered_pair(a: f64, b: f64) -> (f64, f64) {
     if a <= b { (a, b) } else { (b, a) }
@@ -138,6 +139,41 @@ impl BoundingBox {
 
     pub const fn max_z(self) -> i32 {
         self.max.z
+    }
+
+    pub const fn from_point(pos: BlockPos) -> Self {
+        Self::new(pos.0, pos.0)
+    }
+
+    pub const fn encapsulate(self, pos: BlockPos) -> Self {
+        Self {
+            min: IVec3::new(
+                self.min.x.min(pos.0.x),
+                self.min.y.min(pos.0.y),
+                self.min.z.min(pos.0.z),
+            ),
+            max: IVec3::new(
+                self.max.x.max(pos.0.x),
+                self.max.y.max(pos.0.y),
+                self.max.z.max(pos.0.z),
+            ),
+        }
+    }
+
+    pub const fn inflated_by_xyz(self, dx: i32, dy: i32, dz: i32) -> Self {
+        Self {
+            min: IVec3::new(self.min.x - dx, self.min.y - dy, self.min.z - dz),
+            max: IVec3::new(self.max.x + dx, self.max.y + dy, self.max.z + dz),
+        }
+    }
+
+    pub const fn is_inside(self, pos: BlockPos) -> bool {
+        pos.0.x >= self.min.x
+            && pos.0.x <= self.max.x
+            && pos.0.y >= self.min.y
+            && pos.0.y <= self.max.y
+            && pos.0.z >= self.min.z
+            && pos.0.z <= self.max.z
     }
 }
 

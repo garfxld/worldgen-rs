@@ -250,7 +250,7 @@ pub(super) fn with_random_source<T>(
 
 #[inline]
 pub(super) fn horizontal_tunnel_radius(progress_arg: f32, thickness: f32) -> f64 {
-    let radius_offset = f64::from(sin(f64::from(progress_arg))) * f64::from(thickness);
+    let radius_offset = f64::from(sin(progress_arg)) * f64::from(thickness);
     1.5 + radius_offset
 }
 

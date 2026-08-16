@@ -6,13 +6,19 @@ use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_block_tags;
 use crate::util::ident::BlockState;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
 pub enum HeightmapType {
+    #[serde(rename = "WORLD_SURFACE")]
     WorldSurface,
+    #[serde(rename = "MOTION_BLOCKING")]
     MotionBlocking,
+    #[serde(rename = "MOTION_BLOCKING_NO_LEAVES")]
     MotionBlockingNoLeaves,
+    #[serde(rename = "OCEAN_FLOOR")]
     OceanFloor,
+    #[serde(rename = "WORLD_SURFACE_WG")]
     WorldSurfaceWg,
+    #[serde(rename = "OCEAN_FLOOR_WG")]
     OceanFloorWg,
 }
 

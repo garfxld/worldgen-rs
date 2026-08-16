@@ -3,7 +3,9 @@ use std::path::Path;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 
-use crate::util::datapack::{LoadError, collect_json_files, path_to_id, read_and_parse_normalized};
+use crate::util::datapack::{
+    DatapackError, collect_json_files, path_to_id, read_and_parse_normalized,
+};
 use crate::util::ident::Identifier;
 
 #[derive(Debug, Default)]
@@ -94,7 +96,7 @@ fn parse_id(raw: &str) -> Identifier {
 pub fn load_tag_directory(
     namespace: &str,
     directory: &Path,
-) -> Result<Vec<(Identifier, Vec<Identifier>)>, LoadError> {
+) -> Result<Vec<(Identifier, Vec<Identifier>)>, DatapackError> {
     let mut raw: FxHashMap<Identifier, Vec<TagEntry>> = FxHashMap::default();
     let mut order: Vec<Identifier> = Vec::new();
 

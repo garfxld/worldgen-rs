@@ -1,11 +1,21 @@
 use std::path::Path;
-use std::sync::OnceLock;
+use std::sync::{LazyLock, OnceLock};
 
 use serde::{Deserialize, Deserializer};
 
 use crate::registry::{REGISTRY, Registry};
-use crate::util::datapack::{LoadError, collect_json_files, path_to_id, read_and_parse_normalized};
+use crate::util::datapack::{
+    DatapackError, collect_json_files, path_to_id, read_and_parse_normalized,
+};
+use crate::registry::blocks::vanilla_blocks;
+use crate::registry::fluid::is_water_fluid;
 use crate::util::ident::Identifier;
+use crate::util::noise::perlin_simplex_noise::PerlinSimplexNoise;
+use crate::util::pos::BlockPos;
+use crate::util::rng::RandomSource;
+use crate::util::rng::legacy_random::LegacyRandomSource;
+use crate::worldgen::block_survival::can_survive;
+use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TemperatureModifier {
@@ -31,6 +41,131 @@ impl Biome {
 
     pub fn id(&self) -> usize {
         *self.id.get().expect("biome not registered")
+    }
+
+    fn height_adjusted_temperature(&self, pos: BlockPos, sea_level: i32) -> f32 {
+        let adjusted_temperature = self
+            .temperature_modifier
+            .modify_temperature(pos, self.temperature);
+        let snow_level = sea_level + 17;
+        if pos.y() > snow_level {
+            let v = (temperature_noise().get_value(
+                f64::from(pos.x() as f32 / 8.0),
+                f64::from(pos.z() as f32 / 8.0),
+            ) * 8.0) as f32;
+            adjusted_temperature - (v + pos.y() as f32 - snow_level as f32) * 0.05 / 40.0
+        } else {
+            adjusted_temperature
+        }
+    }
+
+    pub fn warm_enough_to_rain(&self, pos: BlockPos, sea_level: i32) -> bool {
+        self.height_adjusted_temperature(pos, sea_level) >= 0.15
+    }
+
+    pub fn cold_enough_to_snow(&self, pos: BlockPos, sea_level: i32) -> bool {
+        !self.warm_enough_to_rain(pos, sea_level)
+    }
+
+    pub fn should_freeze(
+        &self,
+        region: &WorldGenRegion<'_>,
+        pos: BlockPos,
+        check_neighbors: bool,
+    ) -> bool {
+        if self.warm_enough_to_rain(pos, region.sea_level()) {
+            return false;
+        }
+
+        if region.is_inside_build_height(pos.y()) {
+            let state = region.get_block(pos);
+            if is_water_fluid(state.get_fluid_state().fluid_id)
+                && state.get_block() == &vanilla_blocks::WATER
+            {
+                if !check_neighbors {
+                    return true;
+                }
+
+                let surrounded_by_water = is_water_at(region, pos.west())
+                    && is_water_at(region, pos.east())
+                    && is_water_at(region, pos.north())
+                    && is_water_at(region, pos.south());
+                if !surrounded_by_water {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    pub fn should_snow(&self, region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
+        if !self.has_precipitation || !self.cold_enough_to_snow(pos, region.sea_level()) {
+            return false;
+        }
+
+        if region.is_inside_build_height(pos.y()) {
+            let state = region.get_block(pos);
+            if (state.is_air() || state.get_block() == &vanilla_blocks::SNOW)
+                && can_survive(region, pos, vanilla_blocks::SNOW.default_state())
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
+fn is_water_at(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
+    is_water_fluid(region.get_block(pos).get_fluid_state().fluid_id)
+}
+
+fn temperature_noise() -> &'static PerlinSimplexNoise {
+    static NOISE: LazyLock<PerlinSimplexNoise> = LazyLock::new(|| {
+        let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(1234));
+        PerlinSimplexNoise::new(&mut random, &[0])
+    });
+    &NOISE
+}
+
+fn frozen_temperature_noise() -> &'static PerlinSimplexNoise {
+    static NOISE: LazyLock<PerlinSimplexNoise> = LazyLock::new(|| {
+        let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(3456));
+        PerlinSimplexNoise::new(&mut random, &[-2, -1, 0])
+    });
+    &NOISE
+}
+
+fn biome_info_noise() -> &'static PerlinSimplexNoise {
+    static NOISE: LazyLock<PerlinSimplexNoise> = LazyLock::new(|| {
+        let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(2345));
+        PerlinSimplexNoise::new(&mut random, &[0])
+    });
+    &NOISE
+}
+
+impl TemperatureModifier {
+    fn modify_temperature(self, pos: BlockPos, base_temperature: f32) -> f32 {
+        match self {
+            Self::None => base_temperature,
+            Self::Frozen => {
+                let ground_value_large_variation = frozen_temperature_noise()
+                    .get_value(f64::from(pos.x()) * 0.05, f64::from(pos.z()) * 0.05)
+                    * 7.0;
+                let ground_value_edge_variation = biome_info_noise()
+                    .get_value(f64::from(pos.x()) * 0.2, f64::from(pos.z()) * 0.2);
+                let ice_patches = ground_value_large_variation + ground_value_edge_variation;
+                if ice_patches < 0.3 {
+                    let ground_value_small_variation = biome_info_noise()
+                        .get_value(f64::from(pos.x()) * 0.09, f64::from(pos.z()) * 0.09);
+                    if ground_value_small_variation < 0.8 {
+                        return 0.2;
+                    }
+                }
+                base_temperature
+            }
+        }
     }
 }
 
@@ -96,7 +231,7 @@ impl BiomeRegistry {
         &mut self,
         namespace: &str,
         worldgen_dir: &Path,
-    ) -> Result<(), LoadError> {
+    ) -> Result<(), DatapackError> {
         let dir = worldgen_dir.join("biome");
         for file in collect_json_files(&dir) {
             let json: BiomeJson = read_and_parse_normalized(&file)?;

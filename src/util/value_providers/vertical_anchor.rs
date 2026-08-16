@@ -1,6 +1,7 @@
-use serde::{Deserialize, Deserializer, de::Error as _};
+use serde::Deserialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum VerticalAnchor {
     Absolute(i32),
     AboveBottom(i32),
@@ -13,33 +14,6 @@ impl VerticalAnchor {
             Self::Absolute(y) => y,
             Self::AboveBottom(offset) => min_y + offset,
             Self::BelowTop(offset) => min_y + height - 1 - offset,
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for VerticalAnchor {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct Raw {
-            #[serde(default)]
-            absolute: Option<i32>,
-            #[serde(default)]
-            above_bottom: Option<i32>,
-            #[serde(default)]
-            below_top: Option<i32>,
-        }
-        let raw = Raw::deserialize(d)?;
-        match (raw.absolute, raw.above_bottom, raw.below_top) {
-            (Some(y), None, None) => Ok(Self::Absolute(y)),
-            (None, Some(o), None) => Ok(Self::AboveBottom(o)),
-            (None, None, Some(o)) => Ok(Self::BelowTop(o)),
-            (None, None, None) => Err(D::Error::custom(
-                "VerticalAnchor requires exactly one of absolute/above_bottom/below_top",
-            )),
-            _ => Err(D::Error::custom(
-                "VerticalAnchor must have exactly one of absolute/above_bottom/below_top",
-            )),
         }
     }
 }

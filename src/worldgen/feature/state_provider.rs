@@ -1,178 +1,179 @@
-use serde_json::Value;
+use serde::Deserialize;
 
 use crate::registry::REGISTRY;
 use crate::registry::blocks::properties::Axis;
 use crate::util::ident::BlockState;
+use crate::util::inclusive_range::InclusiveRange;
 use crate::util::noise::normal_noise::NormalNoise;
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 use crate::util::rng::legacy_random::LegacyRandomSource;
 use crate::util::value_providers::int::IntProvider;
 use crate::worldgen::block_predicate::BlockPredicate;
-use crate::worldgen::json::{parse_block_state, parse_json, type_of, value_list};
 use crate::worldgen::region::WorldGenRegion;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum BlockStateProvider {
-    Simple(BlockState),
-    RotatedBlock(BlockState),
-    Weighted(Vec<WeightedState>),
+    #[serde(rename = "minecraft:simple_state_provider")]
+    Simple { state: BlockState },
+    #[serde(rename = "minecraft:rotated_block_provider")]
+    RotatedBlock { state: BlockState },
+    #[serde(rename = "minecraft:weighted_state_provider")]
+    Weighted { entries: Vec<WeightedState> },
+    #[serde(rename = "minecraft:rule_based_state_provider")]
     RuleBased {
+        #[serde(default)]
         fallback: Option<Box<BlockStateProvider>>,
         rules: Vec<StateRule>,
     },
+    #[serde(rename = "minecraft:randomized_int_state_provider")]
     RandomizedInt {
         source: Box<BlockStateProvider>,
         property: String,
         values: IntProvider,
     },
-    Noise {
-        noise: NormalNoise,
-        scale: f32,
-        states: Vec<BlockState>,
-    },
-    NoiseThreshold {
-        noise: NormalNoise,
-        scale: f32,
-        threshold: f32,
-        high_chance: f32,
-        default_state: BlockState,
-        low_states: Vec<BlockState>,
-        high_states: Vec<BlockState>,
-    },
-    DualNoise {
-        noise: NormalNoise,
-        scale: f32,
-        slow_noise: NormalNoise,
-        slow_scale: f32,
-        variety_min: i32,
-        variety_max: i32,
-        states: Vec<BlockState>,
-    },
+    #[serde(rename = "minecraft:noise_provider")]
+    Noise(NoiseProvider),
+    #[serde(rename = "minecraft:noise_threshold_provider")]
+    NoiseThreshold(NoiseThresholdProvider),
+    #[serde(rename = "minecraft:dual_noise_provider")]
+    DualNoise(DualNoiseProvider),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WeightedState {
+    #[serde(rename = "data")]
     pub state: BlockState,
     pub weight: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StateRule {
     pub if_true: BlockPredicate,
     pub then: BlockStateProvider,
 }
 
-fn parse_noise(seed: i64, parameters: &Value) -> NormalNoise {
-    let first_octave = parameters["firstOctave"]
-        .as_i64()
-        .unwrap_or_else(|| panic!("noise parameters without firstOctave: {parameters}"))
-        as i32;
-    let amplitudes: Vec<f64> = value_list(&parameters["amplitudes"])
-        .iter()
-        .map(|amplitude| amplitude.as_f64().unwrap_or_default())
-        .collect();
-    let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(seed as u64));
-    NormalNoise::create_from_random(&mut random, first_octave, &amplitudes)
+#[derive(Debug, Deserialize)]
+#[serde(from = "RawNoiseProvider")]
+pub struct NoiseProvider {
+    pub noise: NormalNoise,
+    pub scale: f32,
+    pub states: Vec<BlockState>,
 }
 
-fn parse_states(value: &Value) -> Vec<BlockState> {
-    value_list(value).iter().map(parse_block_state).collect()
+#[derive(Debug, Deserialize)]
+#[serde(from = "RawNoiseThresholdProvider")]
+pub struct NoiseThresholdProvider {
+    pub noise: NormalNoise,
+    pub scale: f32,
+    pub threshold: f32,
+    pub high_chance: f32,
+    pub default_state: BlockState,
+    pub low_states: Vec<BlockState>,
+    pub high_states: Vec<BlockState>,
 }
 
-fn as_f32(value: &Value, key: &str) -> f32 {
-    value[key]
-        .as_f64()
-        .unwrap_or_else(|| panic!("missing float field {key} in {value}")) as f32
+#[derive(Debug, Deserialize)]
+#[serde(from = "RawDualNoiseProvider")]
+pub struct DualNoiseProvider {
+    pub noise: NormalNoise,
+    pub scale: f32,
+    pub slow_noise: NormalNoise,
+    pub slow_scale: f32,
+    pub variety: InclusiveRange,
+    pub states: Vec<BlockState>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NoiseParameters {
+    #[serde(rename = "firstOctave")]
+    first_octave: i32,
+    amplitudes: Vec<f64>,
+}
+
+impl NoiseParameters {
+    fn build(&self, seed: i64) -> NormalNoise {
+        let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(seed as u64));
+        NormalNoise::create_from_random(&mut random, self.first_octave, &self.amplitudes)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawNoiseProvider {
+    seed: i64,
+    noise: NoiseParameters,
+    scale: f32,
+    states: Vec<BlockState>,
+}
+
+impl From<RawNoiseProvider> for NoiseProvider {
+    fn from(raw: RawNoiseProvider) -> Self {
+        Self {
+            noise: raw.noise.build(raw.seed),
+            scale: raw.scale,
+            states: raw.states,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawNoiseThresholdProvider {
+    seed: i64,
+    noise: NoiseParameters,
+    scale: f32,
+    threshold: f32,
+    high_chance: f32,
+    default_state: BlockState,
+    low_states: Vec<BlockState>,
+    high_states: Vec<BlockState>,
+}
+
+impl From<RawNoiseThresholdProvider> for NoiseThresholdProvider {
+    fn from(raw: RawNoiseThresholdProvider) -> Self {
+        Self {
+            noise: raw.noise.build(raw.seed),
+            scale: raw.scale,
+            threshold: raw.threshold,
+            high_chance: raw.high_chance,
+            default_state: raw.default_state,
+            low_states: raw.low_states,
+            high_states: raw.high_states,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawDualNoiseProvider {
+    seed: i64,
+    noise: NoiseParameters,
+    scale: f32,
+    slow_noise: NoiseParameters,
+    slow_scale: f32,
+    variety: InclusiveRange,
+    states: Vec<BlockState>,
+}
+
+impl From<RawDualNoiseProvider> for DualNoiseProvider {
+    fn from(raw: RawDualNoiseProvider) -> Self {
+        Self {
+            noise: raw.noise.build(raw.seed),
+            scale: raw.scale,
+            slow_noise: raw.slow_noise.build(raw.seed),
+            slow_scale: raw.slow_scale,
+            variety: raw.variety,
+            states: raw.states,
+        }
+    }
 }
 
 impl BlockStateProvider {
-    pub fn parse(value: &Value) -> Self {
-        match type_of(value) {
-            "minecraft:simple_state_provider" => Self::Simple(parse_block_state(&value["state"])),
-            "minecraft:rotated_block_provider" => {
-                Self::RotatedBlock(parse_block_state(&value["state"]))
-            }
-            "minecraft:weighted_state_provider" => Self::Weighted(
-                value_list(&value["entries"])
-                    .iter()
-                    .map(|entry| WeightedState {
-                        state: parse_block_state(&entry["data"]),
-                        weight: entry["weight"].as_i64().unwrap_or(1) as i32,
-                    })
-                    .collect(),
-            ),
-            "minecraft:rule_based_state_provider" => Self::RuleBased {
-                fallback: value
-                    .get("fallback")
-                    .map(|fallback| Box::new(Self::parse(fallback))),
-                rules: value_list(&value["rules"])
-                    .iter()
-                    .map(|rule| StateRule {
-                        if_true: BlockPredicate::parse(&rule["if_true"]),
-                        then: Self::parse(&rule["then"]),
-                    })
-                    .collect(),
-            },
-            "minecraft:randomized_int_state_provider" => Self::RandomizedInt {
-                source: Box::new(Self::parse(&value["source"])),
-                property: value["property"]
-                    .as_str()
-                    .unwrap_or_else(|| panic!("randomized_int_state_provider without property"))
-                    .to_owned(),
-                values: parse_json(&value["values"]),
-            },
-            "minecraft:noise_provider" => {
-                let seed = value["seed"].as_i64().unwrap_or_default();
-                Self::Noise {
-                    noise: parse_noise(seed, &value["noise"]),
-                    scale: as_f32(value, "scale"),
-                    states: parse_states(&value["states"]),
-                }
-            }
-            "minecraft:noise_threshold_provider" => {
-                let seed = value["seed"].as_i64().unwrap_or_default();
-                Self::NoiseThreshold {
-                    noise: parse_noise(seed, &value["noise"]),
-                    scale: as_f32(value, "scale"),
-                    threshold: as_f32(value, "threshold"),
-                    high_chance: as_f32(value, "high_chance"),
-                    default_state: parse_block_state(&value["default_state"]),
-                    low_states: parse_states(&value["low_states"]),
-                    high_states: parse_states(&value["high_states"]),
-                }
-            }
-            "minecraft:dual_noise_provider" => {
-                let seed = value["seed"].as_i64().unwrap_or_default();
-                let variety = value_list(&value["variety"]);
-                let variety_bound = |index: usize, fallback: i64| {
-                    variety
-                        .get(index)
-                        .and_then(Value::as_i64)
-                        .or_else(|| {
-                            value["variety"][if index == 0 {
-                                "min_inclusive"
-                            } else {
-                                "max_inclusive"
-                            }]
-                            .as_i64()
-                        })
-                        .unwrap_or(fallback) as i32
-                };
-                Self::DualNoise {
-                    noise: parse_noise(seed, &value["noise"]),
-                    scale: as_f32(value, "scale"),
-                    slow_noise: parse_noise(seed, &value["slow_noise"]),
-                    slow_scale: as_f32(value, "slow_scale"),
-                    variety_min: variety_bound(0, 1),
-                    variety_max: variety_bound(1, 1),
-                    states: parse_states(&value["states"]),
-                }
-            }
-            other => panic!("unknown state provider type {other}"),
-        }
-    }
-
     pub fn get_state(
         &self,
         region: &WorldGenRegion<'_>,
@@ -182,7 +183,7 @@ impl BlockStateProvider {
         match self {
             Self::RuleBased { .. } => self
                 .get_optional_state(region, random, pos)
-                .unwrap_or_else(|| region.get_block_state(pos)),
+                .unwrap_or_else(|| region.get_block(pos)),
             _ => self
                 .get_optional_state(region, random, pos)
                 .expect("only rule-based providers may yield no state"),
@@ -196,8 +197,8 @@ impl BlockStateProvider {
         pos: BlockPos,
     ) -> Option<BlockState> {
         match self {
-            Self::Simple(state) => Some(*state),
-            Self::RotatedBlock(state) => {
+            Self::Simple { state } => Some(*state),
+            Self::RotatedBlock { state } => {
                 let axis = match random.next_i32_bounded(3) {
                     0 => Axis::X,
                     1 => Axis::Y,
@@ -205,7 +206,7 @@ impl BlockStateProvider {
                 };
                 Some(try_set_axis(*state, axis))
             }
-            Self::Weighted(entries) => Some(random_weighted_state(entries, random)),
+            Self::Weighted { entries } => Some(random_weighted_state(entries, random)),
             Self::RuleBased { fallback, rules } => {
                 for rule in rules {
                     if rule.if_true.test(region, pos) {
@@ -225,48 +226,30 @@ impl BlockStateProvider {
                 let value = values.sample(random);
                 Some(set_int_property(state, property, value))
             }
-            Self::Noise {
-                noise,
-                scale,
-                states,
-            } => Some(random_state_from_noise(
-                states,
-                noise_value(noise, pos, f64::from(*scale)),
+            Self::Noise(provider) => Some(random_state_from_noise(
+                &provider.states,
+                noise_value(&provider.noise, pos, f64::from(provider.scale)),
             )),
-            Self::NoiseThreshold {
-                noise,
-                scale,
-                threshold,
-                high_chance,
-                default_state,
-                low_states,
-                high_states,
-            } => {
-                let value = noise_value(noise, pos, f64::from(*scale));
-                if value < f64::from(*threshold) {
-                    Some(random_element(low_states, random))
-                } else if random.next_f32() < *high_chance {
-                    Some(random_element(high_states, random))
+            Self::NoiseThreshold(provider) => {
+                let value = noise_value(&provider.noise, pos, f64::from(provider.scale));
+                if value < f64::from(provider.threshold) {
+                    Some(random_element(&provider.low_states, random))
+                } else if random.next_f32() < provider.high_chance {
+                    Some(random_element(&provider.high_states, random))
                 } else {
-                    Some(*default_state)
+                    Some(provider.default_state)
                 }
             }
-            Self::DualNoise {
-                noise,
-                scale,
-                slow_noise,
-                slow_scale,
-                variety_min,
-                variety_max,
-                states,
-            } => {
-                let slow_at = |pos: BlockPos| noise_value(slow_noise, pos, f64::from(*slow_scale));
+            Self::DualNoise(provider) => {
+                let slow_at = |pos: BlockPos| {
+                    noise_value(&provider.slow_noise, pos, f64::from(provider.slow_scale))
+                };
                 let local_variety = clamped_map(
                     slow_at(pos),
                     -1.0,
                     1.0,
-                    f64::from(*variety_min),
-                    f64::from(*variety_max + 1),
+                    f64::from(provider.variety.min_inclusive),
+                    f64::from(provider.variety.max_inclusive + 1),
                 ) as i32;
                 let possible_states: Vec<BlockState> = (0..local_variety)
                     .map(|index| {
@@ -275,12 +258,12 @@ impl BlockStateProvider {
                             pos.0.y,
                             pos.0.z + index * 34_234,
                         );
-                        random_state_from_noise(states, slow_at(offset))
+                        random_state_from_noise(&provider.states, slow_at(offset))
                     })
                     .collect();
                 Some(random_state_from_noise(
                     &possible_states,
-                    noise_value(noise, pos, f64::from(*scale)),
+                    noise_value(&provider.noise, pos, f64::from(provider.scale)),
                 ))
             }
         }
@@ -361,7 +344,7 @@ fn set_int_property(state: BlockState, property: &str, value: i32) -> BlockState
 mod tests {
     use std::sync::Once;
 
-    use serde_json::json;
+    use serde_json::{from_value, json};
 
     use super::*;
     use crate::registry::Registries;
@@ -380,13 +363,14 @@ mod tests {
     #[test]
     fn weighted_provider_consumes_one_draw_and_respects_weights() {
         init_global_registry();
-        let provider = BlockStateProvider::parse(&json!({
+        let provider = from_value::<BlockStateProvider>(json!({
             "type": "minecraft:weighted_state_provider",
             "entries": [
                 {"data": {"Name": "minecraft:grass_block"}, "weight": 1},
                 {"data": {"Name": "minecraft:podzol"}, "weight": 3}
             ]
-        }));
+        }))
+        .expect("test value");
 
         let grass = REGISTRY
             .blocks
@@ -400,7 +384,7 @@ mod tests {
             let mut random = RandomSource::Xoroshiro(XoroshiroRandomSource::from_seed(seed));
             let state = random_weighted_state(
                 match &provider {
-                    BlockStateProvider::Weighted(entries) => entries,
+                    BlockStateProvider::Weighted { entries } => entries,
                     _ => panic!("expected a weighted provider"),
                 },
                 &mut random,
@@ -419,7 +403,7 @@ mod tests {
     #[test]
     fn randomized_int_provider_sets_the_named_property() {
         init_global_registry();
-        let provider = BlockStateProvider::parse(&json!({
+        let provider = from_value::<BlockStateProvider>(json!({
             "type": "minecraft:randomized_int_state_provider",
             "source": {
                 "type": "minecraft:simple_state_provider",
@@ -427,12 +411,13 @@ mod tests {
             },
             "property": "age",
             "values": {"type": "minecraft:constant", "value": 7}
-        }));
+        }))
+        .expect("test value");
 
         let BlockStateProvider::RandomizedInt { source, .. } = &provider else {
             panic!("expected a randomized int provider");
         };
-        let BlockStateProvider::Simple(base) = **source else {
+        let BlockStateProvider::Simple { state: base } = **source else {
             panic!("expected a simple source provider");
         };
 

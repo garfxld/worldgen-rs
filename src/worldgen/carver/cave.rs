@@ -174,7 +174,7 @@ where
         y_scale: f64,
         skip_checker: S,
     ) {
-        let horizontal_radius = 1.5 + f64::from(sin(f64::from(FRAC_PI_2))) * f64::from(thickness);
+        let horizontal_radius = 1.5 + f64::from(sin(FRAC_PI_2)) * f64::from(thickness);
         let vertical_radius = horizontal_radius * y_scale;
         self.carve_ellipsoid(
             params,
@@ -206,10 +206,10 @@ where
             let progress_arg = PI * current_step as f32 / tunnel.dist as f32;
             let horizontal_radius = horizontal_tunnel_radius(progress_arg, tunnel.thickness);
             let vertical_radius = horizontal_radius * tunnel.y_scale;
-            let cos_x = cos(f64::from(state.vertical_rotation));
-            state.x += f64::from(cos(f64::from(state.horizontal_rotation)) * cos_x);
-            state.y += f64::from(sin(f64::from(state.vertical_rotation)));
-            state.z += f64::from(sin(f64::from(state.horizontal_rotation)) * cos_x);
+            let cos_x = cos(state.vertical_rotation);
+            state.x += f64::from(cos(state.horizontal_rotation) * cos_x);
+            state.y += f64::from(sin(state.vertical_rotation));
+            state.z += f64::from(sin(state.horizontal_rotation) * cos_x);
             state.vertical_rotation *= if steep { 0.92 } else { 0.7 };
             state.vertical_rotation += x_rota * 0.1;
             state.horizontal_rotation += y_rota * 0.1;

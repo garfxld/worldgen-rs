@@ -7,6 +7,7 @@ use super::xoroshiro::XoroshiroRandomSource;
 pub struct WorldgenRandom {
     source: XoroshiroRandomSource,
     gaussian: MarsagliaPolarGaussian,
+    count: i32,
 }
 
 impl WorldgenRandom {
@@ -14,6 +15,7 @@ impl WorldgenRandom {
         Self {
             source: XoroshiroRandomSource::from_seed(seed),
             gaussian: MarsagliaPolarGaussian::new(),
+            count: 0,
         }
     }
 
@@ -41,7 +43,12 @@ impl WorldgenRandom {
     }
 
     const fn next_bits(&mut self, bits: u64) -> u64 {
+        self.count += 1;
         self.source.next_i64() as u64 >> (64 - bits)
+    }
+
+    pub const fn count(&self) -> i32 {
+        self.count
     }
 
     pub const fn fork(&mut self) -> XoroshiroRandomSource {

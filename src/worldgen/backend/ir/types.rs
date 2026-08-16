@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use serde::{Deserialize, Deserializer, de::Error as _};
+use serde::{Deserialize, Deserializer};
 
 pub(crate) fn normalize_id(id: &str) -> String {
     if id.contains(':') {
@@ -119,40 +119,43 @@ pub struct RangeChoice {
     pub when_out_of_range: Arc<DensityFunction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(try_from = "RawIntervalSelect")]
 pub struct IntervalSelect {
     pub input: Arc<DensityFunction>,
     pub thresholds: Vec<f64>,
     pub functions: Vec<Arc<DensityFunction>>,
 }
 
-impl<'de> Deserialize<'de> for IntervalSelect {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        struct Raw {
-            input: Arc<DensityFunction>,
-            thresholds: Vec<f64>,
-            functions: Vec<Arc<DensityFunction>>,
-        }
-        let raw = Raw::deserialize(d)?;
+#[derive(Deserialize)]
+pub struct RawIntervalSelect {
+    input: Arc<DensityFunction>,
+    thresholds: Vec<f64>,
+    functions: Vec<Arc<DensityFunction>>,
+}
 
+impl TryFrom<RawIntervalSelect> for IntervalSelect {
+    type Error = String;
+
+    fn try_from(raw: RawIntervalSelect) -> Result<Self, Self::Error> {
         if raw.functions.len() < 2 {
-            return Err(D::Error::custom(format!(
+            return Err(format!(
                 "minecraft:interval_select requires at least two functions, got {}",
                 raw.functions.len()
-            )));
+            ));
         }
         if raw.thresholds.len() != raw.functions.len() - 1 {
-            return Err(D::Error::custom(format!(
+            return Err(format!(
                 "minecraft:interval_select requires exactly one more function than thresholds, got {} thresholds and {} functions",
                 raw.thresholds.len(),
                 raw.functions.len()
-            )));
+            ));
         }
         if !raw.thresholds.windows(2).all(|pair| pair[0] <= pair[1]) {
-            return Err(D::Error::custom(
-                "minecraft:interval_select thresholds must be ordered from smallest to largest",
-            ));
+            return Err(
+                "minecraft:interval_select thresholds must be ordered from smallest to largest"
+                    .to_owned(),
+            );
         }
 
         Ok(Self {

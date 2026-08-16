@@ -113,11 +113,11 @@ where
                 current_step as f32,
             );
 
-            let xc = cos(f64::from(state.vertical_rotation));
-            let xs = sin(f64::from(state.vertical_rotation));
-            state.x += f64::from(cos(f64::from(state.horizontal_rotation)) * xc);
+            let xc = cos(state.vertical_rotation);
+            let xs = sin(state.vertical_rotation);
+            state.x += f64::from(cos(state.horizontal_rotation) * xc);
             state.y += f64::from(xs);
-            state.z += f64::from(sin(f64::from(state.horizontal_rotation)) * xc);
+            state.z += f64::from(sin(state.horizontal_rotation) * xc);
             state.vertical_rotation *= 0.7;
             state.vertical_rotation += x_rota * 0.05;
             state.horizontal_rotation += y_rota * 0.05;

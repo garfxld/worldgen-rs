@@ -2,7 +2,9 @@
 name = "worldgen-rs"
 version = "0.1.0"
 edition = "2024"
+description = "Minecraft world generation library"
 license = "Apache-2.0"
+repository = "https://github.com/garfxld/worldgen-rs"
 
 [lib]
 name = "worldgen_rs"
@@ -51,11 +53,6 @@ lto = true
 codegen-units = 1
 panic = "abort"
 
-[profile.quick]
-inherits = "release"
-lto = false
-codegen-units = 16
-
 [profile.profiling]
 inherits = "release"
 debug = true
@@ -64,10 +61,11 @@ debug = true
 debug = true
 
 [profile.dev]
+opt-level = 3
+codegen-units = 16
 debug = 0
 
 [profile.dev.package.worldgen-rs]
-opt-level = 3
 debug-assertions = false
 overflow-checks = false
 

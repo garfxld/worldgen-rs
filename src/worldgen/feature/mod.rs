@@ -1,6 +1,15 @@
+pub mod state_provider;
+pub mod configured_feature;
+pub mod featuresize;
+pub mod features;
+pub mod multiface;
+pub mod sculk;
+pub mod foliageplacers;
+pub mod rootplacers;
 pub mod rule_test;
 pub mod sorter;
-pub mod block_state_provider;
+pub mod treedecorators;
+pub mod trunkplacers;
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -11,84 +20,23 @@ use serde_json::Value;
 use crate::registry::REGISTRY;
 use crate::registry::biome::BiomeRef;
 use crate::util::datapack::{collect_json_files, path_to_id, read_and_parse_normalized};
+use crate::util::datapack::{parse_id, parse_json, type_of, value_list};
 use crate::util::ident::Identifier;
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
-use crate::worldgen::json::{parse_id, type_of, value_list};
+use crate::worldgen::feature::configured_feature::{
+    ConfiguredFeature, WeightedPlacedFeature, WeightedRandomFeature,
+};
+use crate::worldgen::feature::features::root_system::RootSystemConfig;
+use crate::worldgen::feature::features::vegetation_patch::VegetationPatchConfig;
 use crate::worldgen::placement::{PlacementContext, PlacementModifier, Positions};
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug)]
-pub struct ConfiguredFeature {
-    pub key: Identifier,
-    pub kind: FeatureKind,
-}
-
-#[derive(Debug)]
-pub enum FeatureKind {
-    RandomSelector {
-        features: Vec<WeightedPlacedFeature>,
-        default: &'static PlacedFeature,
-    },
-    SimpleRandomSelector(Vec<&'static PlacedFeature>),
-    RandomBooleanSelector {
-        feature_true: &'static PlacedFeature,
-        feature_false: &'static PlacedFeature,
-    },
-    Unported(Identifier),
-}
-
-#[derive(Debug)]
-pub struct WeightedPlacedFeature {
-    pub chance: f32,
-    pub feature: &'static PlacedFeature,
-}
-
-#[derive(Debug)]
 pub struct PlacedFeature {
     pub id: usize,
-    pub key: Identifier,
     pub feature: &'static ConfiguredFeature,
     pub placement: Vec<PlacementModifier>,
-}
-
-impl ConfiguredFeature {
-    pub fn place(
-        &'static self,
-        context: &PlacementContext<'_, '_>,
-        random: &mut RandomSource,
-        origin: BlockPos,
-    ) -> bool {
-        match &self.kind {
-            FeatureKind::RandomSelector { features, default } => {
-                for entry in features {
-                    if random.next_f32() < entry.chance {
-                        return entry.feature.place(context.region, random, origin);
-                    }
-                }
-                default.place(context.region, random, origin)
-            }
-            FeatureKind::SimpleRandomSelector(features) => {
-                if features.is_empty() {
-                    return false;
-                }
-                let index = random.next_i32_bounded(features.len() as i32) as usize;
-                features[index].place(context.region, random, origin)
-            }
-            FeatureKind::RandomBooleanSelector {
-                feature_true,
-                feature_false,
-            } => {
-                let chosen = if random.next_bool() {
-                    feature_true
-                } else {
-                    feature_false
-                };
-                chosen.place(context.region, random, origin)
-            }
-            FeatureKind::Unported(_) => false,
-        }
-    }
 }
 
 impl PlacedFeature {
@@ -133,7 +81,27 @@ impl PlacedFeature {
         placed_any: &mut bool,
     ) {
         let Some(modifier) = self.placement.get(index) else {
-            if self.feature.place(context, random, origin) {
+            let before = random.draw_count();
+            let ok = self.feature.place(context, random, origin);
+            if let Some(trace) = trace_sink() {
+                use std::io::Write as _;
+                let mut trace = trace.lock().expect("trace lock");
+                writeln!(
+                    trace,
+                    "PLACE {},{} {} {} {} draws={}->{} ok={} id={}",
+                    context.region.center().0.x,
+                    context.region.center().0.y,
+                    origin.0.x,
+                    origin.0.y,
+                    origin.0.z,
+                    before,
+                    random.draw_count(),
+                    ok,
+                    std::ptr::from_ref(self.feature) as usize
+                )
+                .expect("trace write");
+            }
+            if ok {
                 *placed_any = true;
             }
             return;
@@ -141,6 +109,24 @@ impl PlacedFeature {
 
         let mut positions = Positions::new();
         modifier.positions(context, random, origin, &mut positions);
+        if positions.is_empty()
+            && let Some(trace) = trace_sink()
+        {
+            use std::io::Write as _;
+            let mut trace = trace.lock().expect("trace lock");
+            writeln!(
+                trace,
+                "DROP {},{} {} {} {} mod={} {:?}",
+                context.region.center().0.x,
+                context.region.center().0.y,
+                origin.0.x,
+                origin.0.y,
+                origin.0.z,
+                index,
+                modifier
+            )
+            .expect("trace write");
+        }
         for pos in positions {
             self.run_placement(index + 1, context, random, pos, placed_any);
         }
@@ -169,10 +155,42 @@ impl FeatureRegistry {
             .map_or(&[], Vec::as_slice)
     }
 
+    pub fn configured_names(&self) -> FxHashMap<usize, Identifier> {
+        self.configured
+            .iter()
+            .map(|(key, feature)| (std::ptr::from_ref(*feature) as usize, key.clone()))
+            .collect()
+    }
+
+    pub fn placed_names(&self) -> FxHashMap<usize, Identifier> {
+        self.placed
+            .iter()
+            .map(|(key, feature)| (feature.id, key.clone()))
+            .collect()
+    }
+
     pub fn biome_contains(&self, biome: BiomeRef, feature: &'static PlacedFeature) -> bool {
         self.biome_feature_ids
             .get(&biome.id())
             .is_some_and(|ids| ids.contains(&feature.id))
+    }
+}
+
+static TRACE: LazyLock<Option<std::sync::Mutex<std::io::BufWriter<std::fs::File>>>> =
+    LazyLock::new(|| {
+        let path = std::env::var("WGTRACE").ok()?;
+        let file = std::fs::File::create(path).expect("trace file");
+        Some(std::sync::Mutex::new(std::io::BufWriter::new(file)))
+    });
+
+fn trace_sink() -> Option<&'static std::sync::Mutex<std::io::BufWriter<std::fs::File>>> {
+    TRACE.as_ref()
+}
+
+pub fn flush_trace() {
+    if let Some(trace) = trace_sink() {
+        use std::io::Write as _;
+        trace.lock().expect("trace lock").flush().expect("flush");
     }
 }
 
@@ -194,7 +212,6 @@ struct Loader {
     resolving_placed: FxHashSet<Identifier>,
     resolving_configured: FxHashSet<Identifier>,
     next_placed_id: usize,
-    next_inline_configured_id: usize,
 }
 
 fn load(worldgen_dir: &Path) -> FeatureRegistry {
@@ -206,7 +223,6 @@ fn load(worldgen_dir: &Path) -> FeatureRegistry {
         resolving_placed: FxHashSet::default(),
         resolving_configured: FxHashSet::default(),
         next_placed_id: 0,
-        next_inline_configured_id: 0,
     };
 
     let placed_keys: Vec<Identifier> = loader.placed_json.keys().cloned().collect();
@@ -276,25 +292,24 @@ impl Loader {
             .get(key)
             .unwrap_or_else(|| panic!("unknown placed feature {key}"))
             .clone();
-        let feature = self.build_placed(key.clone(), &json);
+        let feature = self.build_placed(&json);
 
         self.resolving_placed.remove(key);
         self.placed.insert(key.clone(), feature);
         feature
     }
 
-    fn build_placed(&mut self, key: Identifier, json: &Value) -> &'static PlacedFeature {
+    fn build_placed(&mut self, json: &Value) -> &'static PlacedFeature {
         let configured = self.configured_feature_ref(&json["feature"]);
         let placement = value_list(&json["placement"])
             .iter()
-            .map(PlacementModifier::parse)
+            .map(parse_json)
             .collect();
         let id = self.next_placed_id;
         self.next_placed_id += 1;
 
         Box::leak(Box::new(PlacedFeature {
             id,
-            key,
             feature: configured,
             placement,
         }))
@@ -306,10 +321,7 @@ impl Loader {
                 let key = parse_id(raw);
                 self.placed_feature(&key)
             }
-            None => {
-                let key = Identifier::new("worldgen_rs", format!("inline/{}", self.next_placed_id));
-                self.build_placed(key, value)
-            }
+            None => self.build_placed(value),
         }
     }
 
@@ -319,14 +331,7 @@ impl Loader {
                 let key = parse_id(raw);
                 self.configured_feature(&key)
             }
-            None => {
-                let key = Identifier::new(
-                    "worldgen_rs",
-                    format!("inline/{}", self.next_inline_configured_id),
-                );
-                self.next_inline_configured_id += 1;
-                self.build_configured(key, value)
-            }
+            None => self.build_configured(value),
         }
     }
 
@@ -344,17 +349,52 @@ impl Loader {
             .get(key)
             .unwrap_or_else(|| panic!("unknown configured feature {key}"))
             .clone();
-        let feature = self.build_configured(key.clone(), &json);
+        let feature = self.build_configured(&json);
 
         self.resolving_configured.remove(key);
         self.configured.insert(key.clone(), feature);
         feature
     }
 
-    fn build_configured(&mut self, key: Identifier, json: &Value) -> &'static ConfiguredFeature {
+    fn root_system_config(&mut self, config: &Value) -> RootSystemConfig {
+        RootSystemConfig {
+            feature: self.placed_feature_ref(&config["feature"]),
+            required_vertical_space_for_tree: parse_json(&config["required_vertical_space_for_tree"]),
+            level_test_distance: parse_json(&config["level_test_distance"]),
+            max_level_deviation: parse_json(&config["max_level_deviation"]),
+            root_radius: parse_json(&config["root_radius"]),
+            root_replaceable: parse_json(&config["root_replaceable"]),
+            root_state_provider: parse_json(&config["root_state_provider"]),
+            root_placement_attempts: parse_json(&config["root_placement_attempts"]),
+            root_column_max_height: parse_json(&config["root_column_max_height"]),
+            hanging_root_radius: parse_json(&config["hanging_root_radius"]),
+            hanging_roots_vertical_span: parse_json(&config["hanging_roots_vertical_span"]),
+            hanging_root_state_provider: parse_json(&config["hanging_root_state_provider"]),
+            hanging_root_placement_attempts: parse_json(&config["hanging_root_placement_attempts"]),
+            allowed_vertical_water_for_tree: parse_json(&config["allowed_vertical_water_for_tree"]),
+            allowed_tree_position: parse_json(&config["allowed_tree_position"]),
+        }
+    }
+
+    fn vegetation_patch_config(&mut self, config: &Value) -> VegetationPatchConfig {
+        VegetationPatchConfig {
+            replaceable: parse_json(&config["replaceable"]),
+            ground_state: parse_json(&config["ground_state"]),
+            vegetation_feature: self.placed_feature_ref(&config["vegetation_feature"]),
+            surface: parse_json(&config["surface"]),
+            depth: parse_json(&config["depth"]),
+            extra_bottom_block_chance: parse_json(&config["extra_bottom_block_chance"]),
+            vertical_range: parse_json(&config["vertical_range"]),
+            vegetation_chance: parse_json(&config["vegetation_chance"]),
+            xz_radius: parse_json(&config["xz_radius"]),
+            extra_edge_column_chance: parse_json(&config["extra_edge_column_chance"]),
+        }
+    }
+
+    fn build_configured(&mut self, json: &Value) -> &'static ConfiguredFeature {
         let feature_type = parse_id(type_of(json));
         let config = &json["config"];
-        let kind = match feature_type.path.as_ref() {
+        let feature = match feature_type.path.as_ref() {
             "random_selector" => {
                 let features = value_list(&config["features"])
                     .iter()
@@ -363,30 +403,107 @@ impl Loader {
                         feature: self.placed_feature_ref(&entry["feature"]),
                     })
                     .collect::<Vec<_>>();
-                FeatureKind::RandomSelector {
+                ConfiguredFeature::RandomSelector {
                     features,
                     default: self.placed_feature_ref(&config["default"]),
                 }
             }
-            "simple_random_selector" => FeatureKind::SimpleRandomSelector(
+            "simple_random_selector" => ConfiguredFeature::SimpleRandomSelector(
                 value_list(&config["features"])
                     .iter()
                     .map(|entry| self.placed_feature_ref(entry))
                     .collect(),
             ),
-            "random_boolean_selector" => FeatureKind::RandomBooleanSelector {
+            "sequence" => ConfiguredFeature::Sequence(
+                value_list(&config["features"])
+                    .iter()
+                    .map(|entry| self.placed_feature_ref(entry))
+                    .collect(),
+            ),
+            "weighted_random_selector" => ConfiguredFeature::WeightedRandomSelector(
+                value_list(&config["features"])
+                    .iter()
+                    .map(|entry| WeightedRandomFeature {
+                        weight: entry["weight"].as_i64().unwrap_or(1) as i32,
+                        feature: self.placed_feature_ref(&entry["data"]),
+                    })
+                    .collect(),
+            ),
+            "random_boolean_selector" => ConfiguredFeature::RandomBooleanSelector {
                 feature_true: self.placed_feature_ref(&config["feature_true"]),
                 feature_false: self.placed_feature_ref(&config["feature_false"]),
             },
-            _ => FeatureKind::Unported(feature_type),
+            "ore" => ConfiguredFeature::Ore(parse_json(config)),
+            "scattered_ore" => ConfiguredFeature::ScatteredOre(parse_json(config)),
+            "spring_feature" => ConfiguredFeature::Spring(parse_json(config)),
+            "disk" => ConfiguredFeature::Disk(parse_json(config)),
+            "lake" => ConfiguredFeature::Lake(parse_json(config)),
+            "block_column" => ConfiguredFeature::BlockColumn(parse_json(config)),
+            "block_pile" => ConfiguredFeature::BlockPile(parse_json(config)),
+            "simple_block" => ConfiguredFeature::SimpleBlock(parse_json(config)),
+            "vines" => ConfiguredFeature::Vines,
+            "tree" => ConfiguredFeature::Tree(parse_json(config)),
+            "huge_red_mushroom" => ConfiguredFeature::HugeRedMushroom(parse_json(config)),
+            "huge_brown_mushroom" => ConfiguredFeature::HugeBrownMushroom(parse_json(config)),
+            "multiface_growth" => ConfiguredFeature::MultifaceGrowth(parse_json(config)),
+            "fallen_tree" => ConfiguredFeature::FallenTree(parse_json(config)),
+            "block_blob" => ConfiguredFeature::BlockBlob(parse_json(config)),
+            "basalt_pillar" => ConfiguredFeature::BasaltPillar,
+            "blue_ice" => ConfiguredFeature::BlueIce,
+            "glowstone_blob" => ConfiguredFeature::GlowstoneBlob,
+            "kelp" => ConfiguredFeature::Kelp,
+            "seagrass" => ConfiguredFeature::Seagrass(parse_json(config)),
+            "sea_pickle" => ConfiguredFeature::SeaPickle(parse_json(config)),
+            "end_island" => ConfiguredFeature::EndIsland,
+            "end_platform" => ConfiguredFeature::EndPlatform,
+            "void_start_platform" => ConfiguredFeature::VoidStartPlatform,
+            "basalt_columns" => ConfiguredFeature::BasaltColumns(parse_json(config)),
+            "delta_feature" => ConfiguredFeature::DeltaFeature(parse_json(config)),
+            "netherrack_replace_blobs" => {
+                ConfiguredFeature::NetherrackReplaceBlobs(parse_json(config))
+            }
+            "nether_forest_vegetation" => {
+                ConfiguredFeature::NetherForestVegetation(parse_json(config))
+            }
+            "twisting_vines" => ConfiguredFeature::TwistingVines(parse_json(config)),
+            "weeping_vines" => ConfiguredFeature::WeepingVines,
+            "underwater_magma" => ConfiguredFeature::UnderwaterMagma(parse_json(config)),
+            "bamboo" => ConfiguredFeature::Bamboo(parse_json(config)),
+            "desert_well" => ConfiguredFeature::DesertWell,
+            "spike" => ConfiguredFeature::Spike(parse_json(config)),
+            "chorus_plant" => ConfiguredFeature::ChorusPlant,
+            "root_system" => ConfiguredFeature::RootSystem(self.root_system_config(config)),
+            "huge_fungus" => ConfiguredFeature::HugeFungus(parse_json(config)),
+            "iceberg" => ConfiguredFeature::Iceberg(parse_json(config)),
+            "sculk_patch" => ConfiguredFeature::SculkPatch(parse_json(config)),
+            "speleothem_cluster" => ConfiguredFeature::SpeleothemCluster(parse_json(config)),
+            "large_dripstone" => ConfiguredFeature::LargeDripstone(parse_json(config)),
+            "geode" => ConfiguredFeature::Geode(parse_json(config)),
+            "freeze_top_layer" => ConfiguredFeature::FreezeTopLayer,
+            "monster_room" => ConfiguredFeature::MonsterRoom,
+            "bonus_chest" => ConfiguredFeature::BonusChest,
+            "end_spike" => ConfiguredFeature::EndSpike(parse_json(config)),
+            "coral_tree" => ConfiguredFeature::CoralTree,
+            "coral_claw" => ConfiguredFeature::CoralClaw,
+            "coral_mushroom" => ConfiguredFeature::CoralMushroom,
+            "vegetation_patch" => ConfiguredFeature::VegetationPatch {
+                config: self.vegetation_patch_config(config),
+                waterlogged: false,
+            },
+            "waterlogged_vegetation_patch" => ConfiguredFeature::VegetationPatch {
+                config: self.vegetation_patch_config(config),
+                waterlogged: true,
+            },
+            _ => ConfiguredFeature::Unported(feature_type),
         };
 
-        Box::leak(Box::new(ConfiguredFeature { key, kind }))
+        Box::leak(Box::new(feature))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::ptr;
     use std::sync::Once;
 
     use super::*;
@@ -409,7 +526,12 @@ mod tests {
         let oak = registry
             .placed(&Identifier::const_vanilla("oak_checked"))
             .expect("oak_checked should load");
-        assert_eq!(oak.feature.key, Identifier::const_vanilla("oak"));
+        assert!(ptr::eq(
+            oak.feature,
+            registry
+                .configured(&Identifier::const_vanilla("oak"))
+                .expect("oak should load")
+        ));
         assert_eq!(oak.placement.len(), 1);
 
         let ore_granite = registry
@@ -426,18 +548,67 @@ mod tests {
         let trees_plains = registry
             .configured(&Identifier::const_vanilla("trees_plains"))
             .expect("trees_plains should load");
-        let FeatureKind::RandomSelector { features, default } = &trees_plains.kind else {
+        let ConfiguredFeature::RandomSelector { features, default } = trees_plains else {
             panic!("trees_plains should be a random selector");
         };
         assert_eq!(features.len(), 2);
-        assert_eq!(
-            default.feature.key,
-            Identifier::const_vanilla("oak_bees_005")
-        );
-        assert_eq!(
-            features[1].feature.key,
-            Identifier::const_vanilla("fallen_oak_tree")
-        );
+        assert!(ptr::eq(
+            default.feature,
+            registry
+                .configured(&Identifier::const_vanilla("oak_bees_005"))
+                .expect("oak_bees_005 should load")
+        ));
+        assert!(ptr::eq(
+            features[1].feature,
+            registry
+                .placed(&Identifier::const_vanilla("fallen_oak_tree"))
+                .expect("fallen_oak_tree should load")
+        ));
+    }
+
+    #[test]
+    fn ported_feature_types_parse_into_their_own_kinds() {
+        init_global_registry();
+        let registry = features();
+
+        let feature_of = |key: &str| {
+            registry
+                .configured(&parse_id(key))
+                .unwrap_or_else(|| panic!("{key} should load"))
+        };
+
+        assert!(matches!(feature_of("ore_coal"), ConfiguredFeature::Ore(_)));
+        assert!(matches!(
+            feature_of("ore_ancient_debris_small"),
+            ConfiguredFeature::ScatteredOre(_)
+        ));
+        assert!(matches!(
+            feature_of("spring_lava_overworld"),
+            ConfiguredFeature::Spring(_)
+        ));
+        assert!(matches!(
+            feature_of("disk_clay"),
+            ConfiguredFeature::Disk(_)
+        ));
+        assert!(matches!(
+            feature_of("cactus"),
+            ConfiguredFeature::BlockColumn(_)
+        ));
+        assert!(matches!(
+            feature_of("pile_hay"),
+            ConfiguredFeature::BlockPile(_)
+        ));
+        assert!(matches!(
+            feature_of("tall_grass"),
+            ConfiguredFeature::SimpleBlock(_)
+        ));
+        assert!(matches!(feature_of("vines"), ConfiguredFeature::Vines));
+
+        let ConfiguredFeature::Ore(ore) = feature_of("ore_coal") else {
+            panic!("ore_coal should be an ore");
+        };
+        assert_eq!(ore.size, 17);
+        assert_eq!(ore.targets.len(), 2);
     }
 
     #[test]

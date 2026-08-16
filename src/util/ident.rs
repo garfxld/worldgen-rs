@@ -1,8 +1,14 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
 
-#[derive(Clone, PartialEq, Eq, Hash, Default)]
+use serde::Deserialize;
+
+use crate::registry::REGISTRY;
+
+#[derive(Clone, PartialEq, Eq, Hash, Default, Deserialize)]
+#[serde(try_from = "String")]
 pub struct Identifier {
     pub namespace: Cow<'static, str>,
     pub path: Cow<'static, str>,
@@ -104,8 +110,50 @@ impl FromStr for Identifier {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+impl TryFrom<String> for Identifier {
+    type Error = &'static str;
+
+    fn try_from(raw: String) -> Result<Self, Self::Error> {
+        raw.parse()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Deserialize)]
+#[serde(try_from = "RawBlockState")]
 pub struct BlockState(pub u16);
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RawBlockState {
+    #[serde(rename = "Name")]
+    name: Identifier,
+    #[serde(rename = "Properties", default)]
+    properties: BTreeMap<String, String>,
+}
+
+impl TryFrom<RawBlockState> for BlockState {
+    type Error = String;
+
+    fn try_from(raw: RawBlockState) -> Result<Self, Self::Error> {
+        let block = REGISTRY
+            .blocks
+            .by_key(&raw.name)
+            .ok_or_else(|| format!("unknown block {}", raw.name))?;
+
+        if raw.properties.is_empty() {
+            return Ok(REGISTRY.blocks.get_default_state_id(block));
+        }
+
+        let overrides = raw
+            .properties
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str()));
+        REGISTRY
+            .blocks
+            .state_id_from_block_defaulted_properties(block, overrides)
+            .ok_or_else(|| format!("invalid properties {:?} for {}", raw.properties, raw.name))
+    }
+}
 
 #[cfg(test)]
 mod tests {
