@@ -6,6 +6,8 @@ use crate::worldgen::feature::features::block_blob::{self, BlockBlobConfig};
 use crate::worldgen::feature::features::block_column::{self, BlockColumnConfig};
 use crate::worldgen::feature::features::block_pile::{self, BlockPileConfig};
 use crate::worldgen::feature::features::disk::{self, DiskConfig};
+use crate::worldgen::feature::features::end_gateway::{self, EndGatewayConfig};
+use crate::worldgen::feature::features::fossil::{self, FossilConfig};
 use crate::worldgen::feature::features::fallen_tree::{self, FallenTreeConfig};
 use crate::worldgen::feature::features::end_spike::{self, EndSpikeConfig};
 use crate::worldgen::feature::features::geode::{self, GeodeConfig};
@@ -18,6 +20,7 @@ use crate::worldgen::feature::features::multiface_growth::{self, MultifaceGrowth
 use crate::worldgen::feature::features::ore::{self, OreConfig};
 use crate::worldgen::feature::features::simple_block::{self, SimpleBlockConfig};
 use crate::worldgen::feature::features::spring::{self, SpringConfig};
+use crate::worldgen::feature::features::template::{self, TemplateConfig};
 use crate::worldgen::feature::features::tree::{self, TreeConfig};
 use crate::worldgen::feature::features::bamboo::{self, BambooConfig};
 use crate::worldgen::feature::features::basalt_columns::{self, ColumnConfig};
@@ -31,6 +34,7 @@ use crate::worldgen::feature::features::sculk_patch::{self, SculkPatchConfig};
 use crate::worldgen::feature::features::sea_pickle::{self, SeaPickleConfig};
 use crate::worldgen::feature::features::seagrass::{self, SeagrassConfig};
 use crate::worldgen::feature::features::twisting_vines::{self, TwistingVinesConfig};
+use crate::worldgen::feature::features::speleothem::{self, SpeleothemConfig};
 use crate::worldgen::feature::features::speleothem_cluster::{self, SpeleothemClusterConfig};
 use crate::worldgen::feature::features::spike::{self, SpikeConfig};
 use crate::worldgen::feature::features::underwater_magma::{self, UnderwaterMagmaConfig};
@@ -64,6 +68,7 @@ pub enum ConfiguredFeature {
     BlockPile(BlockPileConfig),
     SimpleBlock(SimpleBlockConfig),
     Vines,
+    Template(TemplateConfig),
     Tree(TreeConfig),
     HugeRedMushroom(HugeMushroomConfig),
     HugeBrownMushroom(HugeMushroomConfig),
@@ -94,6 +99,7 @@ pub enum ConfiguredFeature {
     HugeFungus(HugeFungusConfig),
     Iceberg(IcebergConfig),
     SculkPatch(SculkPatchConfig),
+    Speleothem(SpeleothemConfig),
     SpeleothemCluster(SpeleothemClusterConfig),
     LargeDripstone(LargeDripstoneConfig),
     Geode(GeodeConfig),
@@ -104,6 +110,8 @@ pub enum ConfiguredFeature {
     CoralTree,
     CoralClaw,
     CoralMushroom,
+    Fossil(FossilConfig),
+    EndGateway(EndGatewayConfig),
     VegetationPatch {
         config: VegetationPatchConfig,
         waterlogged: bool,
@@ -194,6 +202,7 @@ impl ConfiguredFeature {
                 simple_block::place(context.region, random, origin, config)
             }
             Self::Vines => vines::place(context.region, origin),
+            Self::Template(config) => template::place(context.region, random, origin, config),
             Self::Tree(config) => tree::place(context.region, random, origin, config),
             Self::HugeRedMushroom(config) => {
                 huge_mushroom::place(context.region, random, origin, config, MushroomVariant::Red)
@@ -242,6 +251,7 @@ impl ConfiguredFeature {
             Self::HugeFungus(config) => huge_fungus::place(context.region, random, origin, config),
             Self::Iceberg(config) => iceberg::place(context.region, random, origin, config),
             Self::SculkPatch(config) => sculk_patch::place(context.region, random, origin, config),
+            Self::Speleothem(config) => speleothem::place(context.region, random, origin, config),
             Self::SpeleothemCluster(config) => {
                 speleothem_cluster::place(context.region, random, origin, config)
             }
@@ -256,6 +266,8 @@ impl ConfiguredFeature {
             Self::CoralTree => coral_tree::place(context.region, random, origin),
             Self::CoralClaw => coral_claw::place(context.region, random, origin),
             Self::CoralMushroom => coral_mushroom::place(context.region, random, origin),
+            Self::Fossil(config) => fossil::place(context.region, random, origin, config),
+            Self::EndGateway(config) => end_gateway::place(context.region, origin, config),
             Self::VegetationPatch {
                 config,
                 waterlogged,

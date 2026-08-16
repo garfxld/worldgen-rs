@@ -1,5 +1,7 @@
 use std::f32::consts::TAU;
 
+use serde::Deserialize;
+
 use crate::registry::blocks::BlockRef;
 use crate::registry::blocks::properties::{Properties, SpeleothemThickness};
 use crate::registry::blocks::vanilla_blocks;
@@ -8,6 +10,7 @@ use crate::util::direction::Direction;
 use crate::util::ident::BlockState;
 use crate::util::math;
 use crate::util::pos::BlockPos;
+use crate::util::rng::RandomSource;
 use crate::worldgen::block_predicate::HolderSet;
 use crate::worldgen::region::WorldGenRegion;
 
@@ -178,4 +181,137 @@ pub fn place_base_block_if_possible(
     } else {
         false
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpeleothemConfig {
+    pub base_block: BlockState,
+    pub pointed_block: BlockState,
+    pub replaceable_blocks: HolderSet,
+    #[serde(default = "default_chance_of_taller_generation")]
+    pub chance_of_taller_generation: f32,
+    #[serde(default = "default_chance_of_directional_spread")]
+    pub chance_of_directional_spread: f32,
+    #[serde(default = "default_chance_of_spread_radius2")]
+    pub chance_of_spread_radius2: f32,
+    #[serde(default = "default_chance_of_spread_radius3")]
+    pub chance_of_spread_radius3: f32,
+}
+
+const fn default_chance_of_taller_generation() -> f32 {
+    0.2
+}
+
+const fn default_chance_of_directional_spread() -> f32 {
+    0.7
+}
+
+const fn default_chance_of_spread_radius2() -> f32 {
+    0.5
+}
+
+const fn default_chance_of_spread_radius3() -> f32 {
+    0.5
+}
+
+pub fn place(
+    region: &WorldGenRegion<'_>,
+    random: &mut RandomSource,
+    origin: BlockPos,
+    config: &SpeleothemConfig,
+) -> bool {
+    let base_block = config.base_block.get_block();
+    let pointed_block = config.pointed_block.get_block();
+
+    let Some(tip_direction) = get_tip_direction(region, origin, random, base_block, config) else {
+        return false;
+    };
+
+    let root_pos = tip_direction.opposite().relative(origin);
+    create_patch_of_base_blocks(region, random, root_pos, base_block, config);
+
+    let height = if random.next_f32() < config.chance_of_taller_generation
+        && is_empty_or_water(region.get_block(tip_direction.relative(origin)))
+    {
+        2
+    } else {
+        1
+    };
+    grow_speleothem(
+        region,
+        origin,
+        tip_direction,
+        height,
+        false,
+        base_block,
+        pointed_block,
+        &config.replaceable_blocks,
+    );
+    true
+}
+
+fn get_tip_direction(
+    region: &WorldGenRegion<'_>,
+    pos: BlockPos,
+    random: &mut RandomSource,
+    base_block: BlockRef,
+    config: &SpeleothemConfig,
+) -> Option<Direction> {
+    let can_place_above = is_base(
+        region.get_block(pos.above()),
+        base_block,
+        &config.replaceable_blocks,
+    );
+    let can_place_below = is_base(
+        region.get_block(pos.below()),
+        base_block,
+        &config.replaceable_blocks,
+    );
+
+    if can_place_above && can_place_below {
+        Some(if random.next_bool() {
+            Direction::Down
+        } else {
+            Direction::Up
+        })
+    } else if can_place_above {
+        Some(Direction::Down)
+    } else if can_place_below {
+        Some(Direction::Up)
+    } else {
+        None
+    }
+}
+
+fn create_patch_of_base_blocks(
+    region: &WorldGenRegion<'_>,
+    random: &mut RandomSource,
+    pos: BlockPos,
+    base_block: BlockRef,
+    config: &SpeleothemConfig,
+) {
+    place_base_block_if_possible(region, pos, base_block, &config.replaceable_blocks);
+
+    for direction in Direction::HORIZONTAL {
+        if random.next_f32() > config.chance_of_directional_spread {
+            continue;
+        }
+        let pos1 = direction.relative(pos);
+        place_base_block_if_possible(region, pos1, base_block, &config.replaceable_blocks);
+        if random.next_f32() > config.chance_of_spread_radius2 {
+            continue;
+        }
+        let pos2 = random_direction(random).relative(pos1);
+        place_base_block_if_possible(region, pos2, base_block, &config.replaceable_blocks);
+        if random.next_f32() > config.chance_of_spread_radius3 {
+            continue;
+        }
+        let pos3 = random_direction(random).relative(pos2);
+        place_base_block_if_possible(region, pos3, base_block, &config.replaceable_blocks);
+    }
+}
+
+fn random_direction(random: &mut RandomSource) -> Direction {
+    Direction::ALL[random.next_i32_bounded(Direction::ALL.len() as i32) as usize]
 }

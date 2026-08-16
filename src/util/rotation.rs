@@ -1,14 +1,20 @@
 use glam::IVec3;
+use serde::Deserialize;
 
 use crate::util::direction::Direction;
 use crate::util::geometry::BoundingBox;
 use crate::util::rng::RandomSource;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 pub enum Rotation {
+    #[default]
+    #[serde(rename = "none")]
     None,
+    #[serde(rename = "clockwise_90")]
     Clockwise90,
+    #[serde(rename = "180")]
     Clockwise180,
+    #[serde(rename = "counterclockwise_90")]
     CounterClockwise90,
 }
 
@@ -39,6 +45,15 @@ impl Rotation {
             Self::Clockwise90 => dir.rotate_y_clockwise(),
             Self::Clockwise180 => dir.rotate_y_clockwise().rotate_y_clockwise(),
             Self::CounterClockwise90 => dir.rotate_y_counter_clockwise(),
+        }
+    }
+
+    pub const fn rotate_index(self, rotation: i32, steps: i32) -> i32 {
+        match self {
+            Self::None => rotation,
+            Self::Clockwise90 => (rotation + steps / 4) % steps,
+            Self::Clockwise180 => (rotation + steps / 2) % steps,
+            Self::CounterClockwise90 => (rotation + steps * 3 / 4) % steps,
         }
     }
 

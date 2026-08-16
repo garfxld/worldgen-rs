@@ -6,6 +6,7 @@ pub mod hash_set;
 pub mod ident;
 pub mod inclusive_range;
 pub mod math;
+pub mod mirror;
 pub mod noise;
 pub mod pos;
 pub mod rng;

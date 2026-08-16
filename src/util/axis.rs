@@ -1,5 +1,6 @@
-#[derive(Copy, Clone, Debug, Eq)]
+#[derive(Copy, Clone, Debug, Eq, serde::Deserialize)]
 #[derive_const(PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum Axis {
     X,
     Y,

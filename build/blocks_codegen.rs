@@ -780,6 +780,37 @@ pub fn build() -> TokenStream {
         });
     }
 
+    println!("cargo:rerun-if-changed=assets/block_transforms.json");
+    let transform_assets: FxHashMap<String, String> =
+        serde_json::from_str(&fs::read_to_string("assets/block_transforms.json").unwrap()).unwrap();
+
+    let transform_entries: Vec<TokenStream> = block_assets
+        .blocks
+        .iter()
+        .map(|block| {
+            let variant = match transform_assets
+                .get::<str>(block.name.as_ref())
+                .map_or("none", String::as_str)
+            {
+                "none" => "None",
+                "facing" => "Facing",
+                "facing_rod" => "FacingRod",
+                "stairs" => "Stairs",
+                "door" => "Door",
+                "rotation16" => "Rotation16",
+                "pillar" => "Pillar",
+                "connections" => "Connections",
+                "facemap6" => "FaceMap",
+                "rail" => "Rail",
+                "orientation" => "Orientation",
+                other => panic!("unknown block transform kind {other}"),
+            };
+            let variant = Ident::new(variant, Span::call_site());
+            quote! { BlockTransform::#variant }
+        })
+        .collect();
+    let transform_count = transform_entries.len();
+
     quote! {
         use crate::registry::blocks::{
             config::{BlockConfig, OffsetType},
@@ -787,6 +818,7 @@ pub fn build() -> TokenStream {
             Block, BlockLightProperties, BlockRegistry, StateBooleanData,
             StateBooleanOverwrite, StateFluidData, StateFluidOverwrite, offset,
         };
+        use crate::registry::blocks::transform::BlockTransform;
         use crate::registry::blocks::properties::{self, Properties};
         use crate::registry::blocks::shapes::VoxelShape;
         use crate::registry::fluid::FluidState;
@@ -803,6 +835,8 @@ pub fn build() -> TokenStream {
         #light_fns
 
         #stream
+
+        pub static BLOCK_TRANSFORMS: [BlockTransform; #transform_count] = [#(#transform_entries),*];
 
         pub fn register_blocks(registry: &mut BlockRegistry) {
             #register_stream

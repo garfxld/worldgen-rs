@@ -224,7 +224,7 @@ impl Direction {
         ]
     }
 
-    pub const fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Direction::Down => "down",
             Direction::Up => "up",

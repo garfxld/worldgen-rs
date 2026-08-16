@@ -10,6 +10,7 @@ pub mod generator;
 pub mod placement;
 pub mod region;
 pub mod scheduler;
+pub mod structure;
 pub mod surface;
 
 use std::path::{Path, PathBuf};

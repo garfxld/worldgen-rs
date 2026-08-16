@@ -9,6 +9,7 @@
 pub mod config;
 pub mod properties;
 pub mod shapes;
+pub mod transform;
 pub mod vanilla_block_tags;
 
 #[allow(

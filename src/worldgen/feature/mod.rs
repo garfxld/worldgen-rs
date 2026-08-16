@@ -442,6 +442,7 @@ impl Loader {
             "block_pile" => ConfiguredFeature::BlockPile(parse_json(config)),
             "simple_block" => ConfiguredFeature::SimpleBlock(parse_json(config)),
             "vines" => ConfiguredFeature::Vines,
+            "template" => ConfiguredFeature::Template(parse_json(config)),
             "tree" => ConfiguredFeature::Tree(parse_json(config)),
             "huge_red_mushroom" => ConfiguredFeature::HugeRedMushroom(parse_json(config)),
             "huge_brown_mushroom" => ConfiguredFeature::HugeBrownMushroom(parse_json(config)),
@@ -476,6 +477,7 @@ impl Loader {
             "huge_fungus" => ConfiguredFeature::HugeFungus(parse_json(config)),
             "iceberg" => ConfiguredFeature::Iceberg(parse_json(config)),
             "sculk_patch" => ConfiguredFeature::SculkPatch(parse_json(config)),
+            "speleothem" => ConfiguredFeature::Speleothem(parse_json(config)),
             "speleothem_cluster" => ConfiguredFeature::SpeleothemCluster(parse_json(config)),
             "large_dripstone" => ConfiguredFeature::LargeDripstone(parse_json(config)),
             "geode" => ConfiguredFeature::Geode(parse_json(config)),
@@ -486,6 +488,8 @@ impl Loader {
             "coral_tree" => ConfiguredFeature::CoralTree,
             "coral_claw" => ConfiguredFeature::CoralClaw,
             "coral_mushroom" => ConfiguredFeature::CoralMushroom,
+            "fossil" => ConfiguredFeature::Fossil(parse_json(config)),
+            "end_gateway" => ConfiguredFeature::EndGateway(parse_json(config)),
             "vegetation_patch" => ConfiguredFeature::VegetationPatch {
                 config: self.vegetation_patch_config(config),
                 waterlogged: false,
@@ -538,6 +542,47 @@ mod tests {
             .placed(&Identifier::const_vanilla("ore_granite_upper"))
             .expect("ore_granite_upper should load");
         assert_eq!(ore_granite.placement.len(), 4);
+    }
+
+    #[test]
+    fn every_vanilla_configured_feature_is_ported() {
+        init_global_registry();
+        let registry = features();
+
+        let unported: Vec<&Identifier> = registry
+            .configured
+            .iter()
+            .filter(|(_, feature)| matches!(feature, ConfiguredFeature::Unported(_)))
+            .map(|(key, _)| key)
+            .collect();
+        assert!(unported.is_empty(), "unported configured features: {unported:?}");
+    }
+
+    #[test]
+    fn sulfur_spring_resolves_to_template_features() {
+        init_global_registry();
+        let registry = features();
+
+        let sulfur_spring = registry
+            .configured(&Identifier::const_vanilla("sulfur_spring"))
+            .expect("sulfur_spring should load");
+        let ConfiguredFeature::WeightedRandomSelector(entries) = sulfur_spring else {
+            panic!("sulfur_spring should be a weighted random selector");
+        };
+
+        let mut templates = 0;
+        for entry in entries {
+            let ConfiguredFeature::Sequence(steps) = entry.feature.feature else {
+                continue;
+            };
+            for step in steps {
+                if let ConfiguredFeature::Template(config) = step.feature {
+                    assert!(!config.templates.is_empty());
+                    templates += 1;
+                }
+            }
+        }
+        assert!(templates > 0, "sulfur_spring should place templates");
     }
 
     #[test]

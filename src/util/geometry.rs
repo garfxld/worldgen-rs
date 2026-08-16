@@ -167,6 +167,23 @@ impl BoundingBox {
         }
     }
 
+    pub const fn moved(self, dx: i32, dy: i32, dz: i32) -> Self {
+        Self {
+            min: IVec3::new(self.min.x + dx, self.min.y + dy, self.min.z + dz),
+            max: IVec3::new(self.max.x + dx, self.max.y + dy, self.max.z + dz),
+        }
+    }
+
+    pub fn for_all_corners(self, mut consumer: impl FnMut(BlockPos)) {
+        for z in [self.min.z, self.max.z] {
+            for y in [self.min.y, self.max.y] {
+                for x in [self.min.x, self.max.x] {
+                    consumer(BlockPos::new(x, y, z));
+                }
+            }
+        }
+    }
+
     pub const fn is_inside(self, pos: BlockPos) -> bool {
         pos.0.x >= self.min.x
             && pos.0.x <= self.max.x
