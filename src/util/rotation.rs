@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use crate::util::direction::Direction;
 use crate::util::geometry::BoundingBox;
+use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -45,6 +46,15 @@ impl Rotation {
             Self::Clockwise90 => dir.rotate_y_clockwise(),
             Self::Clockwise180 => dir.rotate_y_clockwise().rotate_y_clockwise(),
             Self::CounterClockwise90 => dir.rotate_y_counter_clockwise(),
+        }
+    }
+
+    pub const fn rotate_pos(self, pos: BlockPos) -> BlockPos {
+        match self {
+            Self::None => pos,
+            Self::Clockwise90 => BlockPos::new(-pos.z(), pos.y(), pos.x()),
+            Self::Clockwise180 => BlockPos::new(-pos.x(), pos.y(), -pos.z()),
+            Self::CounterClockwise90 => BlockPos::new(pos.z(), pos.y(), -pos.x()),
         }
     }
 

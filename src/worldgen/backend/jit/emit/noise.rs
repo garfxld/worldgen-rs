@@ -3,6 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::util::math::fast_floor as host_fast_floor;
 use crate::util::noise::{NormalNoise, OctaveSnapshot, PerlinNoise};
+use crate::worldgen::backend::jit::JitModule;
 
 use super::math;
 
@@ -109,10 +110,9 @@ fn grad_dot_flat(
     let fifteen = builder.ins().iconst(types::I32, 15);
     let idx = builder.ins().band(hash, fifteen);
     let idx = builder.ins().uextend(types::I64, idx);
-    let shift = builder.ins().iconst(
-        types::I64,
-        super::super::jit_module::JitModule::gradient_stride_shift(),
-    );
+    let shift = builder
+        .ins()
+        .iconst(types::I64, JitModule::GRADIENT_STRIDE_SHIFT);
     let byte_offset = builder.ins().ishl(idx, shift);
     let entry = builder.ins().iadd(gradient, byte_offset);
 

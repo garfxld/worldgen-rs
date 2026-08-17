@@ -1,9 +1,11 @@
 pub mod pieces;
+pub mod scattered_feature_piece;
 pub mod placement;
 pub mod pools;
 #[expect(clippy::module_inception, reason = "mirrors vanilla's Structure class")]
 pub mod structure;
 pub mod structure_piece;
+pub mod template_structure_piece;
 pub mod structure_set;
 pub mod structure_start;
 pub mod structures;
@@ -38,6 +40,10 @@ use crate::worldgen::structure::structure::{
     BiomeHolderSet, GenerationStep, Structure, StructureSettings, TerrainAdjustment,
 };
 use crate::worldgen::structure::structure_set::{StructureSelectionEntry, StructureSet};
+use crate::worldgen::structure::structures::ocean_ruin_pieces;
+use crate::worldgen::structure::structures::mineshaft_pieces::MineshaftType;
+use crate::worldgen::structure::structures::ruined_portal;
+use crate::worldgen::structure::structures::ruined_portal_piece::VerticalPlacement;
 use crate::worldgen::structure::structures::jigsaw::{
     DEFAULT_DIMENSION_PADDING, DEFAULT_LIQUID_SETTINGS, JigsawStructure, MaxDistance,
 };
@@ -219,9 +225,6 @@ fn load_structures(dir: &Path) -> FxHashMap<Identifier, &'static Structure> {
 
 fn parse_structure(json: &Value) -> Structure {
     let structure_type = parse_id(json["type"].as_str().unwrap_or_default());
-    if structure_type.path.as_ref() != "jigsaw" {
-        return Structure::Unported(structure_type);
-    }
 
     let settings = StructureSettings {
         biomes: parse_biomes(&json["biomes"]),
@@ -230,6 +233,65 @@ fn parse_structure(json: &Value) -> Structure {
             .get("terrain_adaptation")
             .map_or(TerrainAdjustment::None, parse_json),
     };
+
+    match structure_type.path.as_ref() {
+        "jigsaw" => {}
+        "swamp_hut" => return Structure::SwampHut(settings),
+        "desert_pyramid" => return Structure::DesertPyramid(settings),
+        "igloo" => return Structure::Igloo(settings),
+        "jungle_temple" => return Structure::JungleTemple(settings),
+        "buried_treasure" => return Structure::BuriedTreasure(settings),
+        "end_city" => return Structure::EndCity(settings),
+        "woodland_mansion" => return Structure::WoodlandMansion(settings),
+        "fortress" => return Structure::Fortress(settings),
+        "stronghold" => return Structure::Stronghold(settings),
+        "ocean_monument" => return Structure::OceanMonument(settings),
+        "nether_fossil" => {
+            return Structure::NetherFossil {
+                settings,
+                height: parse_json(&json["height"]),
+            };
+        }
+        "mineshaft" => {
+            return Structure::Mineshaft {
+                settings,
+                mineshaft_type: MineshaftType::parse(
+                    json["mineshaft_type"].as_str().unwrap_or_default(),
+                ),
+            };
+        }
+        "ruined_portal" => {
+            return Structure::RuinedPortal {
+                settings,
+                setups: json["setups"]
+                    .as_array()
+                    .map(Vec::as_slice)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(parse_ruined_portal_setup)
+                    .collect(),
+            };
+        }
+        "ocean_ruin" => {
+            return Structure::OceanRuin {
+                settings,
+                biome_temp: match json["biome_temp"].as_str() {
+                    Some("cold") => ocean_ruin_pieces::Temperature::Cold,
+                    _ => ocean_ruin_pieces::Temperature::Warm,
+                },
+                large_probability: json["large_probability"].as_f64().unwrap_or_default() as f32,
+                cluster_probability: json["cluster_probability"].as_f64().unwrap_or_default()
+                    as f32,
+            };
+        }
+        "shipwreck" => {
+            return Structure::Shipwreck {
+                settings,
+                is_beached: json["is_beached"].as_bool().unwrap_or_default(),
+            };
+        }
+        _ => return Structure::Unported(structure_type),
+    }
 
     Structure::Jigsaw(JigsawStructure {
         settings,
@@ -254,6 +316,19 @@ fn parse_structure(json: &Value) -> Structure {
             .as_str()
             .map_or(DEFAULT_LIQUID_SETTINGS, parse_liquid_settings),
     })
+}
+
+fn parse_ruined_portal_setup(json: &Value) -> ruined_portal::Setup {
+    ruined_portal::Setup {
+        placement: VerticalPlacement::parse(json["placement"].as_str().unwrap_or_default()),
+        air_pocket_probability: json["air_pocket_probability"].as_f64().unwrap_or_default() as f32,
+        mossiness: json["mossiness"].as_f64().unwrap_or_default() as f32,
+        overgrown: json["overgrown"].as_bool().unwrap_or_default(),
+        vines: json["vines"].as_bool().unwrap_or_default(),
+        can_be_cold: json["can_be_cold"].as_bool().unwrap_or_default(),
+        replace_with_blackstone: json["replace_with_blackstone"].as_bool().unwrap_or_default(),
+        weight: json["weight"].as_f64().unwrap_or(1.0) as f32,
+    }
 }
 
 fn parse_biomes(json: &Value) -> BiomeHolderSet {

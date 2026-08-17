@@ -48,6 +48,7 @@ serde_json = "1.0.151"
 [dev-dependencies]
 criterion = "0.8.2"
 cerium = { path = "../cerium/cerium" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [profile.release]
 lto = true

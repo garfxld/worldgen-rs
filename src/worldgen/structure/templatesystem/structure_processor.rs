@@ -2,10 +2,14 @@ use serde::Deserialize;
 
 use crate::chunk::heightmap::HeightmapType;
 use crate::registry::REGISTRY;
+use crate::registry::blocks::BlockRef;
+use crate::registry::blocks::properties::{Half, Properties};
+use crate::registry::blocks::shapes;
 use crate::registry::blocks::vanilla_blocks;
+use crate::util::direction::Direction;
 use crate::util::shuffle;
 use crate::util::axis::Axis;
-use crate::util::ident::BlockState;
+use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 use crate::util::rng::legacy_random::LegacyRandomSource;
 use crate::util::rng::{RandomSource, get_seed};
@@ -182,6 +186,12 @@ pub enum StructureProcessor {
     },
     #[serde(rename = "minecraft:jigsaw_replacement")]
     JigsawReplacement,
+    #[serde(rename = "minecraft:block_age")]
+    BlockAge { mossiness: f32 },
+    #[serde(rename = "minecraft:lava_submerged_block")]
+    LavaSubmergedBlock,
+    #[serde(rename = "minecraft:blackstone_replace")]
+    BlackstoneReplace,
 }
 
 const fn default_gravity_heightmap() -> HeightmapType {
@@ -295,6 +305,47 @@ impl StructureProcessor {
                     })
                 }
             }
+            Self::BlockAge { mossiness } => {
+                let new_state = settings.with_random(processed.pos, random, |random| {
+                    age_block(processed.state, *mossiness, random)
+                });
+                Some(match new_state {
+                    Some(state) => StructureBlockInfo {
+                        pos: processed.pos,
+                        state,
+                        nbt: processed.nbt,
+                    },
+                    None => processed,
+                })
+            }
+            Self::LavaSubmergedBlock => {
+                let was_lava =
+                    region.get_block(processed.pos).get_block() == &vanilla_blocks::LAVA;
+                if was_lava
+                    && !shapes::is_shape_full_block(processed.state.get_static_collision_shape())
+                {
+                    Some(StructureBlockInfo {
+                        pos: processed.pos,
+                        state: vanilla_blocks::LAVA.default_state(),
+                        nbt: processed.nbt,
+                    })
+                } else {
+                    Some(processed)
+                }
+            }
+            Self::BlackstoneReplace => {
+                let Some(new_block) = blackstone_replacement(processed.state.get_block()) else {
+                    return Some(processed);
+                };
+                let new_state = REGISTRY
+                    .blocks
+                    .copy_matching_properties(processed.state, new_block);
+                Some(StructureBlockInfo {
+                    pos: processed.pos,
+                    state: new_state,
+                    nbt: processed.nbt,
+                })
+            }
         }
     }
 
@@ -361,4 +412,147 @@ impl StructureProcessor {
 #[derive(Debug, Clone, Deserialize)]
 pub struct StructureProcessorList {
     pub processors: Vec<StructureProcessor>,
+}
+
+const STAIRS_TAG: Identifier = Identifier::const_vanilla("stairs");
+const SLABS_TAG: Identifier = Identifier::const_vanilla("slabs");
+const WALLS_TAG: Identifier = Identifier::const_vanilla("walls");
+
+fn random_facing_stairs(random: &mut RandomSource, stair_block: BlockRef) -> BlockState {
+    let facing = Direction::get_random_horizontal(random);
+    let half = if random.next_i32_bounded(2) == 0 {
+        Half::Top
+    } else {
+        Half::Bottom
+    };
+    stair_block
+        .default_state()
+        .set_value(&Properties::HORIZONTAL_FACING, facing)
+        .set_value(&Properties::HALF, half)
+}
+
+fn random_of(random: &mut RandomSource, blocks: &[BlockState]) -> BlockState {
+    blocks[random.next_i32_bounded(blocks.len() as i32) as usize]
+}
+
+fn age_block(state: BlockState, mossiness: f32, random: &mut RandomSource) -> Option<BlockState> {
+    let block = state.get_block();
+    if block == &vanilla_blocks::STONE_BRICKS
+        || block == &vanilla_blocks::STONE
+        || block == &vanilla_blocks::CHISELED_STONE_BRICKS
+    {
+        if random.next_f32() >= 0.5 {
+            return None;
+        }
+        let non_mossy = [
+            vanilla_blocks::CRACKED_STONE_BRICKS.default_state(),
+            random_facing_stairs(random, &vanilla_blocks::STONE_BRICK_STAIRS),
+        ];
+        let mossy = [
+            vanilla_blocks::MOSSY_STONE_BRICKS.default_state(),
+            random_facing_stairs(random, &vanilla_blocks::MOSSY_STONE_BRICK_STAIRS),
+        ];
+        return Some(if random.next_f32() < mossiness {
+            random_of(random, &mossy)
+        } else {
+            random_of(random, &non_mossy)
+        });
+    }
+
+    if block.has_tag(&STAIRS_TAG) {
+        if random.next_f32() >= 0.5 {
+            return None;
+        }
+        let non_mossy = [
+            vanilla_blocks::STONE_SLAB.default_state(),
+            vanilla_blocks::STONE_BRICK_SLAB.default_state(),
+        ];
+        let mossy = [
+            REGISTRY
+                .blocks
+                .copy_matching_properties(state, &vanilla_blocks::MOSSY_STONE_BRICK_STAIRS),
+            vanilla_blocks::MOSSY_STONE_BRICK_SLAB.default_state(),
+        ];
+        return Some(if random.next_f32() < mossiness {
+            random_of(random, &mossy)
+        } else {
+            random_of(random, &non_mossy)
+        });
+    }
+
+    if block.has_tag(&SLABS_TAG) {
+        return (random.next_f32() < mossiness).then(|| {
+            REGISTRY
+                .blocks
+                .copy_matching_properties(state, &vanilla_blocks::MOSSY_STONE_BRICK_SLAB)
+        });
+    }
+
+    if block.has_tag(&WALLS_TAG) {
+        return (random.next_f32() < mossiness).then(|| {
+            REGISTRY
+                .blocks
+                .copy_matching_properties(state, &vanilla_blocks::MOSSY_STONE_BRICK_WALL)
+        });
+    }
+
+    if block == &vanilla_blocks::OBSIDIAN {
+        return (random.next_f32() < 0.15)
+            .then(|| vanilla_blocks::CRYING_OBSIDIAN.default_state());
+    }
+
+    None
+}
+
+fn blackstone_replacement(block: BlockRef) -> Option<BlockRef> {
+    let replacement: BlockRef = if block == &vanilla_blocks::COBBLESTONE
+        || block == &vanilla_blocks::MOSSY_COBBLESTONE
+    {
+        &vanilla_blocks::BLACKSTONE
+    } else if block == &vanilla_blocks::STONE {
+        &vanilla_blocks::POLISHED_BLACKSTONE
+    } else if block == &vanilla_blocks::STONE_BRICKS
+        || block == &vanilla_blocks::MOSSY_STONE_BRICKS
+    {
+        &vanilla_blocks::POLISHED_BLACKSTONE_BRICKS
+    } else if block == &vanilla_blocks::COBBLESTONE_STAIRS
+        || block == &vanilla_blocks::MOSSY_COBBLESTONE_STAIRS
+    {
+        &vanilla_blocks::BLACKSTONE_STAIRS
+    } else if block == &vanilla_blocks::STONE_STAIRS {
+        &vanilla_blocks::POLISHED_BLACKSTONE_STAIRS
+    } else if block == &vanilla_blocks::STONE_BRICK_STAIRS
+        || block == &vanilla_blocks::MOSSY_STONE_BRICK_STAIRS
+    {
+        &vanilla_blocks::POLISHED_BLACKSTONE_BRICK_STAIRS
+    } else if block == &vanilla_blocks::COBBLESTONE_SLAB
+        || block == &vanilla_blocks::MOSSY_COBBLESTONE_SLAB
+    {
+        &vanilla_blocks::BLACKSTONE_SLAB
+    } else if block == &vanilla_blocks::SMOOTH_STONE_SLAB
+        || block == &vanilla_blocks::STONE_SLAB
+    {
+        &vanilla_blocks::POLISHED_BLACKSTONE_SLAB
+    } else if block == &vanilla_blocks::STONE_BRICK_SLAB
+        || block == &vanilla_blocks::MOSSY_STONE_BRICK_SLAB
+    {
+        &vanilla_blocks::POLISHED_BLACKSTONE_BRICK_SLAB
+    } else if block == &vanilla_blocks::STONE_BRICK_WALL
+        || block == &vanilla_blocks::MOSSY_STONE_BRICK_WALL
+    {
+        &vanilla_blocks::POLISHED_BLACKSTONE_BRICK_WALL
+    } else if block == &vanilla_blocks::COBBLESTONE_WALL
+        || block == &vanilla_blocks::MOSSY_COBBLESTONE_WALL
+    {
+        &vanilla_blocks::BLACKSTONE_WALL
+    } else if block == &vanilla_blocks::CHISELED_STONE_BRICKS {
+        &vanilla_blocks::CHISELED_POLISHED_BLACKSTONE
+    } else if block == &vanilla_blocks::CRACKED_STONE_BRICKS {
+        &vanilla_blocks::CRACKED_POLISHED_BLACKSTONE_BRICKS
+    } else if block == &vanilla_blocks::IRON_BARS {
+        &vanilla_blocks::IRON_CHAIN
+    } else {
+        return None;
+    };
+    Some(replacement)
 }

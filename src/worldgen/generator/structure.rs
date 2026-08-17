@@ -92,8 +92,8 @@ impl Generator {
                 let Some(source_chunk) = region.chunk(source_pos) else {
                     continue;
                 };
-                let starts = source_chunk.structure_starts();
-                let Some(start) = starts.get(key) else {
+                let mut starts = source_chunk.structure_starts();
+                let Some(start) = starts.get_mut(key) else {
                     continue;
                 };
                 if start.is_valid() {

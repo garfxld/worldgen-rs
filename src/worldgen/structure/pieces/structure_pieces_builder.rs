@@ -17,6 +17,37 @@ impl StructurePiecesBuilder {
         self.pieces.push(piece);
     }
 
+    pub fn add_piece_indexed(&mut self, piece: StructurePiece) -> usize {
+        self.pieces.push(piece);
+        self.pieces.len() - 1
+    }
+
+    pub fn piece_at(&self, index: usize) -> &StructurePiece {
+        &self.pieces[index]
+    }
+
+    pub fn piece_at_mut(&mut self, index: usize) -> &mut StructurePiece {
+        &mut self.pieces[index]
+    }
+
+    pub fn move_below_sea_level(
+        &mut self,
+        sea_level: i32,
+        min_y: i32,
+        random: &mut RandomSource,
+        offset: i32,
+    ) -> i32 {
+        let max_y = sea_level - offset;
+        let bounding_box = self.get_bounding_box();
+        let mut y1_pos = bounding_box.y_span() + min_y + 1;
+        if y1_pos < max_y {
+            y1_pos += random.next_i32_bounded(max_y - y1_pos);
+        }
+        let dy = y1_pos - bounding_box.max_y();
+        self.offset_pieces_vertically(dy);
+        dy
+    }
+
     pub fn find_collision_piece(&self, box_: BoundingBox) -> Option<&StructurePiece> {
         self.pieces
             .iter()
@@ -27,6 +58,10 @@ impl StructurePiecesBuilder {
         for piece in &mut self.pieces {
             piece.move_by(0, dy, 0);
         }
+    }
+
+    pub fn take_pieces(self) -> Vec<StructurePiece> {
+        self.pieces
     }
 
     pub fn move_inside_heights(

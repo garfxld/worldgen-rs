@@ -25,7 +25,9 @@ fn build_biome_id_table(server: &cerium::Server) -> std::collections::HashMap<u1
         .iter()
         .filter_map(|(id, biome)| {
             let key = format!("{}:{}", biome.key.namespace, biome.key.path);
-            let cerium_id = registries.biome.get_id(RegistryKey::<CeriumBiome>::of(key))?;
+            let cerium_id = registries
+                .biome
+                .get_id(RegistryKey::<CeriumBiome>::of(key))?;
             Some((id as u16, i32::from(cerium_id)))
         })
         .collect()
@@ -100,6 +102,15 @@ fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk, biome_ids: &std::collections::
 }
 
 fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "worldgen_rs=debug,cranelift_codegen=warn,cranelift_jit=warn,cranelift_frontend=warn,cranelift_module=warn,info"
+                    .into()
+            }),
+        )
+        .init();
+
     let worldgen = Arc::new(
         Worldgen::new(WorldgenSettings {
             seed: 42,
@@ -122,7 +133,8 @@ fn main() {
             max: Some(MAX_FLY_MULTIPLIER),
         },
     )));
-
+    // dispatcher.executes(&command, |event|)
+    
     server
         .events()
         .subscribe(move |event: &mut PlayerConfigEvent| {

@@ -860,6 +860,101 @@ mod structure_tests {
     }
 
     #[test]
+    fn newly_ported_structures_produce_valid_starts() {
+        init_global_registry();
+        let store = overworld_store(42);
+
+        let mut positions = Vec::new();
+        for x in -40..40 {
+            for z in -40..40 {
+                positions.push(ChunkPos::new(x, z));
+            }
+        }
+        store.generate_to(&positions, ChunkStatus::StructureStarts);
+
+        let mut seen: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
+        let mut sources: rustc_hash::FxHashMap<String, ChunkPos> =
+            rustc_hash::FxHashMap::default();
+        for pos in &positions {
+            let Some(slot) = store.get(*pos) else {
+                continue;
+            };
+            let Some(chunk) = slot.chunk() else {
+                continue;
+            };
+            for (key, start) in chunk.structure_starts().iter() {
+                if start.is_valid() {
+                    seen.insert(key.to_string());
+                    sources.entry(key.to_string()).or_insert(*pos);
+                }
+            }
+        }
+
+        for expected in [
+            "minecraft:swamp_hut",
+            "minecraft:shipwreck",
+            "minecraft:ocean_ruin_cold",
+            "minecraft:ruined_portal",
+            "minecraft:buried_treasure",
+            "minecraft:mineshaft",
+        ] {
+            assert!(
+                seen.contains(expected),
+                "expected at least one {expected} start in the scanned area, saw {seen:?}"
+            );
+        }
+
+        for key in [
+            "minecraft:shipwreck",
+            "minecraft:ocean_ruin_cold",
+            "minecraft:mineshaft",
+        ] {
+            let pos = sources[key];
+            store.generate_to(&[pos], ChunkStatus::Features);
+            let slot = store.get(pos).expect("slot");
+            assert!(slot.chunk().is_some(), "{key} chunk at {pos:?} should place");
+        }
+    }
+
+    #[test]
+    fn rare_structures_assemble_when_generated_directly() {
+        use crate::registry::biome::BiomeRef;
+        use crate::worldgen::structure;
+
+        init_global_registry();
+        let source = DatapackSource::new(datapack_root());
+        let generator = Generator::new(
+            &source,
+            "overworld",
+            "Overworld",
+            BiomeSourceDimension::Overworld,
+            42,
+        )
+        .expect("generator should build");
+
+        let any_biome = |_: BiomeRef| true;
+        for (key, pos) in [
+            ("minecraft:mansion", ChunkPos::new(-18, -11)),
+            ("minecraft:stronghold", ChunkPos::new(4, 4)),
+            ("minecraft:monument", ChunkPos::new(-82, 136)),
+            ("minecraft:fortress", ChunkPos::new(0, 0)),
+        ] {
+            let id = key.parse().expect("valid id");
+            let Some(target) = structure::registry().structure(&id) else {
+                continue;
+            };
+            if matches!(target, structure::structure::Structure::Unported(_)) {
+                continue;
+            }
+            let start = target.generate(&generator, 42, pos, 0, &any_biome);
+            assert!(
+                start.is_valid(),
+                "{key} should assemble at least one piece at {pos:?}"
+            );
+        }
+    }
+
+    #[test]
     fn structure_pieces_are_written_during_the_features_step() {
         init_global_registry();
         let store = overworld_store(42);

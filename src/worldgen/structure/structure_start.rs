@@ -56,12 +56,12 @@ impl StructureStart {
     }
 
     pub fn place_in_chunk(
-        &self,
+        &mut self,
         region: &WorldGenRegion<'_>,
         random: &mut RandomSource,
         chunk_bb: BoundingBox,
     ) {
-        let pieces = self.piece_container.pieces();
+        let pieces = self.piece_container.pieces_mut();
         let Some(first) = pieces.first() else {
             return;
         };
@@ -74,6 +74,10 @@ impl StructureStart {
             if piece.bounding_box().intersects(chunk_bb) {
                 piece.post_process(region, random, chunk_bb, reference_pos);
             }
+        }
+
+        if let Some(structure) = self.structure {
+            structure.after_place(region, chunk_bb, &self.piece_container);
         }
     }
 

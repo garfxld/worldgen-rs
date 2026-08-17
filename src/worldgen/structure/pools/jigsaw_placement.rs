@@ -67,16 +67,18 @@ pub fn add_pieces<'a>(
 
     let local_anchor_position = anchored_position.0 - position.0;
     let adjusted_position = BlockPos(position.0 - local_anchor_position);
-    let mut center_piece = PoolElementStructurePiece::new(
-        center_element,
-        adjusted_position,
-        center_element.ground_level_delta(),
-        center_rotation,
+    let mut center_piece = StructurePiece::pool_element(
+        PoolElementStructurePiece::new(
+            center_element,
+            adjusted_position,
+            center_element.ground_level_delta(),
+            center_rotation,
+            liquid_settings,
+        ),
         center_element.get_bounding_box(adjusted_position, center_rotation),
-        liquid_settings,
     );
 
-    let box_ = center_piece.bounding_box;
+    let box_ = center_piece.base.bounding_box;
     let center_x = (box_.max_x() + box_.min_x()) / 2;
     let center_z = (box_.max_z() + box_.min_z()) / 2;
     let bottom_y = match project_start_to_heightmap {
@@ -85,18 +87,20 @@ pub fn add_pieces<'a>(
             position.y() + context.generator.get_first_free_height(center_x, center_z, heightmap)
         }
     };
-    let old_absolute_ground_y = box_.min_y() + center_piece.ground_level_delta;
+    let old_absolute_ground_y = box_.min_y() + center_piece.as_pool_element().ground_level_delta;
     let dy = bottom_y - old_absolute_ground_y;
-    center_piece.bounding_box = center_piece.bounding_box.moved(0, dy, 0);
-    center_piece.position = center_piece.position.offset(0, dy, 0);
+    center_piece.move_by(0, dy, 0);
 
-    if is_start_too_close_to_world_height_limits(context, dimension_padding, center_piece.bounding_box)
-    {
+    if is_start_too_close_to_world_height_limits(
+        context,
+        dimension_padding,
+        center_piece.base.bounding_box,
+    ) {
         return None;
     }
 
     let center_y = bottom_y + local_anchor_position.y;
-    let outer_box = center_piece.bounding_box;
+    let outer_box = center_piece.base.bounding_box;
 
     Some(GenerationStub {
         position: BlockPos::new(center_x, center_y, center_z),
@@ -135,7 +139,7 @@ pub fn add_pieces<'a>(
             }
 
             for piece in pieces {
-                builder.add_piece(StructurePiece::PoolElement(piece));
+                builder.add_piece(piece);
             }
         }),
     })
@@ -185,7 +189,7 @@ fn place_children(
     context: &GenerationContext<'_>,
     max_depth: i32,
     do_expansion_hack: bool,
-    pieces: &mut Vec<PoolElementStructurePiece>,
+    pieces: &mut Vec<StructurePiece>,
     shape: VoxelShape,
     pool_alias_lookup: &PoolAliasLookup,
     liquid_settings: LiquidSettings,
@@ -229,7 +233,7 @@ fn try_placing_children(
     context: &GenerationContext<'_>,
     max_depth: i32,
     do_expansion_hack: bool,
-    pieces: &mut Vec<PoolElementStructurePiece>,
+    pieces: &mut Vec<StructurePiece>,
     source_index: usize,
     context_free: &Rc<RefCell<VoxelShape>>,
     depth: i32,
@@ -237,14 +241,14 @@ fn try_placing_children(
     pool_alias_lookup: &PoolAliasLookup,
     liquid_settings: LiquidSettings,
 ) {
-    let source_element = pieces[source_index].element;
-    let source_box_position = pieces[source_index].position;
-    let source_rotation = pieces[source_index].rotation;
+    let source_element = pieces[source_index].as_pool_element().element;
+    let source_box_position = pieces[source_index].as_pool_element().position;
+    let source_rotation = pieces[source_index].as_pool_element().rotation;
     let source_projection = source_element.projection();
     let source_rigid = source_projection == Projection::Rigid;
-    let source_bb = pieces[source_index].bounding_box;
+    let source_bb = pieces[source_index].base.bounding_box;
     let source_box_y = source_bb.min_y();
-    let source_ground_level_delta = pieces[source_index].ground_level_delta;
+    let source_ground_level_delta = pieces[source_index].as_pool_element().ground_level_delta;
 
     let mut source_free: Option<Rc<RefCell<VoxelShape>>> = None;
 
@@ -408,13 +412,15 @@ fn try_placing_children(
                         target_element.ground_level_delta()
                     };
 
-                    let mut target_piece = PoolElementStructurePiece::new(
-                        target_element,
-                        target_box_position,
-                        target_ground_level_delta,
-                        target_rotation,
+                    let mut target_piece = StructurePiece::pool_element(
+                        PoolElementStructurePiece::new(
+                            target_element,
+                            target_box_position,
+                            target_ground_level_delta,
+                            target_rotation,
+                            liquid_settings,
+                        ),
                         target_bb,
-                        liquid_settings,
                     );
 
                     let junction_y = if source_rigid {
@@ -432,14 +438,14 @@ fn try_placing_children(
                         source_jigsaw_base_height + delta_y / 2
                     };
 
-                    pieces[source_index].add_junction(JigsawJunction::new(
+                    pieces[source_index].as_pool_element_mut().add_junction(JigsawJunction::new(
                         target_jigsaw_pos.x(),
                         junction_y - source_jigsaw_local_y + source_ground_level_delta,
                         target_jigsaw_pos.z(),
                         delta_y,
                         target_projection,
                     ));
-                    target_piece.add_junction(JigsawJunction::new(
+                    target_piece.as_pool_element_mut().add_junction(JigsawJunction::new(
                         source_jigsaw_pos.x(),
                         junction_y - target_jigsaw_local_y + target_ground_level_delta,
                         source_jigsaw_pos.z(),

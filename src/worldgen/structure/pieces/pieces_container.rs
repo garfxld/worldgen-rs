@@ -16,6 +16,10 @@ impl PiecesContainer {
         &self.pieces
     }
 
+    pub const fn pieces_mut(&mut self) -> &mut [StructurePiece] {
+        self.pieces.as_mut_slice()
+    }
+
     pub const fn is_empty(&self) -> bool {
         self.pieces.is_empty()
     }

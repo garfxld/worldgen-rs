@@ -6,7 +6,7 @@ use crate::util::pos::{BlockPos, ChunkPos};
 use crate::worldgen::structure::pools::jigsaw_junction::JigsawJunction;
 use crate::worldgen::structure::pools::structure_template_pool::Projection;
 use crate::worldgen::structure::structure::TerrainAdjustment;
-use crate::worldgen::structure::structure_piece::StructurePiece;
+use crate::worldgen::structure::structure_piece::PieceKind;
 use crate::worldgen::structure::structure_start::StructureStart;
 
 pub const BEARD_KERNEL_RADIUS: i32 = 12;
@@ -77,10 +77,19 @@ impl Beardifier {
                     continue;
                 }
 
-                let StructurePiece::PoolElement(pool_piece) = piece;
+                let PieceKind::PoolElement(pool_piece) = &piece.kind else {
+                    pieces.push(Rigid {
+                        box_: piece.bounding_box(),
+                        terrain_adjustment,
+                        ground_level_delta: 0,
+                    });
+                    any_piece_bounding_box =
+                        Some(include_bounding_box(any_piece_bounding_box, piece.bounding_box()));
+                    continue;
+                };
                 if pool_piece.element.projection() == Projection::Rigid {
                     pieces.push(Rigid {
-                        box_: pool_piece.bounding_box,
+                        box_: piece.bounding_box(),
                         terrain_adjustment,
                         ground_level_delta: pool_piece.ground_level_delta,
                     });

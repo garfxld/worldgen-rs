@@ -1,4 +1,5 @@
 use std::sync::OnceLock;
+use std::time::Instant;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -26,6 +27,22 @@ use crate::worldgen::surface::{DatapackSurfaceRules, SurfaceSystem};
 
 const WORLDGEN_REGION_RANDOM: &str = "minecraft:worldgen_region_random";
 pub const GENERATION_STEPS: usize = 11;
+
+#[derive(Debug)]
+pub struct NoiseColumn {
+    min_y: i32,
+    states: Vec<BlockState>,
+}
+
+impl NoiseColumn {
+    pub fn get_block(&self, y: i32) -> BlockState {
+        let index = y - self.min_y;
+        if index < 0 || index as usize >= self.states.len() {
+            return REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR);
+        }
+        self.states[index as usize]
+    }
+}
 
 mod carver;
 mod feature;
@@ -113,10 +130,25 @@ impl Generator {
         biome_source_kind: BiomeSourceDimension,
         seed: u64,
     ) -> Result<Self, GeneratorError> {
+        let total = Instant::now();
+
+        let t = Instant::now();
         let registry = source.density_function_registry()?;
         let (program, settings) = source.program(dimension, prefix, &registry)?;
         let params = source.noise_parameters()?;
+        tracing::debug!(
+            "datapack loaded ({} density functions, {} noise params) in {:?}",
+            registry.len(),
+            params.len(),
+            t.elapsed()
+        );
+
+        let t = Instant::now();
         let noises = Noises::new(&program, &settings, &params, seed)?;
+        tracing::debug!(
+            "primary noises compiled for {dimension} in {:?}",
+            t.elapsed()
+        );
 
         let biome_source = match biome_source_kind {
             BiomeSourceDimension::Overworld => {
@@ -164,6 +196,8 @@ impl Generator {
         let features_per_step = build_features_per_step(&possible_biome_refs, |biome| {
             features().features_for_biome(*biome)
         });
+
+        tracing::debug!("generator for {dimension} fully initialized in {:?}", total.elapsed());
 
         Ok(Self {
             biome_source,
@@ -245,6 +279,50 @@ impl Generator {
                 heightmap.is_opaque(state)
             })
             .unwrap_or(min_y)
+    }
+
+    pub fn get_base_column(&self, x: i32, z: i32) -> NoiseColumn {
+        let noises = &self.noises;
+        let min_y = noises.min_y();
+        let height = noises.height();
+        let cell_width = noises.cell_width();
+
+        let mut noise_chunk = NoiseChunk::new_column(x, z, noises);
+        let mut column_cache = ColumnCache::new(noises);
+        column_cache.init_grid(
+            x.div_euclid(cell_width) * cell_width,
+            z.div_euclid(cell_width) * cell_width,
+            noises,
+        );
+
+        let mut aquifer = Aquifer::new_sized(
+            x.div_euclid(cell_width) * cell_width,
+            z.div_euclid(cell_width) * cell_width,
+            cell_width,
+            cell_width,
+            min_y,
+            height,
+            noises.aquifer_random(),
+            self.aquifers_enabled,
+            self.default_fluid_id,
+            noises,
+            ColumnCache::new(noises),
+        );
+
+        let air = REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR);
+        let default_block_id = self.default_block_id;
+        let mut states = vec![air; height as usize];
+        noise_chunk.iterate_column(noises, &mut column_cache, x, z, |world_y, density, _, _| {
+            states[(world_y - min_y) as usize] =
+                match aquifer.compute_substance(noises, x, world_y, z, density) {
+                    AquiferResult::Solid => default_block_id,
+                    AquiferResult::Fluid(state) => state,
+                    AquiferResult::Air => air,
+                };
+            false
+        });
+
+        NoiseColumn { min_y, states }
     }
 
     pub fn get_first_free_height(&self, x: i32, z: i32, heightmap: HeightmapType) -> i32 {

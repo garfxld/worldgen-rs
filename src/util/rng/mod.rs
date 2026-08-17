@@ -46,6 +46,15 @@ impl RandomSource {
         }
     }
 
+    pub fn set_large_feature_seed(&mut self, seed: i64, chunk_x: i32, chunk_z: i32) {
+        match self {
+            Self::Legacy(r) => r.set_large_feature_seed(seed, chunk_x, chunk_z),
+            Self::Worldgen(_) | Self::Xoroshiro(_) => {
+                panic!("large feature seeds require a legacy random source")
+            }
+        }
+    }
+
     pub fn set_feature_seed(&mut self, decoration_seed: i64, feature_index: i32, step: i32) {
         match self {
             Self::Worldgen(r) => r.set_feature_seed(decoration_seed, feature_index, step),

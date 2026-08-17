@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use crate::util::axis::Axis;
 use crate::util::pos::BlockPos;
+use crate::util::rng::RandomSource;
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[derive_const(PartialEq)]
@@ -95,6 +96,51 @@ impl Direction {
             Axis::Y => Direction::Up,
             Axis::Z => Direction::South,
         }
+    }
+
+    pub const fn get_3d_data_value(self) -> usize {
+        match self {
+            Direction::Down => 0,
+            Direction::Up => 1,
+            Direction::North => 2,
+            Direction::South => 3,
+            Direction::West => 4,
+            Direction::East => 5,
+        }
+    }
+
+    pub const fn from_3d_data_value(data: usize) -> Direction {
+        match data % 6 {
+            0 => Direction::Down,
+            1 => Direction::Up,
+            2 => Direction::North,
+            3 => Direction::South,
+            4 => Direction::West,
+            _ => Direction::East,
+        }
+    }
+
+    pub const fn get_2d_data_value(self) -> i32 {
+        match self {
+            Direction::South => 0,
+            Direction::West => 1,
+            Direction::North => 2,
+            Direction::East => 3,
+            Direction::Down | Direction::Up => -1,
+        }
+    }
+
+    pub const fn from_2d_data_value(data: i32) -> Direction {
+        match (data % 4).abs() {
+            0 => Direction::South,
+            1 => Direction::West,
+            2 => Direction::North,
+            _ => Direction::East,
+        }
+    }
+
+    pub fn get_random_horizontal(random: &mut RandomSource) -> Direction {
+        Self::HORIZONTAL[random.next_i32_bounded(4) as usize]
     }
 
     pub const fn is_horizontal(self) -> bool {

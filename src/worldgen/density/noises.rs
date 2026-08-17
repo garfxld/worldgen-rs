@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::ptr;
+use std::time::Instant;
 
 use rustc_hash::FxHashMap;
 
@@ -40,10 +41,17 @@ impl Noises {
         params: &BTreeMap<String, NoiseParameters>,
         seed: u64,
     ) -> Result<Self, CompileError> {
+        let total = Instant::now();
+        let t = Instant::now();
         let analysis = program.analyze();
         let layout = CacheLayout::new(program, &analysis);
         let legacy = analysis.legacy_random_source;
+        tracing::debug!(
+            "density function analysis + layout planning done in {:?}",
+            t.elapsed()
+        );
 
+        let t = Instant::now();
         let mut root = if legacy {
             RandomSource::Legacy(LegacyRandomSource::from_seed(seed))
         } else {
@@ -79,7 +87,13 @@ impl Noises {
             };
             noises.insert(id.clone(), normal);
         }
+        tracing::debug!(
+            "instantiated {} normal noises in {:?}",
+            noises.len(),
+            t.elapsed()
+        );
 
+        let t = Instant::now();
         let blended = analysis.blended_noise_config.as_ref().map(|cfg| {
             let mut terrain_random = if legacy {
                 RandomSource::Legacy(LegacyRandomSource::from_seed(seed))
@@ -100,7 +114,9 @@ impl Noises {
             .uses_end_islands
             .then(|| Box::new(EndIslands::new(seed)));
         let end_islands_ptr = end_islands.as_deref().map(ptr::from_ref);
+        tracing::debug!("blended noise + end islands setup done in {:?}", t.elapsed());
 
+        let t = Instant::now();
         let module = JitModule::new()?;
         let dimension_compiler = DimensionCompiler::new(
             module,
@@ -112,6 +128,16 @@ impl Noises {
             end_islands_ptr,
         );
         let compiled = dimension_compiler.compile()?;
+        tracing::debug!(
+            "density function JIT compilation done in {:?} ({} slots, {} interpolated)",
+            t.elapsed(),
+            compiled.slots(),
+            compiled.interpolated_count()
+        );
+        tracing::debug!(
+            "density functions fully compiled in {:?}",
+            total.elapsed()
+        );
 
         Ok(Self {
             compiled,

@@ -40,8 +40,6 @@ unsafe extern "C" fn end_islands_sample(
     unsafe { (*instance).sample(x, y, z) }
 }
 
-const GRADIENT_STRIDE_SHIFT: i64 = 5;
-
 pub struct JitModule {
     module: JITModule,
     gradient: DataId,
@@ -50,6 +48,8 @@ pub struct JitModule {
 }
 
 impl JitModule {
+    pub const GRADIENT_STRIDE_SHIFT: i64 = 5;
+
     pub fn new() -> Result<Self, JitError> {
         let mut flags = settings::builder();
         flags.set("use_colocated_libcalls", "false")?;
@@ -112,10 +112,6 @@ impl JitModule {
 
     pub(crate) const fn gradient(&self) -> DataId {
         self.gradient
-    }
-
-    pub(crate) const fn gradient_stride_shift() -> i64 {
-        GRADIENT_STRIDE_SHIFT
     }
 
     pub(crate) const fn inner(&self) -> &JITModule {

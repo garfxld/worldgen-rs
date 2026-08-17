@@ -16,6 +16,7 @@ pub mod surface;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::sync::Once;
+use std::time::Instant;
 
 use crate::chunk::status::ChunkStatus;
 use crate::chunk::view::ChunkView;
@@ -42,11 +43,13 @@ pub struct Worldgen {
 fn ensure_registry_initialized() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
+        let start = Instant::now();
         let mut registries =
             Registries::new_vanilla().expect("bundled vanilla datapack should load");
         registries.freeze();
 
         let _ = REGISTRY.init(registries);
+        tracing::debug!("vanilla registries loaded in {:?}", start.elapsed());
     });
 }
 

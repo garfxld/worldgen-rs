@@ -147,6 +147,70 @@ impl BoundingBox {
         }
     }
 
+    pub const fn from_coords(
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+    ) -> Self {
+        Self::new(
+            IVec3::new(min_x, min_y, min_z),
+            IVec3::new(max_x, max_y, max_z),
+        )
+    }
+
+    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla BoundingBox::orientBox")]
+    pub const fn orient_box(
+        foot_x: i32,
+        foot_y: i32,
+        foot_z: i32,
+        off_x: i32,
+        off_y: i32,
+        off_z: i32,
+        width: i32,
+        height: i32,
+        depth: i32,
+        direction: crate::util::direction::Direction,
+    ) -> Self {
+        use crate::util::direction::Direction;
+        match direction {
+            Direction::North => Self::from_coords(
+                foot_x + off_x,
+                foot_y + off_y,
+                foot_z - depth + 1 + off_z,
+                foot_x + width - 1 + off_x,
+                foot_y + height - 1 + off_y,
+                foot_z + off_z,
+            ),
+            Direction::West => Self::from_coords(
+                foot_x - depth + 1 + off_z,
+                foot_y + off_y,
+                foot_z + off_x,
+                foot_x + off_z,
+                foot_y + height - 1 + off_y,
+                foot_z + width - 1 + off_x,
+            ),
+            Direction::East => Self::from_coords(
+                foot_x + off_z,
+                foot_y + off_y,
+                foot_z + off_x,
+                foot_x + depth - 1 + off_z,
+                foot_y + height - 1 + off_y,
+                foot_z + width - 1 + off_x,
+            ),
+            _ => Self::from_coords(
+                foot_x + off_x,
+                foot_y + off_y,
+                foot_z + off_z,
+                foot_x + width - 1 + off_x,
+                foot_y + height - 1 + off_y,
+                foot_z + depth - 1 + off_z,
+            ),
+        }
+    }
+
     pub const fn min_x(self) -> i32 {
         self.min.x
     }
