@@ -5,9 +5,7 @@ use crate::util::ident::Identifier;
 use crate::worldgen::structure::structure::{
     GenerationContext, GenerationStub, on_top_of_chunk_center,
 };
-use crate::worldgen::structure::structures::ocean_monument_pieces::{
-    self, BIOME_RANGE_CHECK,
-};
+use crate::worldgen::structure::structures::ocean_monument_pieces::{self, BIOME_RANGE_CHECK};
 
 fn required_surrounding_tag() -> Identifier {
     "minecraft:required_ocean_monument_surrounding"
@@ -45,9 +43,7 @@ fn is_surrounded_by_required_biomes(
     true
 }
 
-pub fn find_generation_point<'a>(
-    context: &'a GenerationContext<'a>,
-) -> Option<GenerationStub<'a>> {
+pub fn find_generation_point<'a>(context: &'a GenerationContext<'a>) -> Option<GenerationStub<'a>> {
     let chunk_pos = context.chunk_pos;
     let offset_x = chunk_pos.0.x * 16 + 9;
     let offset_z = chunk_pos.0.y * 16 + 9;

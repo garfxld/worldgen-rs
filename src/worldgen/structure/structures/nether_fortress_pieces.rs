@@ -210,10 +210,7 @@ const fn is_ok_box(box_: BoundingBox) -> bool {
     box_.min_y() > LOWEST_Y_POSITION
 }
 
-fn try_box(
-    builder: &StructurePiecesBuilder,
-    box_: BoundingBox,
-) -> Option<BoundingBox> {
+fn try_box(builder: &StructurePiecesBuilder, box_: BoundingBox) -> Option<BoundingBox> {
     (is_ok_box(box_) && builder.find_collision_piece(box_).is_none()).then_some(box_)
 }
 
@@ -465,8 +462,7 @@ fn generate_piece(
             if weight_selection >= 0 {
                 continue;
             }
-            if !piece.do_place()
-                || (state.previous_piece == Some(piece.id) && !piece.allow_in_row)
+            if !piece.do_place() || (state.previous_piece == Some(piece.id) && !piece.allow_in_row)
             {
                 break;
             }
@@ -499,7 +495,10 @@ fn generate_piece(
     create_bridge_end_filler(builder, random, foot_x, foot_y, foot_z, direction, depth)
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateAndAddPiece")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateAndAddPiece"
+)]
 fn generate_and_add_piece(
     state: &mut FortressGen,
     builder: &mut StructurePiecesBuilder,
@@ -534,7 +533,10 @@ fn generate_and_add_piece(
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateChildForward")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateChildForward"
+)]
 fn generate_child_forward(
     state: &mut FortressGen,
     builder: &mut StructurePiecesBuilder,
@@ -576,7 +578,10 @@ fn generate_child_forward(
     generate_and_add_piece(state, builder, random, x, y, z, dir, gen_depth, is_castle);
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateChildLeft")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateChildLeft"
+)]
 fn generate_child_left(
     state: &mut FortressGen,
     builder: &mut StructurePiecesBuilder,
@@ -606,7 +611,10 @@ fn generate_child_left(
     generate_and_add_piece(state, builder, random, x, y, z, dir, gen_depth, is_castle);
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateChildRight")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateChildRight"
+)]
 fn generate_child_right(
     state: &mut FortressGen,
     builder: &mut StructurePiecesBuilder,
@@ -654,40 +662,200 @@ fn add_children(
 
     match &bridge.kind {
         NetherBridgeKind::BridgeCrossing => {
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 8, 3, false);
-            generate_child_left(state, builder, random, box_, orientation, gen_depth, 3, 8, false);
-            generate_child_right(state, builder, random, box_, orientation, gen_depth, 3, 8, false);
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                8,
+                3,
+                false,
+            );
+            generate_child_left(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                3,
+                8,
+                false,
+            );
+            generate_child_right(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                3,
+                8,
+                false,
+            );
         }
         NetherBridgeKind::BridgeStraight => {
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 1, 3, false);
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                1,
+                3,
+                false,
+            );
         }
         NetherBridgeKind::RoomCrossing => {
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 2, 0, false);
-            generate_child_left(state, builder, random, box_, orientation, gen_depth, 0, 2, false);
-            generate_child_right(state, builder, random, box_, orientation, gen_depth, 0, 2, false);
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                2,
+                0,
+                false,
+            );
+            generate_child_left(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                0,
+                2,
+                false,
+            );
+            generate_child_right(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                0,
+                2,
+                false,
+            );
         }
         NetherBridgeKind::StairsRoom => {
-            generate_child_right(state, builder, random, box_, orientation, gen_depth, 6, 2, false);
+            generate_child_right(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                6,
+                2,
+                false,
+            );
         }
         NetherBridgeKind::CastleEntrance => {
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 5, 3, true);
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                5,
+                3,
+                true,
+            );
         }
         NetherBridgeKind::CastleCorridorStairs => {
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 1, 0, true);
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                1,
+                0,
+                true,
+            );
         }
         NetherBridgeKind::CastleSmallCorridor => {
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 1, 0, true);
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                1,
+                0,
+                true,
+            );
         }
         NetherBridgeKind::CastleSmallCorridorCrossing => {
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 1, 0, true);
-            generate_child_left(state, builder, random, box_, orientation, gen_depth, 0, 1, true);
-            generate_child_right(state, builder, random, box_, orientation, gen_depth, 0, 1, true);
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                1,
+                0,
+                true,
+            );
+            generate_child_left(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                0,
+                1,
+                true,
+            );
+            generate_child_right(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                0,
+                1,
+                true,
+            );
         }
         NetherBridgeKind::CastleSmallCorridorLeftTurn { .. } => {
-            generate_child_left(state, builder, random, box_, orientation, gen_depth, 0, 1, true);
+            generate_child_left(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                0,
+                1,
+                true,
+            );
         }
         NetherBridgeKind::CastleSmallCorridorRightTurn { .. } => {
-            generate_child_right(state, builder, random, box_, orientation, gen_depth, 0, 1, true);
+            generate_child_right(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                0,
+                1,
+                true,
+            );
         }
         NetherBridgeKind::CastleCorridorTBalcony => {
             let z_off = if orientation == Direction::West || orientation == Direction::North {
@@ -697,16 +865,52 @@ fn add_children(
             };
             let left_castle = random.next_i32_bounded(8) > 0;
             generate_child_left(
-                state, builder, random, box_, orientation, gen_depth, 0, z_off, left_castle,
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                0,
+                z_off,
+                left_castle,
             );
             let right_castle = random.next_i32_bounded(8) > 0;
             generate_child_right(
-                state, builder, random, box_, orientation, gen_depth, 0, z_off, right_castle,
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                0,
+                z_off,
+                right_castle,
             );
         }
         NetherBridgeKind::CastleStalkRoom => {
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 5, 3, true);
-            generate_child_forward(state, builder, random, box_, orientation, gen_depth, 5, 11, true);
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                5,
+                3,
+                true,
+            );
+            generate_child_forward(
+                state,
+                builder,
+                random,
+                box_,
+                orientation,
+                gen_depth,
+                5,
+                11,
+                true,
+            );
         }
         NetherBridgeKind::MonsterThrone { .. } | NetherBridgeKind::BridgeEndFiller { .. } => {}
     }
@@ -760,13 +964,7 @@ impl NetherBridgePiece {
                 castle_small_corridor_crossing(piece, region, chunk_bb);
             }
             NetherBridgeKind::CastleSmallCorridorRightTurn { is_needing_chest } => {
-                castle_small_corridor_right_turn(
-                    piece,
-                    region,
-                    random,
-                    chunk_bb,
-                    is_needing_chest,
-                );
+                castle_small_corridor_right_turn(piece, region, random, chunk_bb, is_needing_chest);
             }
             NetherBridgeKind::CastleSmallCorridorLeftTurn { is_needing_chest } => {
                 castle_small_corridor_left_turn(piece, region, random, chunk_bb, is_needing_chest);
@@ -786,7 +984,9 @@ fn bridge_crossing(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: Boun
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(7, 3, 0, 11, 4, 18, bricks);
@@ -830,7 +1030,9 @@ fn bridge_straight(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: Boun
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 3, 0, 4, 4, 18, bricks);
@@ -870,7 +1072,9 @@ fn bridge_end_filler(
     let bricks = bricks();
     let mut self_random = RandomSource::Legacy(LegacyRandomSource::from_seed(self_seed as u64));
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     for x in 0..=4 {
@@ -902,7 +1106,9 @@ fn room_crossing(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: Boundi
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 0, 0, 6, 1, 6, bricks);
@@ -937,7 +1143,9 @@ fn stairs_room(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: Bounding
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 0, 0, 6, 1, 6, bricks);
@@ -978,7 +1186,9 @@ fn monster_throne(
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 2, 0, 6, 7, 7, air);
@@ -1113,7 +1323,9 @@ fn castle_entrance(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: Boun
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 3, 0, 12, 4, 12, bricks);
@@ -1221,7 +1433,9 @@ fn castle_small_corridor(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 0, 0, 4, 1, 4, bricks);
@@ -1250,7 +1464,9 @@ fn castle_small_corridor_crossing(
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 0, 0, 4, 1, 4, bricks);
@@ -1278,7 +1494,9 @@ fn castle_small_corridor_left_turn(
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 0, 0, 4, 1, 4, bricks);
@@ -1316,7 +1534,9 @@ fn castle_small_corridor_right_turn(
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 0, 0, 4, 1, 4, bricks);
@@ -1352,7 +1572,9 @@ fn castle_corridor_stairs(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_b
         .set_value(&Properties::HORIZONTAL_FACING, Direction::South);
     let ns = ns_fence();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     for step in 0..=9 {
@@ -1379,17 +1601,15 @@ fn castle_corridor_stairs(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_b
     }
 }
 
-fn castle_corridor_t_balcony(
-    base: &PieceBase,
-    region: &WorldGenRegion<'_>,
-    chunk_bb: BoundingBox,
-) {
+fn castle_corridor_t_balcony(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: BoundingBox) {
     let bricks = bricks();
     let air = air();
     let we = we_fence();
     let ns = ns_fence();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 0, 0, 8, 1, 8, bricks);
@@ -1447,7 +1667,9 @@ fn castle_stalk_room(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: Bo
     let bricks = bricks();
     let air = air();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     gbox(0, 3, 0, 12, 4, 12, bricks);

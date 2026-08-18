@@ -8,7 +8,6 @@ use crate::util::value_providers::int::IntProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ColumnConfig {
     pub reach: IntProvider,
     pub height: IntProvider,
@@ -139,8 +138,7 @@ pub fn place(
         let _ = random.next_i32_bounded(1);
         let z = origin.z() - reach + random.next_i32_bounded(width);
         let pos = BlockPos::new(x, origin.y(), z);
-        let blocks_to_place_y =
-            column_height - ((x - origin.x()).abs() + (z - origin.z()).abs());
+        let blocks_to_place_y = column_height - ((x - origin.x()).abs() + (z - origin.z()).abs());
         if blocks_to_place_y >= 0 {
             placed |= place_column(
                 region,

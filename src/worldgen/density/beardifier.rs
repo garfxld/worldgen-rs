@@ -18,12 +18,13 @@ static BEARD_KERNEL: LazyLock<[f32; BEARD_KERNEL_SIZE * BEARD_KERNEL_SIZE * BEAR
         for zi in 0..BEARD_KERNEL_SIZE {
             for xi in 0..BEARD_KERNEL_SIZE {
                 for yi in 0..BEARD_KERNEL_SIZE {
-                    kernel[zi * BEARD_KERNEL_SIZE * BEARD_KERNEL_SIZE + xi * BEARD_KERNEL_SIZE + yi] =
-                        compute_beard_contribution(
-                            xi as i32 - BEARD_KERNEL_RADIUS,
-                            f64::from(yi as i32 - BEARD_KERNEL_RADIUS) + 0.5,
-                            zi as i32 - BEARD_KERNEL_RADIUS,
-                        ) as f32;
+                    kernel[zi * BEARD_KERNEL_SIZE * BEARD_KERNEL_SIZE
+                        + xi * BEARD_KERNEL_SIZE
+                        + yi] = compute_beard_contribution(
+                        xi as i32 - BEARD_KERNEL_RADIUS,
+                        f64::from(yi as i32 - BEARD_KERNEL_RADIUS) + 0.5,
+                        zi as i32 - BEARD_KERNEL_RADIUS,
+                    ) as f32;
                 }
             }
         }
@@ -83,8 +84,10 @@ impl Beardifier {
                         terrain_adjustment,
                         ground_level_delta: 0,
                     });
-                    any_piece_bounding_box =
-                        Some(include_bounding_box(any_piece_bounding_box, piece.bounding_box()));
+                    any_piece_bounding_box = Some(include_bounding_box(
+                        any_piece_bounding_box,
+                        piece.bounding_box(),
+                    ));
                     continue;
                 };
                 if pool_piece.element.projection() == Projection::Rigid {
@@ -93,8 +96,10 @@ impl Beardifier {
                         terrain_adjustment,
                         ground_level_delta: pool_piece.ground_level_delta,
                     });
-                    any_piece_bounding_box =
-                        Some(include_bounding_box(any_piece_bounding_box, piece.bounding_box()));
+                    any_piece_bounding_box = Some(include_bounding_box(
+                        any_piece_bounding_box,
+                        piece.bounding_box(),
+                    ));
                 }
 
                 for junction in &pool_piece.junctions {

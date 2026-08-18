@@ -6,9 +6,7 @@ use crate::util::ident::BlockState;
 use crate::util::rng::RandomSource;
 use crate::worldgen::region::WorldGenRegion;
 use crate::worldgen::structure::pieces::structure_pieces_builder::StructurePiecesBuilder;
-use crate::worldgen::structure::structure_piece::{
-    PieceBase, PieceKind, StructurePiece, cave_air,
-};
+use crate::worldgen::structure::structure_piece::{PieceBase, PieceKind, StructurePiece, cave_air};
 
 const MAX_DEPTH: i32 = 50;
 const LOWEST_Y_POSITION: i32 = 10;
@@ -83,17 +81,37 @@ fn stronghold_piece_weights() -> Vec<PieceWeight> {
 
 #[derive(Debug)]
 pub enum StrongholdKind {
-    ChestCorridor { has_placed_chest: bool },
-    FillerCorridor { steps: i32 },
-    FiveCrossing { left_low: bool, left_high: bool, right_low: bool, right_high: bool },
+    ChestCorridor {
+        has_placed_chest: bool,
+    },
+    FillerCorridor {
+        steps: i32,
+    },
+    FiveCrossing {
+        left_low: bool,
+        left_high: bool,
+        right_low: bool,
+        right_high: bool,
+    },
     LeftTurn,
     RightTurn,
-    Library { is_tall: bool },
-    PortalRoom { has_placed_spawner: bool },
+    Library {
+        is_tall: bool,
+    },
+    PortalRoom {
+        has_placed_spawner: bool,
+    },
     PrisonHall,
-    RoomCrossing { room_type: i32 },
-    StairsDown { is_source: bool },
-    Straight { left_child: bool, right_child: bool },
+    RoomCrossing {
+        room_type: i32,
+    },
+    StairsDown {
+        is_source: bool,
+    },
+    Straight {
+        left_child: bool,
+        right_child: bool,
+    },
     StraightStairsDown,
 }
 
@@ -376,9 +394,8 @@ fn find_filler_corridor_box(
     foot_z: i32,
     direction: Direction,
 ) -> Option<BoundingBox> {
-    let orient = |depth| {
-        BoundingBox::orient_box(foot_x, foot_y, foot_z, -1, -1, 0, 5, 5, depth, direction)
-    };
+    let orient =
+        |depth| BoundingBox::orient_box(foot_x, foot_y, foot_z, -1, -1, 0, 5, 5, depth, direction);
     let box_ = orient(4);
     let collision = builder.find_collision_piece(box_)?;
     let collision_box = collision.bounding_box();
@@ -486,7 +503,10 @@ fn generate_piece_from_small_door(
     ))
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateAndAddPiece")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateAndAddPiece"
+)]
 fn generate_and_add_piece(
     state: &mut StrongholdGen,
     builder: &mut StructurePiecesBuilder,
@@ -693,16 +713,52 @@ fn add_children(
             }
             child_forward(state, builder, random, box_, orientation, gen_depth, 5, 1);
             if left_low {
-                child_left(state, builder, random, box_, orientation, gen_depth, z_off_a, 1);
+                child_left(
+                    state,
+                    builder,
+                    random,
+                    box_,
+                    orientation,
+                    gen_depth,
+                    z_off_a,
+                    1,
+                );
             }
             if left_high {
-                child_left(state, builder, random, box_, orientation, gen_depth, z_off_b, 7);
+                child_left(
+                    state,
+                    builder,
+                    random,
+                    box_,
+                    orientation,
+                    gen_depth,
+                    z_off_b,
+                    7,
+                );
             }
             if right_low {
-                child_right(state, builder, random, box_, orientation, gen_depth, z_off_a, 1);
+                child_right(
+                    state,
+                    builder,
+                    random,
+                    box_,
+                    orientation,
+                    gen_depth,
+                    z_off_a,
+                    1,
+                );
             }
             if right_high {
-                child_right(state, builder, random, box_, orientation, gen_depth, z_off_b, 7);
+                child_right(
+                    state,
+                    builder,
+                    random,
+                    box_,
+                    orientation,
+                    gen_depth,
+                    z_off_b,
+                    7,
+                );
             }
         }
         StrongholdKind::PortalRoom { .. } => {
@@ -745,7 +801,14 @@ impl StrongholdPiece {
         let orientation = piece.orientation().unwrap_or(Direction::North);
         match &mut self.kind {
             StrongholdKind::ChestCorridor { has_placed_chest } => {
-                chest_corridor(piece, region, random, chunk_bb, entry_door, has_placed_chest);
+                chest_corridor(
+                    piece,
+                    region,
+                    random,
+                    chunk_bb,
+                    entry_door,
+                    has_placed_chest,
+                );
             }
             StrongholdKind::FillerCorridor { steps } => {
                 filler_corridor(piece, region, chunk_bb, *steps);
@@ -756,14 +819,37 @@ impl StrongholdPiece {
                 right_low,
                 right_high,
             } => five_crossing(
-                piece, region, random, chunk_bb, entry_door, *left_low, *left_high, *right_low,
+                piece,
+                region,
+                random,
+                chunk_bb,
+                entry_door,
+                *left_low,
+                *left_high,
+                *right_low,
                 *right_high,
             ),
             StrongholdKind::LeftTurn => {
-                turn(piece, region, random, chunk_bb, entry_door, orientation, true);
+                turn(
+                    piece,
+                    region,
+                    random,
+                    chunk_bb,
+                    entry_door,
+                    orientation,
+                    true,
+                );
             }
             StrongholdKind::RightTurn => {
-                turn(piece, region, random, chunk_bb, entry_door, orientation, false);
+                turn(
+                    piece,
+                    region,
+                    random,
+                    chunk_bb,
+                    entry_door,
+                    orientation,
+                    false,
+                );
             }
             StrongholdKind::Library { is_tall } => {
                 library(piece, region, random, chunk_bb, entry_door, *is_tall);
@@ -799,7 +885,10 @@ impl StrongholdPiece {
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateSmallDoor")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateSmallDoor"
+)]
 fn generate_small_door(
     base: &PieceBase,
     region: &WorldGenRegion<'_>,
@@ -1025,7 +1114,9 @@ fn five_crossing(
     selected_box(base, region, chunk_bb, random, 1, 3, 5, 3, 3, 6, false);
     let slab = vanilla_blocks::SMOOTH_STONE_SLAB.default_state();
     let gslab = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     gslab(1, 3, 4, 3, 3, 4, slab);
     gslab(1, 4, 6, 3, 4, 6, slab);
@@ -1048,7 +1139,10 @@ fn five_crossing(
     );
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla Turn::postProcess")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla Turn::postProcess"
+)]
 fn turn(
     base: &PieceBase,
     region: &WorldGenRegion<'_>,
@@ -1062,7 +1156,11 @@ fn turn(
     selected_box(base, region, chunk_bb, random, 0, 0, 0, 4, 4, 4, true);
     generate_small_door(base, region, chunk_bb, entry_door, 1, 1, 0);
     let north_or_east = orientation == Direction::North || orientation == Direction::East;
-    let open_east = if is_left { !north_or_east } else { north_or_east };
+    let open_east = if is_left {
+        !north_or_east
+    } else {
+        north_or_east
+    };
     let x = if open_east { 4 } else { 0 };
     base.generate_box(
         region, chunk_bb, x, 1, 1, x, 3, 3, cave_air, cave_air, false,
@@ -1104,7 +1202,9 @@ fn library(
     let planks = vanilla_blocks::OAK_PLANKS.default_state();
     let bookshelf = vanilla_blocks::BOOKSHELF.default_state();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let wall_torch = vanilla_blocks::WALL_TORCH.default_state();
 
@@ -1282,7 +1382,9 @@ fn portal_room(
     selected_box(base, region, chunk_bb, random, 8, 1, 1, 9, 1, 4, false);
     let lava = vanilla_blocks::LAVA.default_state();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     gbox(1, 1, 1, 1, 1, 3, lava);
     gbox(9, 1, 1, 9, 1, 3, lava);
@@ -1584,7 +1686,10 @@ fn stairs_down(
     base.place_block(region, slab, 1, 1, 3, chunk_bb);
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla Straight::postProcess")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla Straight::postProcess"
+)]
 fn straight(
     base: &PieceBase,
     region: &WorldGenRegion<'_>,

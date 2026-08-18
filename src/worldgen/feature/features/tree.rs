@@ -20,10 +20,10 @@ use crate::worldgen::region::WorldGenRegion;
 const LEAVES: Identifier = Identifier::const_vanilla("leaves");
 const REPLACEABLE_BY_TREES: Identifier = Identifier::const_vanilla("replaceable_by_trees");
 const VINE: Identifier = Identifier::const_vanilla("vine");
-const PREVENTS_NEARBY_LEAF_DECAY: Identifier = Identifier::const_vanilla("prevents_nearby_leaf_decay");
+const PREVENTS_NEARBY_LEAF_DECAY: Identifier =
+    Identifier::const_vanilla("prevents_nearby_leaf_decay");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TreeConfig {
     pub trunk_provider: BlockStateProvider,
     pub trunk_placer: TrunkPlacer,
@@ -62,16 +62,32 @@ pub fn is_air_or_leaves(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
 
 pub fn valid_tree_pos(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
     let state = region.get_block(pos);
-    state.is_air() || REGISTRY.blocks.is_in_tag(&state.get_block().key, &REPLACEABLE_BY_TREES)
+    state.is_air()
+        || REGISTRY
+            .blocks
+            .is_in_tag(&state.get_block().key, &REPLACEABLE_BY_TREES)
 }
 
-pub fn place(region: &WorldGenRegion<'_>, random: &mut RandomSource, origin: BlockPos, config: &TreeConfig) -> bool {
+pub fn place(
+    region: &WorldGenRegion<'_>,
+    random: &mut RandomSource,
+    origin: BlockPos,
+    config: &TreeConfig,
+) -> bool {
     let mut root_positions = JavaHashSet::new();
     let mut trunks = JavaHashSet::new();
     let mut foliage_setter = FoliageSetter::new();
     let mut decorations = JavaHashSet::new();
 
-    let placed = do_place(region, random, origin, &mut root_positions, &mut trunks, &mut foliage_setter, config);
+    let placed = do_place(
+        region,
+        random,
+        origin,
+        &mut root_positions,
+        &mut trunks,
+        &mut foliage_setter,
+        config,
+    );
     if !placed || (trunks.is_empty() && foliage_setter.positions.is_empty()) {
         return false;
     }
@@ -107,7 +123,10 @@ pub fn place(region: &WorldGenRegion<'_>, random: &mut RandomSource, origin: Blo
     true
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla TreeFeature.doPlace")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla TreeFeature.doPlace"
+)]
 fn do_place(
     region: &WorldGenRegion<'_>,
     random: &mut RandomSource,
@@ -121,10 +140,9 @@ fn do_place(
     let foliage_height = config.foliage_placer.foliage_height(random, tree_height);
     let trunk_height = tree_height - foliage_height;
     let leaf_radius = config.foliage_placer.foliage_radius(random, trunk_height);
-    let trunk_origin = config
-        .root_placer
-        .as_ref()
-        .map_or(origin, |root_placer| root_placer.get_trunk_origin(origin, random));
+    let trunk_origin = config.root_placer.as_ref().map_or(origin, |root_placer| {
+        root_placer.get_trunk_origin(origin, random)
+    });
     let min_y = origin.y().min(trunk_origin.y());
     let max_y = origin.y().max(trunk_origin.y()) + tree_height + 1;
     if min_y < region.min_y() + 1 || max_y > region.max_y() {
@@ -133,7 +151,9 @@ fn do_place(
 
     let min_clipped_height = config.minimum_size.min_clipped_height();
     let clipped_tree_height = get_max_free_tree_height(region, tree_height, trunk_origin, config);
-    if clipped_tree_height < tree_height && !min_clipped_height.is_some_and(|min| clipped_tree_height >= min) {
+    if clipped_tree_height < tree_height
+        && !min_clipped_height.is_some_and(|min| clipped_tree_height >= min)
+    {
         return false;
     }
 
@@ -142,7 +162,14 @@ fn do_place(
             root_positions.insert(pos);
             region.set_block(pos, state);
         };
-        if !root_placer.place_roots(region, &mut root_setter, random, origin, trunk_origin, config) {
+        if !root_placer.place_roots(
+            region,
+            &mut root_setter,
+            random,
+            origin,
+            trunk_origin,
+            config,
+        ) {
             return false;
         }
     }
@@ -152,9 +179,14 @@ fn do_place(
             trunks.insert(pos);
             region.set_block(pos, state);
         };
-        config
-            .trunk_placer
-            .place_trunk(region, &mut trunk_setter, random, clipped_tree_height, trunk_origin, config)
+        config.trunk_placer.place_trunk(
+            region,
+            &mut trunk_setter,
+            random,
+            clipped_tree_height,
+            trunk_origin,
+            config,
+        )
     };
     for attachment in &attachments {
         config.foliage_placer.create_foliage(
@@ -182,7 +214,9 @@ fn get_max_free_tree_height(
         for x in -r..=r {
             for z in -r..=r {
                 let pos = tree_pos.offset(x, y, z);
-                if !config.trunk_placer.is_free(region, pos) || (!config.ignore_vines && is_vine(region, pos)) {
+                if !config.trunk_placer.is_free(region, pos)
+                    || (!config.ignore_vines && is_vine(region, pos))
+                {
                     return y - 2;
                 }
             }
@@ -218,13 +252,18 @@ fn update_leaves(
             if smallest_distance >= MAX_DISTANCE {
                 return;
             }
-            let pos = to_check[smallest_distance].remove_first().expect("bucket is non-empty");
+            let pos = to_check[smallest_distance]
+                .remove_first()
+                .expect("bucket is non-empty");
             if !bounds.is_inside(pos) {
                 continue;
             }
             if smallest_distance != 0 {
                 let state = region.get_block(pos);
-                region.set_block(pos, state.set_value(&Properties::DISTANCE, smallest_distance as u8));
+                region.set_block(
+                    pos,
+                    state.set_value(&Properties::DISTANCE, smallest_distance as u8),
+                );
             }
             shape.insert(pos);
 
@@ -234,7 +273,10 @@ fn update_leaves(
                     continue;
                 }
                 let state = region.get_block(neighbour);
-                let distance = if REGISTRY.blocks.is_in_tag(&state.get_block().key, &PREVENTS_NEARBY_LEAF_DECAY) {
+                let distance = if REGISTRY
+                    .blocks
+                    .is_in_tag(&state.get_block().key, &PREVENTS_NEARBY_LEAF_DECAY)
+                {
                     0
                 } else {
                     let Some(value) = state.try_get_value(&Properties::DISTANCE) else {

@@ -247,14 +247,46 @@ fn add_cluster_ruins(
 
 fn all_positions(random: &mut RandomSource, origin: BlockPos) -> Vec<BlockPos> {
     vec![
-        origin.offset(-16 + random.next_i32_between(1, 8), 0, 16 + random.next_i32_between(1, 7)),
-        origin.offset(-16 + random.next_i32_between(1, 8), 0, random.next_i32_between(1, 7)),
-        origin.offset(-16 + random.next_i32_between(1, 8), 0, -16 + random.next_i32_between(4, 8)),
-        origin.offset(random.next_i32_between(1, 7), 0, 16 + random.next_i32_between(1, 7)),
-        origin.offset(random.next_i32_between(1, 7), 0, -16 + random.next_i32_between(4, 6)),
-        origin.offset(16 + random.next_i32_between(1, 7), 0, 16 + random.next_i32_between(3, 8)),
-        origin.offset(16 + random.next_i32_between(1, 7), 0, random.next_i32_between(1, 7)),
-        origin.offset(16 + random.next_i32_between(1, 7), 0, -16 + random.next_i32_between(4, 8)),
+        origin.offset(
+            -16 + random.next_i32_between(1, 8),
+            0,
+            16 + random.next_i32_between(1, 7),
+        ),
+        origin.offset(
+            -16 + random.next_i32_between(1, 8),
+            0,
+            random.next_i32_between(1, 7),
+        ),
+        origin.offset(
+            -16 + random.next_i32_between(1, 8),
+            0,
+            -16 + random.next_i32_between(4, 8),
+        ),
+        origin.offset(
+            random.next_i32_between(1, 7),
+            0,
+            16 + random.next_i32_between(1, 7),
+        ),
+        origin.offset(
+            random.next_i32_between(1, 7),
+            0,
+            -16 + random.next_i32_between(4, 6),
+        ),
+        origin.offset(
+            16 + random.next_i32_between(1, 7),
+            0,
+            16 + random.next_i32_between(3, 8),
+        ),
+        origin.offset(
+            16 + random.next_i32_between(1, 7),
+            0,
+            random.next_i32_between(1, 7),
+        ),
+        origin.offset(
+            16 + random.next_i32_between(1, 7),
+            0,
+            -16 + random.next_i32_between(4, 8),
+        ),
     ]
 }
 
@@ -325,7 +357,10 @@ pub struct OceanRuinPiece {
 }
 
 impl OceanRuinPiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     fn new(
         template_location: &Identifier,
         position: BlockPos,
@@ -340,10 +375,7 @@ impl OceanRuinPiece {
             make_settings(rotation, integrity, biome_type),
             position,
         );
-        StructurePiece::new(
-            base,
-            PieceKind::OceanRuin(Self { template, is_large }),
-        )
+        StructurePiece::new(base, PieceKind::OceanRuin(Self { template, is_large }))
     }
 
     pub fn post_process(

@@ -7,6 +7,7 @@ use crate::registry::blocks::vanilla_blocks;
 use crate::util::ident::BlockState;
 use crate::util::math::{clamp, map, map_clamped};
 use crate::util::rng::RandomFactory;
+use crate::worldgen::backend::jit::RouterEntry;
 use crate::worldgen::density::{ColumnCache, Noises};
 
 const Y_SPACING: i32 = 12;
@@ -157,14 +158,19 @@ const fn unpack_z(packed: i64) -> i32 {
 }
 
 #[inline]
+fn router(entry: Option<RouterEntry>, name: &str) -> RouterEntry {
+    entry.unwrap_or_else(|| panic!("no router entry named {name}"))
+}
+
+#[inline]
 fn similarity(dist_sq1: i32, dist_sq2: i32) -> f64 {
     1.0 - f64::from(dist_sq2 - dist_sq1) / 25.0
 }
 
 fn is_deep_dark_region(noises: &Noises, cache: &mut ColumnCache, x: i32, y: i32, z: i32) -> bool {
     cache.ensure(x, z, noises);
-    let erosion = cache.router("erosion", x, y, z, noises);
-    let depth = cache.router("depth", x, y, z, noises);
+    let erosion = cache.router_at(router(noises.compiled().routers().erosion, "erosion"), x, y, z, noises);
+    let depth = cache.router_at(router(noises.compiled().routers().depth, "depth"), x, y, z, noises);
     erosion < -0.225 && depth > 0.9
 }
 
@@ -720,8 +726,16 @@ impl Aquifer {
 
                 self.cache.ensure(x, z, noises);
                 let floodedness_noise = clamp(
-                    self.cache
-                        .router("fluid_level_floodedness", x, y, z, noises),
+                    self.cache.router_at(
+                        router(
+                            noises.compiled().routers().fluid_level_floodedness,
+                            "fluid_level_floodedness",
+                        ),
+                        x,
+                        y,
+                        z,
+                        noises,
+                    ),
                     -1.0,
                     1.0,
                 );
@@ -760,7 +774,16 @@ impl Aquifer {
         self.cache.ensure(cell_x, cell_z, noises);
         let spread = self
             .cache
-            .router("fluid_level_spread", cell_x, cell_y, cell_z, noises)
+            .router_at(
+                router(
+                    noises.compiled().routers().fluid_level_spread,
+                    "fluid_level_spread",
+                ),
+                cell_x,
+                cell_y,
+                cell_z,
+                noises,
+            )
             * 10.0;
         let spread_quantized = quantize(spread, 3);
         let target = cell_middle_y + spread_quantized;
@@ -782,7 +805,13 @@ impl Aquifer {
             let cell_y = y.div_euclid(40);
             let cell_z = z.div_euclid(64);
             self.cache.ensure(cell_x, cell_z, noises);
-            let lava_noise = self.cache.router("lava", cell_x, cell_y, cell_z, noises);
+            let lava_noise = self.cache.router_at(
+                router(noises.compiled().routers().lava, "lava"),
+                cell_x,
+                cell_y,
+                cell_z,
+                noises,
+            );
             if lava_noise.abs() > 0.3 {
                 return self.lava_id;
             }
@@ -844,7 +873,13 @@ impl Aquifer {
             0.0
         } else if barrier_noise.is_nan() {
             self.cache.ensure(x, z, noises);
-            let n = self.cache.router("barrier", x, y, z, noises);
+            let n = self.cache.router_at(
+                router(noises.compiled().routers().barrier, "barrier"),
+                x,
+                y,
+                z,
+                noises,
+            );
             *barrier_noise = n;
             n
         } else {
@@ -866,7 +901,16 @@ pub fn preliminary_surface_level(noises: &Noises, cache: &mut ColumnCache, x: i3
     let qz = (z >> 2) << 2;
     cache.ensure(qx, qz, noises);
     cache
-        .router("preliminary_surface_level", qx, 0, qz, noises)
+        .router_at(
+            router(
+                noises.compiled().routers().preliminary_surface_level,
+                "preliminary_surface_level",
+            ),
+            qx,
+            0,
+            qz,
+            noises,
+        )
         .floor() as i32
 }
 
@@ -892,16 +936,13 @@ fn cached_preliminary_surface_level(
     reason = "test loads the checked-in vanilla datapack"
 )]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use crate::util::ident::Identifier;
+
     use std::sync::Once;
 
     use super::*;
     use crate::registry::Registries;
     use crate::worldgen::backend::ir::loader::DatapackSource;
-
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
 
     fn init_global_registry() {
         static INIT: Once = Once::new();
@@ -915,9 +956,14 @@ mod tests {
     fn compute_substance_never_places_fluid_above_solid_density() {
         init_global_registry();
 
-        let source = DatapackSource::new(datapack_root());
+        let source = DatapackSource::builtin();
         let registry = source.density_function_registry().unwrap();
-        let (program, settings) = source.program("overworld", "Overworld", &registry).unwrap();
+        let (program, settings) = source
+            .program(
+                &Identifier::new(Identifier::VANILLA_NAMESPACE, "overworld"),
+                &registry,
+            )
+            .unwrap();
         let params = source.noise_parameters().unwrap();
         let noises = Noises::new(&program, &settings, &params, 42).unwrap();
 

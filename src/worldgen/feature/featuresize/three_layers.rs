@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ThreeLayersFeatureSize {
     #[serde(default = "default_limit")]
     pub limit: i32,

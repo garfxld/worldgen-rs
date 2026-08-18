@@ -13,7 +13,6 @@ const LEAVES: Identifier = Identifier::const_vanilla("leaves");
 const REPLACEABLE_BY_MUSHROOMS: Identifier = Identifier::const_vanilla("replaceable_by_mushrooms");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct HugeMushroomConfig {
     pub can_place_on: BlockPredicate,
     pub cap_provider: BlockStateProvider,
@@ -53,10 +52,19 @@ pub fn place(
     true
 }
 
-const fn tree_radius_for_height(variant: MushroomVariant, tree_height: i32, leaf_radius: i32, yo: i32) -> i32 {
+const fn tree_radius_for_height(
+    variant: MushroomVariant,
+    tree_height: i32,
+    leaf_radius: i32,
+    yo: i32,
+) -> i32 {
     match variant {
         MushroomVariant::Brown => {
-            if yo <= 3 { 0 } else { leaf_radius }
+            if yo <= 3 {
+                0
+            } else {
+                leaf_radius
+            }
         }
         MushroomVariant::Red => {
             if yo >= tree_height - 3 && yo <= tree_height {
@@ -96,9 +104,17 @@ fn is_valid_position(
     true
 }
 
-fn place_mushroom_block(region: &WorldGenRegion<'_>, pos: BlockPos, state: crate::util::ident::BlockState) {
+fn place_mushroom_block(
+    region: &WorldGenRegion<'_>,
+    pos: BlockPos,
+    state: crate::util::ident::BlockState,
+) {
     let current = region.get_block(pos);
-    if current.is_air() || REGISTRY.blocks.is_in_tag(&current.get_block().key, &REPLACEABLE_BY_MUSHROOMS) {
+    if current.is_air()
+        || REGISTRY
+            .blocks
+            .is_in_tag(&current.get_block().key, &REPLACEABLE_BY_MUSHROOMS)
+    {
         region.set_block(pos, state);
     }
 }
@@ -136,7 +152,11 @@ fn make_cap(
     match variant {
         MushroomVariant::Red => {
             for dy in (height - 3)..=height {
-                let radius = if dy < height { config.foliage_radius } else { config.foliage_radius - 1 };
+                let radius = if dy < height {
+                    config.foliage_radius
+                } else {
+                    config.foliage_radius - 1
+                };
                 let center = config.foliage_radius - 2;
                 for dx in -radius..=radius {
                     for dz in -radius..=radius {
@@ -151,7 +171,10 @@ fn make_cap(
                         }
                         let pos = origin.offset(dx, dy, dz);
                         let mut state = config.cap_provider.get_state(region, random, origin);
-                        if HAS_ALL_FACES.iter().all(|p| state.try_get_value(*p).is_some()) {
+                        if HAS_ALL_FACES
+                            .iter()
+                            .all(|p| state.try_get_value(*p).is_some())
+                        {
                             state = state
                                 .set_value(&Properties::UP, dy >= height - 1)
                                 .set_value(&Properties::WEST, dx < -center)
@@ -183,9 +206,14 @@ fn make_cap(
                     let north = min_z || (x_edge && dz == 1 - radius);
                     let south = max_z || (x_edge && dz == radius - 1);
                     let mut state = config.cap_provider.get_state(region, random, origin);
-                    if [&Properties::WEST, &Properties::EAST, &Properties::NORTH, &Properties::SOUTH]
-                        .iter()
-                        .all(|p| state.try_get_value(*p).is_some())
+                    if [
+                        &Properties::WEST,
+                        &Properties::EAST,
+                        &Properties::NORTH,
+                        &Properties::SOUTH,
+                    ]
+                    .iter()
+                    .all(|p| state.try_get_value(*p).is_some())
                     {
                         state = state
                             .set_value(&Properties::WEST, west)

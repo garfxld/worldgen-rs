@@ -22,7 +22,6 @@ use crate::worldgen::region::WorldGenRegion;
 const BASE_STONE_OVERWORLD: Identifier = Identifier::const_vanilla("base_stone_overworld");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct LargeDripstoneConfig {
     #[serde(default = "default_floor_to_ceiling_search_range")]
     pub floor_to_ceiling_search_range: i32,
@@ -294,10 +293,10 @@ pub fn place(
         WindOffsetter::no_wind()
     };
 
-    let stalactite_base_embedded_in_stone =
-        stalactite.move_back_until_base_is_inside_stone_and_shrink_radius_if_necessary(region, &wind);
-    let stalagmite_base_embedded_in_stone =
-        stalagmite.move_back_until_base_is_inside_stone_and_shrink_radius_if_necessary(region, &wind);
+    let stalactite_base_embedded_in_stone = stalactite
+        .move_back_until_base_is_inside_stone_and_shrink_radius_if_necessary(region, &wind);
+    let stalagmite_base_embedded_in_stone = stalagmite
+        .move_back_until_base_is_inside_stone_and_shrink_radius_if_necessary(region, &wind);
 
     if stalactite_base_embedded_in_stone {
         stalactite.place_blocks(region, random, &wind);

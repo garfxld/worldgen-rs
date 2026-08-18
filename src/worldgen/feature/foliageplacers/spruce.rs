@@ -4,7 +4,6 @@ use crate::util::rng::RandomSource;
 use crate::util::value_providers::int::IntProvider;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SpruceFoliagePlacer {
     pub radius: IntProvider,
     pub offset: IntProvider,

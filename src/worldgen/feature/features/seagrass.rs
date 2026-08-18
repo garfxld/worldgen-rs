@@ -13,7 +13,6 @@ use crate::worldgen::region::WorldGenRegion;
 const CANNOT_SUPPORT_SEAGRASS: Identifier = Identifier::const_vanilla("cannot_support_seagrass");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SeagrassConfig {
     pub probability: f32,
 }

@@ -13,14 +13,16 @@ use crate::worldgen::region::WorldGenRegion;
 use super::giant::GiantTrunkPlacer;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MegaJungleTrunkPlacer {
     #[serde(flatten)]
     pub giant: GiantTrunkPlacer,
 }
 
 impl MegaJungleTrunkPlacer {
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla MegaJungleTrunkPlacer.placeTrunk")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla MegaJungleTrunkPlacer.placeTrunk"
+    )]
     pub fn place_trunk(
         &self,
         placer: &super::TrunkPlacer,
@@ -31,9 +33,15 @@ impl MegaJungleTrunkPlacer {
         origin: BlockPos,
         config: &TreeConfig,
     ) -> Vec<FoliageAttachment> {
-        let mut attachments =
-            self.giant
-                .place_trunk(placer, region, trunk_setter, random, tree_height, origin, config);
+        let mut attachments = self.giant.place_trunk(
+            placer,
+            region,
+            trunk_setter,
+            random,
+            tree_height,
+            origin,
+            config,
+        );
 
         let mut branch_height = tree_height - 2 - random.next_i32_bounded(4);
         while branch_height > tree_height / 2 {

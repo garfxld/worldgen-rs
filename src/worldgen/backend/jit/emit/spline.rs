@@ -44,7 +44,10 @@ fn emit_spline_f32(
 
     let mut fallthrough = branch_if_below(builder, coord, first.location);
     {
-        let value = point_value(builder, ctx, &first.value)?;
+        let outer = ctx.ref_memo.clone();
+        let value = point_value(builder, ctx, &first.value);
+        ctx.ref_memo = outer;
+        let value = value?;
         let result = extrapolate(builder, value, first.derivative, first.location, coord);
         builder.ins().jump(merge, &[result.into()]);
     }
@@ -57,8 +60,11 @@ fn emit_spline_f32(
         builder.seal_block(fallthrough);
         fallthrough = branch_if_below(builder, coord, hi.location);
 
-        let y1 = point_value(builder, ctx, &lo.value)?;
-        let y2 = point_value(builder, ctx, &hi.value)?;
+        let outer = ctx.ref_memo.clone();
+        let pair = point_value(builder, ctx, &lo.value)
+            .and_then(|y1| point_value(builder, ctx, &hi.value).map(|y2| (y1, y2)));
+        ctx.ref_memo = outer;
+        let (y1, y2) = pair?;
         let result = hermite(
             builder,
             HermiteSegment {
@@ -78,7 +84,10 @@ fn emit_spline_f32(
     builder.seal_block(fallthrough);
     {
         let point = &spline.points[last_index];
-        let value = point_value(builder, ctx, &point.value)?;
+        let outer = ctx.ref_memo.clone();
+        let value = point_value(builder, ctx, &point.value);
+        ctx.ref_memo = outer;
+        let value = value?;
         let result = extrapolate(builder, value, point.derivative, point.location, coord);
         builder.ins().jump(merge, &[result.into()]);
     }

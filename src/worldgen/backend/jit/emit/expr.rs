@@ -39,6 +39,7 @@ pub struct EmitCtx<'a> {
     pub(crate) interpolated: Option<Value>,
     pub(crate) end_islands: Option<EndIslandsCall>,
     pub(crate) interp_index: usize,
+    pub(crate) ref_memo: FxHashMap<String, Value>,
 }
 
 #[derive(Clone, Copy)]
@@ -237,40 +238,46 @@ pub fn emit(
         },
 
         DensityFunction::Reference(r) => {
+            let memoizable = ctx.interpolated.is_none();
+            if memoizable && let Some(value) = ctx.ref_memo.get(&r.id) {
+                return Ok(*value);
+            }
+
             let must_inline = (ctx.interpolated.is_some()
                 && ctx.analysis.interpolated_refs.contains(&r.id))
                 || (ctx.fill.is_some() && ctx.analysis.blended_noise_refs.contains(&r.id));
 
-            if must_inline {
+            let value = if must_inline {
                 let target = ctx
                     .program
                     .registry
                     .get(&r.id)
                     .ok_or(Unsupported("unresolved density function reference"))?;
-                return emit(builder, ctx, target);
-            }
-
-            if let Some(offset) = ctx.layout.named_offset(&r.id) {
-                return Ok(ctx.load_slot(builder, offset));
-            }
-
-            if ctx.inlining.should_inline(&r.id) {
+                emit(builder, ctx, target)?
+            } else if let Some(offset) = ctx.layout.named_offset(&r.id) {
+                ctx.load_slot(builder, offset)
+            } else if ctx.inlining.should_inline(&r.id) {
                 let target = ctx
                     .program
                     .registry
                     .get(&r.id)
                     .ok_or(Unsupported("unresolved density function reference"))?;
                 let inner = unwrap_markers(target);
-                return emit(builder, ctx, inner);
-            }
+                emit(builder, ctx, inner)?
+            } else {
+                let func = *ctx
+                    .named_refs
+                    .get(&r.id)
+                    .ok_or(Unsupported("reference to an uncompiled density function"))?;
+                let args = [ctx.cache, ctx.pos.x, ctx.pos.y, ctx.pos.z];
+                let call = builder.ins().call(func, &args);
+                builder.inst_results(call)[0]
+            };
 
-            let func = *ctx
-                .named_refs
-                .get(&r.id)
-                .ok_or(Unsupported("reference to an uncompiled density function"))?;
-            let args = [ctx.cache, ctx.pos.x, ctx.pos.y, ctx.pos.z];
-            let call = builder.ins().call(func, &args);
-            Ok(builder.inst_results(call)[0])
+            if memoizable {
+                ctx.ref_memo.insert(r.id.clone(), value);
+            }
+            Ok(value)
         }
 
         DensityFunction::Spline(s) => emit_spline(builder, ctx, &s.spline),
@@ -344,11 +351,13 @@ pub fn emit(
             builder.seal_block(body);
             let outer_y = ctx.pos.y;
             let outer_flat = ctx.is_flat;
+            let outer_memo = std::mem::take(&mut ctx.ref_memo);
             ctx.pos.y = y;
             ctx.is_flat = false;
             let density = emit(builder, ctx, &fts.density);
             ctx.pos.y = outer_y;
             ctx.is_flat = outer_flat;
+            ctx.ref_memo = outer_memo;
             let density = density?;
             let zero = math::f64_const(builder, 0.0);
             let solid = builder.ins().fcmp(FloatCC::GreaterThan, density, zero);

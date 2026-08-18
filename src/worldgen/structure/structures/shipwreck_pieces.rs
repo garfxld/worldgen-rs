@@ -93,7 +93,10 @@ pub struct ShipwreckPiece {
 }
 
 impl ShipwreckPiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     fn new(
         location: &Identifier,
         position: BlockPos,

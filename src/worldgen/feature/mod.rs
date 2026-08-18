@@ -1,26 +1,26 @@
-pub mod state_provider;
 pub mod configured_feature;
-pub mod featuresize;
 pub mod features;
-pub mod multiface;
-pub mod sculk;
+pub mod featuresize;
 pub mod foliageplacers;
+pub mod multiface;
 pub mod rootplacers;
 pub mod rule_test;
+pub mod sculk;
 pub mod sorter;
+pub mod state_provider;
 pub mod treedecorators;
 pub mod trunkplacers;
 
-use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde_json::Value;
 
+use crate::datapack::{self, Datapack};
+use crate::datapack::{collect_json_files, path_to_id, read_and_parse_normalized};
+use crate::datapack::{parse_id, parse_json, type_of, value_list};
 use crate::registry::REGISTRY;
 use crate::registry::biome::BiomeRef;
-use crate::util::datapack::{collect_json_files, path_to_id, read_and_parse_normalized};
-use crate::util::datapack::{parse_id, parse_json, type_of, value_list};
 use crate::util::ident::Identifier;
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
@@ -194,14 +194,10 @@ pub fn flush_trace() {
     }
 }
 
-static FEATURES: LazyLock<FeatureRegistry> = LazyLock::new(|| load(&vanilla_worldgen_dir()));
+static FEATURES: LazyLock<FeatureRegistry> = LazyLock::new(|| load(datapack::active()));
 
 pub fn features() -> &'static FeatureRegistry {
     &FEATURES
-}
-
-fn vanilla_worldgen_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
 }
 
 struct Loader {
@@ -214,10 +210,10 @@ struct Loader {
     next_placed_id: usize,
 }
 
-fn load(worldgen_dir: &Path) -> FeatureRegistry {
+fn load(pack: &Datapack) -> FeatureRegistry {
     let mut loader = Loader {
-        configured_json: read_directory(&worldgen_dir.join("configured_feature")),
-        placed_json: read_directory(&worldgen_dir.join("placed_feature")),
+        configured_json: read_directory(pack, "worldgen/configured_feature"),
+        placed_json: read_directory(pack, "worldgen/placed_feature"),
         configured: FxHashMap::default(),
         placed: FxHashMap::default(),
         resolving_placed: FxHashSet::default(),
@@ -265,16 +261,17 @@ fn load(worldgen_dir: &Path) -> FeatureRegistry {
     }
 }
 
-fn read_directory(directory: &Path) -> FxHashMap<Identifier, Value> {
-    collect_json_files(directory)
-        .into_iter()
-        .map(|file| {
-            let key = parse_id(&path_to_id("minecraft", &file, directory));
+fn read_directory(pack: &Datapack, relative: &str) -> FxHashMap<Identifier, Value> {
+    let mut entries = FxHashMap::default();
+    for (namespace, directory) in pack.namespaced_dirs(relative) {
+        for file in collect_json_files(&directory) {
+            let key = parse_id(&path_to_id(&namespace, &file, &directory));
             let json: Value = read_and_parse_normalized(&file)
                 .unwrap_or_else(|e| panic!("failed to load {}: {e}", file.display()));
-            (key, json)
-        })
-        .collect()
+            entries.insert(key, json);
+        }
+    }
+    entries
 }
 
 impl Loader {
@@ -359,7 +356,9 @@ impl Loader {
     fn root_system_config(&mut self, config: &Value) -> RootSystemConfig {
         RootSystemConfig {
             feature: self.placed_feature_ref(&config["feature"]),
-            required_vertical_space_for_tree: parse_json(&config["required_vertical_space_for_tree"]),
+            required_vertical_space_for_tree: parse_json(
+                &config["required_vertical_space_for_tree"],
+            ),
             level_test_distance: parse_json(&config["level_test_distance"]),
             max_level_deviation: parse_json(&config["max_level_deviation"]),
             root_radius: parse_json(&config["root_radius"]),
@@ -555,7 +554,10 @@ mod tests {
             .filter(|(_, feature)| matches!(feature, ConfiguredFeature::Unported(_)))
             .map(|(key, _)| key)
             .collect();
-        assert!(unported.is_empty(), "unported configured features: {unported:?}");
+        assert!(
+            unported.is_empty(),
+            "unported configured features: {unported:?}"
+        );
     }
 
     #[test]

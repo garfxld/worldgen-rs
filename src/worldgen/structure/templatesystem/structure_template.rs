@@ -2,8 +2,8 @@ use glam::IVec3;
 use simdnbt::owned::{NbtCompound, NbtList, NbtTag};
 
 use crate::registry::REGISTRY;
-use crate::registry::blocks::shapes::is_shape_full_block;
 use crate::registry::blocks::properties::Properties;
+use crate::registry::blocks::shapes::is_shape_full_block;
 use crate::registry::blocks::transform;
 use crate::registry::blocks::vanilla_blocks;
 use crate::registry::fluid::{FluidState, vanilla_fluids};
@@ -90,7 +90,11 @@ fn nbt_identifier(nbt: &NbtCompound, key: &str) -> Option<Identifier> {
 }
 
 fn joint_type(nbt: &NbtCompound, state: BlockState) -> JointType {
-    match nbt.string("joint").map(|value| value.to_string()).as_deref() {
+    match nbt
+        .string("joint")
+        .map(|value| value.to_string())
+        .as_deref()
+    {
         Some("rollable") => JointType::Rollable,
         Some("aligned") => JointType::Aligned,
         _ => {
@@ -185,10 +189,7 @@ impl StructureTemplate {
     pub fn load(nbt: &NbtCompound) -> Self {
         let mut template = Self::default();
 
-        let size = nbt
-            .list("size")
-            .and_then(NbtList::ints)
-            .unwrap_or_default();
+        let size = nbt.list("size").and_then(NbtList::ints).unwrap_or_default();
         template.size = IVec3::new(
             size.first().copied().unwrap_or_default(),
             size.get(1).copied().unwrap_or_default(),
@@ -205,9 +206,7 @@ impl StructureTemplate {
             let variants = palette_list_list.lists().unwrap_or(&[]);
             for variant in variants {
                 let entries = variant.compounds().unwrap_or(&[]);
-                template
-                    .palettes
-                    .push(load_palette(entries, &block_list));
+                template.palettes.push(load_palette(entries, &block_list));
             }
         } else {
             let entries = nbt
@@ -217,10 +216,7 @@ impl StructureTemplate {
             template.palettes.push(load_palette(entries, &block_list));
         }
 
-        if let Some(entities) = nbt
-            .list("entities")
-            .and_then(NbtList::compounds)
-        {
+        if let Some(entities) = nbt.list("entities").and_then(NbtList::compounds) {
             for entity in entities {
                 let pos = entity
                     .list("pos")
@@ -305,7 +301,8 @@ impl StructureTemplate {
             return result;
         }
         let bounding_box = settings.bounding_box();
-        let palette = &self.palettes[settings.random_palette(self.palettes.len(), position, random)];
+        let palette =
+            &self.palettes[settings.random_palette(self.palettes.len(), position, random)];
 
         for info in palette.blocks_of(block) {
             let pos = if absolute {
@@ -346,14 +343,8 @@ impl StructureTemplate {
         let bounding_box = settings.bounding_box();
         let mut to_fill: Vec<BlockPos> = Vec::new();
         let mut locked_fluids: Vec<BlockPos> = Vec::new();
-        let processed = process_block_infos(
-            region,
-            position,
-            reference_pos,
-            settings,
-            blocks,
-            random,
-        );
+        let processed =
+            process_block_infos(region, position, reference_pos, settings, blocks, random);
 
         for info in &processed {
             if !bounding_box.is_none_or(|bounds| bounds.is_inside(info.pos)) {
@@ -582,8 +573,7 @@ pub fn process_block_infos(
 
     for info in blocks {
         let pos = offset(calculate_relative_position(settings, info.pos), position);
-        if process_only_in_current_chunk
-            && !chunk_bounds.is_none_or(|bounds| bounds.is_inside(pos))
+        if process_only_in_current_chunk && !chunk_bounds.is_none_or(|bounds| bounds.is_inside(pos))
         {
             continue;
         }
@@ -695,9 +685,7 @@ pub const fn zero_position_with_transform(
     };
 
     match rotation {
-        Rotation::CounterClockwise90 => {
-            zero_pos.offset(mirror_delta_z, 0, size_x - mirror_delta_x)
-        }
+        Rotation::CounterClockwise90 => zero_pos.offset(mirror_delta_z, 0, size_x - mirror_delta_x),
         Rotation::Clockwise90 => zero_pos.offset(size_z - mirror_delta_z, 0, mirror_delta_x),
         Rotation::Clockwise180 => {
             zero_pos.offset(size_x - mirror_delta_x, 0, size_z - mirror_delta_z)
@@ -735,12 +723,7 @@ fn is_liquid_block_container(state: BlockState) -> bool {
         .any(|(property, _)| *property == "waterlogged")
 }
 
-fn place_liquid(
-    region: &WorldGenRegion<'_>,
-    pos: BlockPos,
-    state: BlockState,
-    fluid: FluidState,
-) {
+fn place_liquid(region: &WorldGenRegion<'_>, pos: BlockPos, state: BlockState, fluid: FluidState) {
     if fluid.fluid_id.key != vanilla_fluids::WATER.key {
         return;
     }
@@ -799,10 +782,12 @@ mod tests {
             .blocks
             .by_key(&Identifier::const_vanilla("bone_block"))
             .expect("bone_block should exist");
-        assert!(blocks.iter().all(|info| REGISTRY
-            .blocks
-            .by_state_id(info.state)
-            .is_some_and(|block| block.key == bone_block.key)));
+        assert!(blocks.iter().all(|info| {
+            REGISTRY
+                .blocks
+                .by_state_id(info.state)
+                .is_some_and(|block| block.key == bone_block.key)
+        }));
     }
 
     #[test]

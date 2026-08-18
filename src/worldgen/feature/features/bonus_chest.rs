@@ -24,9 +24,7 @@ pub fn place(region: &WorldGenRegion<'_>, random: &mut RandomSource, origin: Blo
             let y = region.get_height(HeightmapType::MotionBlockingNoLeaves, x, z);
             let chest_pos = BlockPos::new(x, y, z);
             let state = region.get_block(chest_pos);
-            if state.is_air()
-                || state.get_collision_shape_at(chest_pos).is_empty()
-            {
+            if state.is_air() || state.get_collision_shape_at(chest_pos).is_empty() {
                 region.set_block(chest_pos, vanilla_blocks::CHEST.default_state());
                 random.next_i64();
 

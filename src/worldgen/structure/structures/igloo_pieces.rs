@@ -1,5 +1,5 @@
-use crate::registry::blocks::vanilla_blocks;
 use crate::chunk::heightmap::HeightmapType;
+use crate::registry::blocks::vanilla_blocks;
 use crate::util::geometry::BoundingBox;
 use crate::util::ident::Identifier;
 use crate::util::mirror::Mirror;
@@ -88,7 +88,10 @@ pub struct IglooPiece {
 }
 
 impl IglooPiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     fn new(
         location: &Identifier,
         position: BlockPos,
@@ -97,7 +100,11 @@ impl IglooPiece {
     ) -> StructurePiece {
         let template_offset = offset(location);
         let template_position = position
-            .offset(template_offset.x(), template_offset.y(), template_offset.z())
+            .offset(
+                template_offset.x(),
+                template_offset.y(),
+                template_offset.z(),
+            )
             .below_n(depth);
         let (base, template) = TemplateStructurePiece::new(
             0,

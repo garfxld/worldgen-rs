@@ -1,5 +1,5 @@
-use crate::registry::blocks::vanilla_blocks;
 use crate::registry::blocks::transform;
+use crate::registry::blocks::vanilla_blocks;
 use crate::util::geometry::BoundingBox;
 use crate::util::ident::Identifier;
 use crate::util::mirror::Mirror;
@@ -64,7 +64,10 @@ pub struct NetherFossilPiece {
 }
 
 impl NetherFossilPiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     fn new(location: &Identifier, position: BlockPos, rotation: Rotation) -> StructurePiece {
         let (base, template) =
             TemplateStructurePiece::new(0, location, make_settings(rotation), position);
@@ -79,10 +82,10 @@ impl NetherFossilPiece {
         chunk_bb: BoundingBox,
         reference_pos: BlockPos,
     ) {
-        let fossil_bb = self
-            .template
-            .template
-            .get_bounding_box(&self.template.place_settings, self.template.template_position);
+        let fossil_bb = self.template.template.get_bounding_box(
+            &self.template.place_settings,
+            self.template.template_position,
+        );
         let chunk_bb = chunk_bb.encapsulate_box(fossil_bb);
         self.template.post_process(
             base,

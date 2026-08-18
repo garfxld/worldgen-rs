@@ -244,15 +244,9 @@ fn default_feature_jigsaw_state() -> BlockState {
 fn default_feature_jigsaw_nbt() -> NbtCompound {
     let mut nbt = NbtCompound::new();
     nbt.insert("name", NbtTag::String("minecraft:bottom".into()));
-    nbt.insert(
-        "final_state",
-        NbtTag::String("minecraft:air".into()),
-    );
+    nbt.insert("final_state", NbtTag::String("minecraft:air".into()));
     nbt.insert("pool", NbtTag::String("minecraft:empty".into()));
-    nbt.insert(
-        "target",
-        NbtTag::String("minecraft:empty".into()),
-    );
+    nbt.insert("target", NbtTag::String("minecraft:empty".into()));
     nbt.insert("joint", NbtTag::String("rollable".into()));
     nbt
 }

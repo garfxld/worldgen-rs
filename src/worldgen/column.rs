@@ -43,14 +43,7 @@ impl Column {
             return None;
         }
 
-        let ceiling = scan_direction(
-            region,
-            search_range,
-            &inside_column,
-            &valid_edge,
-            pos,
-            true,
-        );
+        let ceiling = scan_direction(region, search_range, &inside_column, &valid_edge, pos, true);
         let floor = scan_direction(
             region,
             search_range,

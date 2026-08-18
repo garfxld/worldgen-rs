@@ -3,12 +3,10 @@ use std::simd::f64x4;
 use crate::util::math::lerp;
 use crate::worldgen::density::{Beardifier, ColumnCache, Noises};
 
-const MAX_INTERP: usize = 16;
-const MAX_SLICE_LEN: usize = 1024;
-
 pub struct NoiseChunk {
-    slices: Vec<Box<[f64; MAX_INTERP * MAX_SLICE_LEN]>>,
+    slices: Vec<Box<[f64]>>,
     interp_count: usize,
+    stride: usize,
     corners_y: usize,
     block_ys: Vec<i32>,
     first_cell_x: i32,
@@ -36,14 +34,7 @@ impl NoiseChunk {
         let slice_len = z_corners * corners_y;
 
         let interp_count = noises.compiled().interpolated_count();
-        assert!(
-            slice_len <= MAX_SLICE_LEN,
-            "slice_len {slice_len} exceeds MAX_SLICE_LEN {MAX_SLICE_LEN}"
-        );
-        assert!(
-            interp_count <= MAX_INTERP,
-            "interp_count {interp_count} exceeds MAX_INTERP {MAX_INTERP}"
-        );
+        let stride = interp_count.next_multiple_of(4);
 
         let block_ys: Vec<i32> = (0..corners_y)
             .map(|cy| (cy as i32 + cell_min_y) * cell_height)
@@ -52,12 +43,13 @@ impl NoiseChunk {
         let n_slices = cell_count_xz + 1;
         let mut slices = Vec::with_capacity(n_slices);
         for _ in 0..n_slices {
-            slices.push(Box::new([0.0; MAX_INTERP * MAX_SLICE_LEN]));
+            slices.push(vec![0.0; stride * slice_len].into_boxed_slice());
         }
 
         Self {
             slices,
             interp_count,
+            stride,
             corners_y,
             block_ys,
             first_cell_x,
@@ -94,6 +86,7 @@ impl NoiseChunk {
         let cell_height = noises.cell_height();
         let corners_y = self.corners_y;
         let interp_count = self.interp_count;
+        let stride = self.stride;
         let combine_final = noises.compiled().combine_final();
 
         let mut local_blended = vec![0.0f64; corners_y];
@@ -105,6 +98,7 @@ impl NoiseChunk {
                 &self.block_ys,
                 &mut local_blended,
                 interp_count,
+                self.stride,
                 corners_y,
                 self.cell_count_xz,
                 self.first_cell_z,
@@ -114,7 +108,7 @@ impl NoiseChunk {
         }
 
         let zero_cache = vec![0.0f64; noises.compiled().slots()];
-        let mut interpolated = [0.0f64; MAX_INTERP];
+        let mut interpolated = vec![0.0f64; self.stride];
         let factor_x = f64::from(block_x.rem_euclid(cell_width)) / f64::from(cell_width);
         let factor_z = f64::from(block_z.rem_euclid(cell_width)) / f64::from(cell_width);
 
@@ -123,10 +117,10 @@ impl NoiseChunk {
                 let factor_y = f64::from(y_in_cell) / f64::from(cell_height);
                 let world_y = (self.cell_min_y + cell_y_idx as i32) * cell_height + y_in_cell;
 
-                let i0_base = cell_y_idx * MAX_INTERP;
-                let i1_base = (corners_y + cell_y_idx) * MAX_INTERP;
-                let i0_next = i0_base + MAX_INTERP;
-                let i1_next = i1_base + MAX_INTERP;
+                let i0_base = cell_y_idx * stride;
+                let i1_base = (corners_y + cell_y_idx) * stride;
+                let i0_next = i0_base + stride;
+                let i1_next = i1_base + stride;
                 let s0 = &*self.slices[0];
                 let s1 = &*self.slices[1];
 
@@ -186,11 +180,12 @@ impl NoiseChunk {
         reason = "slice filling needs the precomputed geometry and per-thread cache"
     )]
     fn fill_column_slice(
-        slice: &mut [f64; MAX_INTERP * MAX_SLICE_LEN],
+        slice: &mut [f64],
         cell_x: i32,
         block_ys: &[i32],
         blended_column: &mut [f64],
         interp_count: usize,
+        stride: usize,
         corners_y: usize,
         cell_count_xz: usize,
         first_cell_z: i32,
@@ -202,8 +197,8 @@ impl NoiseChunk {
         let fill = noises.compiled().fill();
         let fill_4x = noises.compiled().fill_4x();
 
-        let mut values = [0.0f64; MAX_INTERP];
-        let mut values_4x = [0.0f64; 4 * MAX_INTERP];
+        let mut values = vec![0.0f64; stride];
+        let mut values_4x = vec![0.0f64; 4 * stride];
 
         for cz in 0..=cell_count_xz {
             let cell_z = first_cell_z + cz as i32;
@@ -245,7 +240,7 @@ impl NoiseChunk {
                     let lane_cy = cy + lane;
                     let src = &values_4x[lane * interp_count..(lane + 1) * interp_count];
                     let corner_idx = cz * corners_y + lane_cy;
-                    let base = corner_idx * MAX_INTERP;
+                    let base = corner_idx * stride;
                     slice[base..base + interp_count].copy_from_slice(src);
                 }
 
@@ -269,7 +264,7 @@ impl NoiseChunk {
                 }
 
                 let corner_idx = cz * corners_y + cy;
-                let base = corner_idx * MAX_INTERP;
+                let base = corner_idx * stride;
                 slice[base..base + interp_count].copy_from_slice(&values[..interp_count]);
 
                 cy += 1;
@@ -291,6 +286,7 @@ impl NoiseChunk {
         let cell_count_xz = self.cell_count_xz;
         let cell_count_y = self.cell_count_y;
         let interp_count = self.interp_count;
+        let stride = self.stride;
         let corners_y = self.corners_y;
         let first_cell_x = self.first_cell_x;
         let first_cell_z = self.first_cell_z;
@@ -307,6 +303,7 @@ impl NoiseChunk {
                 block_ys,
                 &mut local_blended,
                 interp_count,
+                stride,
                 corners_y,
                 cell_count_xz,
                 first_cell_z,
@@ -316,7 +313,7 @@ impl NoiseChunk {
         }
 
         let zero_cache = vec![0.0f64; noises.compiled().slots()];
-        let mut interpolated = [0.0f64; MAX_INTERP];
+        let mut interpolated = vec![0.0f64; stride];
 
         for cell_x_idx in 0..cell_count_xz {
             for cell_z_idx in 0..cell_count_xz {
@@ -338,10 +335,10 @@ impl NoiseChunk {
                                 let world_y =
                                     (self.cell_min_y + cell_y_idx as i32) * cell_height + y_in_cell;
 
-                                let i0_base = (z0_base + cell_y_idx) * MAX_INTERP;
-                                let i1_base = (z1_base + cell_y_idx) * MAX_INTERP;
-                                let i0_next = i0_base + MAX_INTERP;
-                                let i1_next = i1_base + MAX_INTERP;
+                                let i0_base = (z0_base + cell_y_idx) * stride;
+                                let i1_base = (z1_base + cell_y_idx) * stride;
+                                let i0_next = i0_base + stride;
+                                let i1_next = i1_base + stride;
                                 let s0 = &*self.slices[cell_x_idx];
                                 let s1 = &*self.slices[cell_x_idx + 1];
                                 let factor_y_v = f64x4::splat(factor_y);
@@ -350,7 +347,7 @@ impl NoiseChunk {
 
                                 let mut ch_batch = 0;
                                 while ch_batch + 4 <= interp_count {
-                                    // SAFETY: ch_batch+3 < interp_count ≤ MAX_INTERP, all base indices in bounds.
+                                    // SAFETY: ch_batch+3 < interp_count ≤ stride, all base indices in bounds.
                                     unsafe {
                                         let n000 = f64x4::from_slice(s0.get_unchecked(
                                             i0_base + ch_batch..i0_base + ch_batch + 4,
@@ -393,7 +390,7 @@ impl NoiseChunk {
                                 }
                                 while ch_batch < interp_count {
                                     let ch = ch_batch;
-                                    // SAFETY: ch < interp_count ≤ MAX_INTERP; indices in bounds (see comment above).
+                                    // SAFETY: ch < interp_count ≤ stride; indices in bounds (see comment above).
                                     unsafe {
                                         let n000 = *s0.get_unchecked(i0_base + ch);
                                         let n001 = *s0.get_unchecked(i1_base + ch);
@@ -461,20 +458,21 @@ impl NoiseChunk {
     reason = "test loads the checked-in vanilla datapack"
 )]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use crate::util::ident::Identifier;
 
     use super::*;
     use crate::worldgen::backend::ir::loader::DatapackSource;
 
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
-
     #[test]
     fn fills_an_overworld_chunk_with_finite_densities() {
-        let source = DatapackSource::new(datapack_root());
+        let source = DatapackSource::builtin();
         let registry = source.density_function_registry().unwrap();
-        let (program, settings) = source.program("overworld", "Overworld", &registry).unwrap();
+        let (program, settings) = source
+            .program(
+                &Identifier::new(Identifier::VANILLA_NAMESPACE, "overworld"),
+                &registry,
+            )
+            .unwrap();
         let params = source.noise_parameters().unwrap();
         let noises = Noises::new(&program, &settings, &params, 42).unwrap();
 

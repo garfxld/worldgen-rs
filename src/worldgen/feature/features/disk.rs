@@ -4,13 +4,12 @@ use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 use crate::util::value_providers::int::IntProvider;
 use crate::worldgen::block_predicate::BlockPredicate;
-use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::feature::features::blockpos_iter::between_closed;
 use crate::worldgen::feature::features::mark_above_for_post_processing;
+use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct DiskConfig {
     pub state_provider: BlockStateProvider,
     pub target: BlockPredicate,

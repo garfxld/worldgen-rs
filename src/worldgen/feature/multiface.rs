@@ -108,10 +108,7 @@ impl SpreadType {
         match self {
             Self::SamePosition => (pos, spread_direction),
             Self::SamePlane => (relative, from_face),
-            Self::WrapAround => (
-                from_face.relative(relative),
-                spread_direction.opposite(),
-            ),
+            Self::WrapAround => (from_face.relative(relative), spread_direction.opposite()),
         }
     }
 }

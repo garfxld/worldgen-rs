@@ -31,7 +31,6 @@ impl PiecesContainer {
     }
 
     pub fn calculate_bounding_box(&self) -> BoundingBox {
-        create_bounding_box(&self.pieces)
-            .expect("Unable to calculate boundingbox without pieces")
+        create_bounding_box(&self.pieces).expect("Unable to calculate boundingbox without pieces")
     }
 }

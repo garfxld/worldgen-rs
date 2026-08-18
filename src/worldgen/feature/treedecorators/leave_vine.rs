@@ -5,7 +5,6 @@ use crate::util::pos::BlockPos;
 use crate::worldgen::feature::treedecorators::TreeDecoratorContext;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct LeaveVineDecorator {
     pub probability: f32,
 }
@@ -45,7 +44,11 @@ impl LeaveVineDecorator {
     }
 }
 
-fn add_hanging_vine(pos: BlockPos, direction: &BoolProperty, context: &mut TreeDecoratorContext<'_, '_>) {
+fn add_hanging_vine(
+    pos: BlockPos,
+    direction: &BoolProperty,
+    context: &mut TreeDecoratorContext<'_, '_>,
+) {
     context.place_vine(pos, direction);
     let mut remaining = 4;
     let mut below = pos.below();

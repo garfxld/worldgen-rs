@@ -14,7 +14,6 @@ const BENEATH_BAMBOO_PODZOL_REPLACEABLE: Identifier =
     Identifier::const_vanilla("beneath_bamboo_podzol_replaceable");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct BambooConfig {
     pub probability: f32,
 }

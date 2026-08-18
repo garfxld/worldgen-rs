@@ -10,7 +10,6 @@ use crate::worldgen::feature::foliageplacers::FoliageAttachment;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct BendingTrunkPlacer {
     pub base_height: i32,
     pub height_rand_a: i32,
@@ -25,7 +24,10 @@ const fn default_min_height_for_leaves() -> i32 {
 }
 
 impl BendingTrunkPlacer {
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla BendingTrunkPlacer.placeTrunk")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla BendingTrunkPlacer.placeTrunk"
+    )]
     pub fn place_trunk(
         &self,
         placer: &super::TrunkPlacer,

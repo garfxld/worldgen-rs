@@ -7,7 +7,6 @@ use crate::util::rng::RandomSource;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TwistingVinesConfig {
     pub spread_width: i32,
     pub spread_height: i32,
@@ -61,7 +60,10 @@ fn place_twisting_vines_column(
                 break;
             }
 
-            region.set_block(place_pos, vanilla_blocks::TWISTING_VINES_PLANT.default_state());
+            region.set_block(
+                place_pos,
+                vanilla_blocks::TWISTING_VINES_PLANT.default_state(),
+            );
         }
 
         place_pos = place_pos.above();

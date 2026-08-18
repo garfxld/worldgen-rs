@@ -26,7 +26,10 @@ pub fn place_weeping_vines_column(
                 break;
             }
 
-            region.set_block(place_pos, vanilla_blocks::WEEPING_VINES_PLANT.default_state());
+            region.set_block(
+                place_pos,
+                vanilla_blocks::WEEPING_VINES_PLANT.default_state(),
+            );
         }
 
         place_pos = place_pos.below();

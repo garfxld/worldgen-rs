@@ -93,17 +93,28 @@ impl ColumnCache {
     }
 
     pub fn router(&self, name: &str, x: i32, y: i32, z: i32, noises: &Noises) -> f64 {
-        let entry = noises
+        let entry = *noises
             .compiled()
             .router(name)
             .unwrap_or_else(|| panic!("no router entry named {name}"));
+        self.router_at(entry, x, y, z, noises)
+    }
+
+    pub(crate) fn router_at(
+        &self,
+        entry: RouterEntry,
+        x: i32,
+        y: i32,
+        z: i32,
+        noises: &Noises,
+    ) -> f64 {
         let cache = self.ptr(x, z, noises);
         match entry {
             RouterEntry::Cached(slot) => {
                 // SAFETY: `cache` points at a buffer of `noises.compiled().slots()`
                 // entries, populated up through this router's flat step by `ensure`
                 // or `init_grid`, and `slot` is within that range.
-                unsafe { *cache.add(*slot) }
+                unsafe { *cache.add(slot) }
             }
             // SAFETY: compiled with the `Full` shape, matching `cache`'s layout.
             RouterEntry::Computed(func) => unsafe {
@@ -119,20 +130,21 @@ impl ColumnCache {
     reason = "test loads the checked-in vanilla datapack"
 )]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use crate::util::ident::Identifier;
 
     use super::*;
     use crate::worldgen::backend::ir::loader::DatapackSource;
 
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
-
     #[test]
     fn lazy_and_grid_paths_agree() {
-        let source = DatapackSource::new(datapack_root());
+        let source = DatapackSource::builtin();
         let registry = source.density_function_registry().unwrap();
-        let (program, settings) = source.program("overworld", "Overworld", &registry).unwrap();
+        let (program, settings) = source
+            .program(
+                &Identifier::new(Identifier::VANILLA_NAMESPACE, "overworld"),
+                &registry,
+            )
+            .unwrap();
         let params = source.noise_parameters().unwrap();
         let noises = Noises::new(&program, &settings, &params, 42).unwrap();
 

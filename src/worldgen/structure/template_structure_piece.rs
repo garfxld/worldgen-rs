@@ -59,7 +59,13 @@ impl TemplateStructurePiece {
         random: &mut RandomSource,
         chunk_bb: BoundingBox,
         reference_pos: BlockPos,
-        mut handle_data_marker: impl FnMut(&str, BlockPos, &WorldGenRegion<'_>, &mut RandomSource, BoundingBox),
+        mut handle_data_marker: impl FnMut(
+            &str,
+            BlockPos,
+            &WorldGenRegion<'_>,
+            &mut RandomSource,
+            BoundingBox,
+        ),
     ) {
         self.place_settings = self.place_settings.clone().set_bounding_box(chunk_bb);
         base.bounding_box = self

@@ -12,7 +12,6 @@ use crate::worldgen::feature::foliageplacers::FoliageAttachment;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct CherryTrunkPlacer {
     pub base_height: i32,
     pub height_rand_a: i32,
@@ -29,7 +28,10 @@ impl CherryTrunkPlacer {
             .with_max_inclusive(self.branch_start_offset_from_top.max_inclusive - 1)
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla CherryTrunkPlacer.placeTrunk")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla CherryTrunkPlacer.placeTrunk"
+    )]
     pub fn place_trunk(
         &self,
         placer: &super::TrunkPlacer,
@@ -107,7 +109,10 @@ impl CherryTrunkPlacer {
         attachments
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla CherryTrunkPlacer.generateBranch")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla CherryTrunkPlacer.generateBranch"
+    )]
     fn generate_branch(
         &self,
         placer: &super::TrunkPlacer,
@@ -127,8 +132,8 @@ impl CherryTrunkPlacer {
             tree_height - 1 + self.branch_end_offset_from_top.sample(random);
         let extend_branch_away_from_trunk =
             middle_continues_upwards || branch_end_pos_offset_from_origin < offset_from_origin;
-        let distance_to_trunk = self.branch_horizontal_length.sample(random)
-            + i32::from(extend_branch_away_from_trunk);
+        let distance_to_trunk =
+            self.branch_horizontal_length.sample(random) + i32::from(extend_branch_away_from_trunk);
         let branch_end_pos = BlockPos::new(
             origin.x() + branch_direction.offset().0 * distance_to_trunk,
             origin.y() + branch_end_pos_offset_from_origin,
@@ -143,7 +148,11 @@ impl CherryTrunkPlacer {
             });
         }
 
-        let vertical_step = if branch_end_pos.y() > log_pos.y() { 1 } else { -1 };
+        let vertical_step = if branch_end_pos.y() > log_pos.y() {
+            1
+        } else {
+            -1
+        };
 
         loop {
             let distance = (branch_end_pos.x() - log_pos.x()).abs()

@@ -7,7 +7,7 @@ pub use three_layers::ThreeLayersFeatureSize;
 pub use two_layers::TwoLayersFeatureSize;
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", deny_unknown_fields)]
+#[serde(tag = "type")]
 pub enum FeatureSize {
     #[serde(rename = "minecraft:two_layers_feature_size")]
     TwoLayers(TwoLayersFeatureSize),

@@ -29,7 +29,10 @@ fn moss_stone_selector(random: &mut RandomSource) -> BlockState {
 }
 
 impl JungleTemplePiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     pub fn new(random: &mut RandomSource, west: i32, north: i32) -> StructurePiece {
         let direction = Direction::get_random_horizontal(random);
         let base = ScatteredFeature::make_base(west, 64, north, WIDTH, 10, DEPTH, direction);
@@ -66,27 +69,22 @@ impl JungleTemplePiece {
         let width = self.scattered.width;
         let depth = self.scattered.depth;
         let piece = &*base;
-        let stones = |x0: i32,
-                          y0: i32,
-                          z0: i32,
-                          x1: i32,
-                          y1: i32,
-                          z1: i32,
-                          random: &mut RandomSource| {
-            piece.generate_box_selected(
-                region,
-                chunk_bb,
-                x0,
-                y0,
-                z0,
-                x1,
-                y1,
-                z1,
-                false,
-                random,
-                |random, _, _, _, _| moss_stone_selector(random),
-            );
-        };
+        let stones =
+            |x0: i32, y0: i32, z0: i32, x1: i32, y1: i32, z1: i32, random: &mut RandomSource| {
+                piece.generate_box_selected(
+                    region,
+                    chunk_bb,
+                    x0,
+                    y0,
+                    z0,
+                    x1,
+                    y1,
+                    z1,
+                    false,
+                    random,
+                    |random, _, _, _, _| moss_stone_selector(random),
+                );
+            };
 
         stones(0, -4, 0, width - 1, 0, depth - 1, random);
         stones(2, 1, 2, 9, 2, 2, random);
@@ -256,15 +254,8 @@ impl JungleTemplePiece {
         let mossy = vanilla_blocks::MOSSY_COBBLESTONE.default_state();
         place(mossy, 3, -3, 1);
         if !self.placed_trap_1 {
-            self.placed_trap_1 = piece.create_dispenser(
-                region,
-                chunk_bb,
-                random,
-                3,
-                -2,
-                1,
-                Direction::North,
-            );
+            self.placed_trap_1 =
+                piece.create_dispenser(region, chunk_bb, random, 3, -2, 1, Direction::North);
         }
 
         let vine = vanilla_blocks::VINE.default_state();
@@ -345,7 +336,12 @@ impl JungleTemplePiece {
             9,
         );
         let piston = vanilla_blocks::STICKY_PISTON.default_state();
-        place(piston.set_value(&Properties::FACING, Direction::Up), 9, -2, 8);
+        place(
+            piston.set_value(&Properties::FACING, Direction::Up),
+            9,
+            -2,
+            8,
+        );
         place(
             piston.set_value(&Properties::FACING, Direction::West),
             10,

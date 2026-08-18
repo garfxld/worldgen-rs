@@ -17,7 +17,7 @@ use crate::util::ident::{BlockState, Identifier};
 use crate::util::math;
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
-use crate::worldgen::feature::features::tree::{valid_tree_pos, TreeConfig};
+use crate::worldgen::feature::features::tree::{TreeConfig, valid_tree_pos};
 use crate::worldgen::feature::foliageplacers::FoliageAttachment;
 use crate::worldgen::region::WorldGenRegion;
 
@@ -32,7 +32,7 @@ use straight::StraightTrunkPlacer;
 use upwards_branching::UpwardsBranchingTrunkPlacer;
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", deny_unknown_fields)]
+#[serde(tag = "type")]
 pub enum TrunkPlacer {
     #[serde(rename = "minecraft:dark_oak_trunk_placer")]
     DarkOak(DarkOakTrunkPlacer),
@@ -119,22 +119,95 @@ impl TrunkPlacer {
         config: &TreeConfig,
     ) -> Vec<FoliageAttachment> {
         match self {
-            Self::Straight(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
-            Self::Fancy(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
-            Self::DarkOak(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
-            Self::Giant(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
-            Self::MegaJungle(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
-            Self::Forking(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
-            Self::Bending(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
-            Self::UpwardsBranching(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
-            Self::Cherry(p) => p.place_trunk(self, region, trunk_setter, random, tree_height, origin, config),
+            Self::Straight(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
+            Self::Fancy(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
+            Self::DarkOak(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
+            Self::Giant(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
+            Self::MegaJungle(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
+            Self::Forking(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
+            Self::Bending(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
+            Self::UpwardsBranching(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
+            Self::Cherry(p) => p.place_trunk(
+                self,
+                region,
+                trunk_setter,
+                random,
+                tree_height,
+                origin,
+                config,
+            ),
         }
     }
 
     pub fn valid_tree_pos(&self, region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
         match self {
             Self::UpwardsBranching(p) => {
-                valid_tree_pos(region, pos) || p.can_grow_through.contains_block(region.get_block(pos))
+                valid_tree_pos(region, pos)
+                    || p.can_grow_through.contains_block(region.get_block(pos))
             }
             _ => valid_tree_pos(region, pos),
         }
@@ -191,7 +264,10 @@ impl TrunkPlacer {
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla FancyTrunkPlacer.makeLimb")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla FancyTrunkPlacer.makeLimb"
+)]
 fn make_limb(
     placer: &TrunkPlacer,
     region: &WorldGenRegion<'_>,
@@ -280,7 +356,10 @@ fn place_below_trunk_block(
     pos: BlockPos,
     config: &TreeConfig,
 ) {
-    if let Some(state) = config.below_trunk_provider.get_optional_state(region, random, pos) {
+    if let Some(state) = config
+        .below_trunk_provider
+        .get_optional_state(region, random, pos)
+    {
         trunk_setter(pos, state);
     }
 }

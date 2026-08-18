@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 
 use glam::IVec3;
 use parking_lot::{Mutex, RwLock};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::chunk::proto::{Chunk, GenerationChunk};
@@ -76,6 +77,31 @@ impl ChunkStore {
             let Some(needed) = levels.get(&status) else {
                 continue;
             };
+            // Statuses below Features only write into their own chunk, so running
+            // a level's chunks in parallel cannot change the result. Features
+            // writes into its 3x3 neighborhood, where application order is part
+            // of the generated output, so it stays sequential.
+            if status < ChunkStatus::Features {
+                let pending: Vec<ChunkPos> = needed
+                    .as_slice()
+                    .iter()
+                    .copied()
+                    .filter(|&pos| {
+                        self.get(pos)
+                            .is_none_or(|slot| slot.status().is_none_or(|current| current < status))
+                    })
+                    .collect();
+                if pending.len() > 1 {
+                    pending
+                        .par_iter()
+                        .for_each(|&pos| self.advance_one(pos, status));
+                    continue;
+                }
+                for &pos in &pending {
+                    self.advance_one(pos, status);
+                }
+                continue;
+            }
             for &pos in needed.as_slice() {
                 self.advance_one(pos, status);
             }
@@ -145,8 +171,7 @@ impl ChunkStore {
                 let neighbor_slots: Vec<Arc<ChunkSlot>> = (-STRUCTURE_REGION_RADIUS
                     ..=STRUCTURE_REGION_RADIUS)
                     .flat_map(|dz| {
-                        (-STRUCTURE_REGION_RADIUS..=STRUCTURE_REGION_RADIUS)
-                            .map(move |dx| (dx, dz))
+                        (-STRUCTURE_REGION_RADIUS..=STRUCTURE_REGION_RADIUS).map(move |dx| (dx, dz))
                     })
                     .map(|(dx, dz)| self.slot(ChunkPos::new(pos.0.x + dx, pos.0.y + dz)))
                     .collect();
@@ -168,8 +193,7 @@ impl ChunkStore {
                 let neighbor_slots: Vec<Arc<ChunkSlot>> = (-STRUCTURE_REGION_RADIUS
                     ..=STRUCTURE_REGION_RADIUS)
                     .flat_map(|dz| {
-                        (-STRUCTURE_REGION_RADIUS..=STRUCTURE_REGION_RADIUS)
-                            .map(move |dx| (dx, dz))
+                        (-STRUCTURE_REGION_RADIUS..=STRUCTURE_REGION_RADIUS).map(move |dx| (dx, dz))
                     })
                     .map(|(dx, dz)| self.slot(ChunkPos::new(pos.0.x + dx, pos.0.y + dz)))
                     .collect();
@@ -336,9 +360,15 @@ pub(crate) fn chebyshev_neighbors(pos: ChunkPos, radius: usize) -> impl Iterator
 
 #[cfg(test)]
 mod tests {
+    use crate::worldgen::dimension::{DimensionSpec, resolve};
+
+    fn spec(source: &DatapackSource, dimension: &str) -> DimensionSpec {
+        let id = Identifier::new(Identifier::VANILLA_NAMESPACE, dimension.to_owned());
+        resolve(source, &id).expect("dimension should resolve")
+    }
     #[test]
     fn features_layer_scans_x_major_z_inner_like_vanilla() {
-        use super::{compute_levels, ChunkStatus, ChunkPos, chebyshev_neighbors};
+        use super::{ChunkPos, ChunkStatus, chebyshev_neighbors, compute_levels};
 
         let center = ChunkPos::new(9, 3);
         let requested: Vec<ChunkPos> = chebyshev_neighbors(center, 1).collect();
@@ -353,7 +383,6 @@ mod tests {
         assert_eq!(features.as_slice(), expected.as_slice());
     }
 
-    use std::path::{Path, PathBuf};
     use std::sync::Once;
 
     use super::*;
@@ -362,11 +391,6 @@ mod tests {
     use crate::util::ident::Identifier;
     use crate::util::pos::BlockPos;
     use crate::worldgen::backend::ir::loader::DatapackSource;
-    use crate::worldgen::generator::BiomeSourceDimension;
-
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
 
     fn init_global_registry() {
         static INIT: Once = Once::new();
@@ -394,15 +418,9 @@ mod tests {
 
         init_global_registry();
 
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            42,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), 42)
+            .expect("generator should build");
 
         let pos = ChunkPos::new(0, 0);
         let store = ChunkStore::new(generator);
@@ -425,15 +443,9 @@ mod tests {
     fn generates_overworld_chunk_to_noise_matching_old_tree_seed_42() {
         init_global_registry();
 
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            42,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), 42)
+            .expect("generator should build");
         let store = ChunkStore::new(generator);
 
         let pos = ChunkPos::new(0, 0);
@@ -483,15 +495,9 @@ mod tests {
     fn generates_overworld_chunk_to_features_without_panicking() {
         init_global_registry();
 
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            42,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), 42)
+            .expect("generator should build");
         let store = ChunkStore::new(generator);
 
         let pos = ChunkPos::new(0, 0);
@@ -519,15 +525,9 @@ mod tests {
     fn concurrent_features_generation_of_adjacent_chunks_does_not_race() {
         init_global_registry();
 
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            42,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), 42)
+            .expect("generator should build");
         let store = Arc::new(ChunkStore::new(generator));
 
         // Dark forest (dark_oak trees) sits reliably around this region on
@@ -549,7 +549,9 @@ mod tests {
             .collect();
 
         for handle in handles {
-            handle.join().expect("chunk generation thread should not panic");
+            handle
+                .join()
+                .expect("chunk generation thread should not panic");
         }
     }
 
@@ -557,15 +559,9 @@ mod tests {
     fn generates_overworld_chunk_to_carvers_without_panicking() {
         init_global_registry();
 
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            42,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), 42)
+            .expect("generator should build");
         let store = ChunkStore::new(generator);
 
         let pos = ChunkPos::new(0, 0);
@@ -586,15 +582,9 @@ mod tests {
     fn dark_forest_places_huge_mushrooms_and_glow_lichen() {
         init_global_registry();
 
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            42,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), 42)
+            .expect("generator should build");
         let store = ChunkStore::new(generator);
 
         // A dark_forest patch on seed 42 (chunk (-18, -11) and its surroundings).
@@ -620,7 +610,9 @@ mod tests {
         let mut lichen_count = 0;
         let mut fallen_log_count = 0;
         for &pos in &positions {
-            let slot = store.get(pos).expect("chunk should exist after generate_to");
+            let slot = store
+                .get(pos)
+                .expect("chunk should exist after generate_to");
             let chunk = slot.chunk().expect("chunk allocated");
             for relative_y in 0..chunk.height() as usize {
                 for x in 0..16 {
@@ -634,7 +626,8 @@ mod tests {
                         } else if block == Some(glow_lichen) {
                             lichen_count += 1;
                         } else if block == Some(oak_log)
-                            && REGISTRY.blocks.try_get_property(state, &Properties::AXIS) != Some(Axis::Y)
+                            && REGISTRY.blocks.try_get_property(state, &Properties::AXIS)
+                                != Some(Axis::Y)
                         {
                             // A horizontal-axis oak_log is the signature of a fallen tree's
                             // trunk segments (standing oak trunks are always axis=y).
@@ -645,26 +638,34 @@ mod tests {
             }
         }
 
-        assert!(stem_count > 0, "expected at least one huge mushroom stem block");
+        assert!(
+            stem_count > 0,
+            "expected at least one huge mushroom stem block"
+        );
         assert!(lichen_count > 0, "expected at least one glow lichen block");
-        assert!(fallen_log_count > 0, "expected at least one fallen oak log segment");
+        assert!(
+            fallen_log_count > 0,
+            "expected at least one fallen oak log segment"
+        );
     }
 }
 
 #[cfg(test)]
 mod structure_tests {
-    use std::path::{Path, PathBuf};
+    use crate::util::ident::Identifier;
+    use crate::worldgen::dimension::{DimensionSpec, resolve};
+
+    fn spec(source: &DatapackSource, dimension: &str) -> DimensionSpec {
+        let id = Identifier::new(Identifier::VANILLA_NAMESPACE, dimension.to_owned());
+        resolve(source, &id).expect("dimension should resolve")
+    }
+
     use std::sync::Once;
 
     use super::*;
-    use crate::util::pos::BlockPos;
     use crate::registry::{REGISTRY, Registries};
+    use crate::util::pos::BlockPos;
     use crate::worldgen::backend::ir::loader::DatapackSource;
-    use crate::worldgen::generator::BiomeSourceDimension;
-
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
 
     fn init_global_registry() {
         static INIT: Once = Once::new();
@@ -675,15 +676,9 @@ mod structure_tests {
     }
 
     fn overworld_store(seed: u64) -> ChunkStore {
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            seed,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), seed)
+            .expect("generator should build");
         ChunkStore::new(generator)
     }
 
@@ -814,7 +809,10 @@ mod structure_tests {
         let mut candidates = Vec::new();
         for x in -40..40 {
             for z in -40..40 {
-                if set.placement.is_placement_chunk(store.generator().seed(), x, z, None) {
+                if set
+                    .placement
+                    .is_placement_chunk(store.generator().seed(), x, z, None)
+                {
                     candidates.push(ChunkPos::new(x, z));
                 }
             }
@@ -873,8 +871,7 @@ mod structure_tests {
         store.generate_to(&positions, ChunkStatus::StructureStarts);
 
         let mut seen: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
-        let mut sources: rustc_hash::FxHashMap<String, ChunkPos> =
-            rustc_hash::FxHashMap::default();
+        let mut sources: rustc_hash::FxHashMap<String, ChunkPos> = rustc_hash::FxHashMap::default();
         for pos in &positions {
             let Some(slot) = store.get(*pos) else {
                 continue;
@@ -912,7 +909,10 @@ mod structure_tests {
             let pos = sources[key];
             store.generate_to(&[pos], ChunkStatus::Features);
             let slot = store.get(pos).expect("slot");
-            assert!(slot.chunk().is_some(), "{key} chunk at {pos:?} should place");
+            assert!(
+                slot.chunk().is_some(),
+                "{key} chunk at {pos:?} should place"
+            );
         }
     }
 
@@ -922,15 +922,9 @@ mod structure_tests {
         use crate::worldgen::structure;
 
         init_global_registry();
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            42,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), 42)
+            .expect("generator should build");
 
         let any_biome = |_: BiomeRef| true;
         for (key, pos) in [

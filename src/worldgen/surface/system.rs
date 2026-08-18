@@ -550,7 +550,7 @@ fn create_noise(
     reason = "test loads the checked-in vanilla datapack"
 )]
 mod tests {
-    use std::path::{Path, PathBuf};
+
     use std::sync::Once;
 
     use super::*;
@@ -559,10 +559,6 @@ mod tests {
     use crate::util::rng::RandomSource as RootRandomSource;
     use crate::util::rng::xoroshiro::XoroshiroRandomSource;
     use crate::worldgen::backend::ir::loader::DatapackSource;
-
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
 
     fn init_global_registry() {
         static INIT: Once = Once::new();
@@ -573,7 +569,7 @@ mod tests {
     }
 
     fn build_system(seed: u64) -> SurfaceSystem {
-        let source = DatapackSource::new(datapack_root());
+        let source = DatapackSource::builtin();
         let params = source.noise_parameters().unwrap();
         let mut root = RootRandomSource::Xoroshiro(XoroshiroRandomSource::from_seed(seed));
         let splitter = root.next_positional();

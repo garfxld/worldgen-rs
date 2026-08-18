@@ -7,7 +7,6 @@ use crate::util::shuffle;
 use crate::worldgen::feature::treedecorators::TreeDecoratorContext;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct BeehiveDecorator {
     pub probability: f32,
 }

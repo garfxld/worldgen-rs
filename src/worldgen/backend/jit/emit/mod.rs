@@ -141,6 +141,7 @@ impl CompiledExpr {
             interpolated: None,
             end_islands: None,
             interp_index: 0,
+            ref_memo: FxHashMap::default(),
         };
 
         let result = expr::emit(&mut builder, &mut ctx, df)?;
@@ -204,7 +205,6 @@ mod tests {
         DensityProgram {
             registry: BTreeMap::new(),
             router_entries: BTreeMap::new(),
-            prefix: String::new(),
             cell_width: 4,
             legacy_random_source: false,
         }

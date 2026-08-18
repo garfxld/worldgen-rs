@@ -12,7 +12,6 @@ use crate::worldgen::feature::foliageplacers::FoliageAttachment;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct UpwardsBranchingTrunkPlacer {
     pub base_height: i32,
     pub height_rand_a: i32,

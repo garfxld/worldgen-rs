@@ -18,11 +18,11 @@ pub enum BiomeSourceKind {
 }
 
 impl BiomeSourceKind {
-    pub const fn overworld(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
+    pub fn overworld(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
         Self::Overworld(MultiNoiseBiomeSource::new(seed, noises, parameters))
     }
 
-    pub const fn nether(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
+    pub fn nether(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
         Self::Nether(MultiNoiseBiomeSource::new(seed, noises, parameters))
     }
 
@@ -118,7 +118,7 @@ pub struct MultiNoiseBiomeSource {
 }
 
 impl MultiNoiseBiomeSource {
-    pub const fn new(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
+    pub fn new(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
         Self {
             seed,
             climate_sampler: ClimateSampler::new(noises),
@@ -299,17 +299,13 @@ impl ChunkBiomeSampler<'_> {
     reason = "test loads the checked-in vanilla datapack"
 )]
 mod tests {
-    use std::path::{Path, PathBuf};
+
     use std::sync::Once;
 
     use super::*;
     use crate::registry::Registries;
     use crate::worldgen::backend::ir::loader::DatapackSource;
     use crate::worldgen::biome::multi_noise::build_parameter_list;
-
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
 
     fn init_global_registry() {
         static INIT: Once = Once::new();
@@ -319,13 +315,14 @@ mod tests {
         });
     }
 
-    fn build(dimension: &str, prefix: &str, seed: u64) -> BiomeSourceKind {
-        let source = DatapackSource::new(datapack_root());
+    fn build(dimension: &str, seed: u64) -> BiomeSourceKind {
+        let source = DatapackSource::builtin();
+        let id = Identifier::new(Identifier::VANILLA_NAMESPACE, dimension.to_owned());
         let registry = source.density_function_registry().unwrap();
-        let (program, settings) = source.program(dimension, prefix, &registry).unwrap();
+        let (program, settings) = source.program(&id, &registry).unwrap();
         let params = source.noise_parameters().unwrap();
         let noises = Noises::new(&program, &settings, &params, seed).unwrap();
-        let biome_params = source.multi_noise_biome_parameters(dimension).unwrap();
+        let biome_params = source.multi_noise_biome_parameters(&id).unwrap();
         let parameters = build_parameter_list(&biome_params);
         if dimension == "nether" {
             BiomeSourceKind::nether(seed, noises, parameters)
@@ -337,7 +334,7 @@ mod tests {
     #[test]
     fn overworld_biome_sampling_agrees_lazy_and_grid() {
         init_global_registry();
-        let source = build("overworld", "Overworld", 42);
+        let source = build("overworld", 42);
 
         let mut lazy = source.chunk_sampler();
         let mut gridded = source.chunk_sampler();
@@ -353,8 +350,8 @@ mod tests {
     #[test]
     fn overworld_and_nether_have_disjoint_biome_pools() {
         init_global_registry();
-        let overworld = build("overworld", "Overworld", 1);
-        let nether = build("nether", "Nether", 1);
+        let overworld = build("overworld", 1);
+        let nether = build("nether", 1);
 
         let overworld_biomes = overworld.possible_biomes();
         let nether_biomes = nether.possible_biomes();
@@ -379,11 +376,11 @@ mod tests {
     #[test]
     fn overworld_spawn_search_returns_a_position() {
         init_global_registry();
-        let overworld = build("overworld", "Overworld", 42);
+        let overworld = build("overworld", 42);
         let origin = overworld.initial_spawn_search_origin();
         assert_eq!(origin.y(), 0);
 
-        let nether = build("nether", "Nether", 42);
+        let nether = build("nether", 42);
         assert_eq!(nether.initial_spawn_search_origin(), BlockPos::new(0, 0, 0));
     }
 }

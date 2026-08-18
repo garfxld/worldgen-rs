@@ -98,8 +98,11 @@ fn place_dirt_and_tree(
     let mut working_pos = origin;
     for y in 0..config.root_column_max_height {
         working_pos = working_pos.above();
-        if region.get_height(HeightmapType::WorldSurface, working_pos.x(), working_pos.z())
-            < working_pos.y()
+        if region.get_height(
+            HeightmapType::WorldSurface,
+            working_pos.x(),
+            working_pos.z(),
+        ) < working_pos.y()
         {
             return false;
         }
@@ -153,7 +156,10 @@ fn place_rooted_dirt(
             0,
             random.next_i32_bounded(root_radius) - random.next_i32_bounded(root_radius),
         );
-        if config.root_replaceable.contains_block(region.get_block(pos)) {
+        if config
+            .root_replaceable
+            .contains_block(region.get_block(pos))
+        {
             let state = config.root_state_provider.get_state(region, random, pos);
             region.set_block(pos, state);
         }
@@ -176,9 +182,10 @@ fn place_roots(
             random.next_i32_bounded(root_radius) - random.next_i32_bounded(root_radius),
         );
         if region.get_block(working_pos).is_air() {
-            let target_state = config
-                .hanging_root_state_provider
-                .get_state(region, random, working_pos);
+            let target_state =
+                config
+                    .hanging_root_state_provider
+                    .get_state(region, random, working_pos);
             if block_survival::can_survive(region, working_pos, target_state)
                 && region
                     .get_block(working_pos.above())

@@ -10,7 +10,6 @@ use crate::util::value_providers::int::IntProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SeaPickleConfig {
     pub count: IntProvider,
 }

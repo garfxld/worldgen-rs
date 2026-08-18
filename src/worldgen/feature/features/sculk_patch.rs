@@ -12,7 +12,6 @@ use crate::worldgen::feature::sculk::SculkSpreader;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SculkPatchConfig {
     pub charge_count: i32,
     pub amount_per_charge: i32,

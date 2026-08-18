@@ -13,7 +13,6 @@ use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MangroveRootPlacement {
     pub can_grow_through: HolderSet,
     pub muddy_roots_in: HolderSet,
@@ -24,7 +23,6 @@ pub struct MangroveRootPlacement {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MangroveRootPlacer {
     pub trunk_offset_y: IntProvider,
     pub root_provider: BlockStateProvider,
@@ -34,7 +32,10 @@ pub struct MangroveRootPlacer {
 }
 
 impl MangroveRootPlacer {
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla MangroveRootPlacer.placeRoots")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla MangroveRootPlacer.placeRoots"
+    )]
     pub fn place_roots(
         &self,
         placer: &RootPlacer,
@@ -59,7 +60,16 @@ impl MangroveRootPlacer {
         for dir in HORIZONTAL_DIRECTIONS {
             let pos = trunk_origin.offset(dir.offset().0, 0, dir.offset().2);
             let mut positions_in_direction = Vec::new();
-            if !self.simulate_roots(placer, region, random, pos, dir, trunk_origin, &mut positions_in_direction, 0) {
+            if !self.simulate_roots(
+                placer,
+                region,
+                random,
+                pos,
+                dir,
+                trunk_origin,
+                &mut positions_in_direction,
+                0,
+            ) {
                 return false;
             }
 
@@ -74,7 +84,10 @@ impl MangroveRootPlacer {
         true
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla MangroveRootPlacer.simulateRoots")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla MangroveRootPlacer.simulateRoots"
+    )]
     fn simulate_roots(
         &self,
         placer: &RootPlacer,
@@ -94,7 +107,16 @@ impl MangroveRootPlacer {
         for pos in self.potential_root_positions(root_pos, dir, random, root_origin) {
             if placer.can_place_root(region, pos) {
                 root_positions.push(pos);
-                if !self.simulate_roots(placer, region, random, pos, dir, root_origin, root_positions, layer + 1) {
+                if !self.simulate_roots(
+                    placer,
+                    region,
+                    random,
+                    pos,
+                    dir,
+                    root_origin,
+                    root_positions,
+                    layer + 1,
+                ) {
                     return false;
                 }
             }
@@ -147,9 +169,19 @@ impl MangroveRootPlacer {
         pos: BlockPos,
         config: &TreeConfig,
     ) {
-        if self.mangrove_root_placement.muddy_roots_in.contains_block(region.get_block(pos)) {
-            let muddy_roots = self.mangrove_root_placement.muddy_roots_provider.get_state(region, random, pos);
-            root_setter(pos, super::potentially_waterlogged_state(region, pos, muddy_roots));
+        if self
+            .mangrove_root_placement
+            .muddy_roots_in
+            .contains_block(region.get_block(pos))
+        {
+            let muddy_roots = self
+                .mangrove_root_placement
+                .muddy_roots_provider
+                .get_state(region, random, pos);
+            root_setter(
+                pos,
+                super::potentially_waterlogged_state(region, pos, muddy_roots),
+            );
         } else {
             placer.place_root(region, root_setter, random, pos, config);
         }

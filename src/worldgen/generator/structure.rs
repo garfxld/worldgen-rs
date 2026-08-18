@@ -1,6 +1,7 @@
 use std::f64::consts::TAU;
 
 use glam::IVec3;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::chunk::proto::Chunk;
 use crate::util::geometry::BoundingBox;
@@ -10,14 +11,14 @@ use crate::worldgen::structure::structure::Structure;
 use rustc_hash::FxHashMap;
 
 use crate::registry::biome::BiomeRef;
-use crate::worldgen::structure::placement::structure_placement::StructurePlacementKind;
-use crate::worldgen::structure::structure::BiomeHolderSet;
 use crate::util::ident::Identifier;
 use crate::util::pos::ChunkPos;
 use crate::util::rng::legacy_random::LegacyRandomSource;
 use crate::worldgen::density::Beardifier;
 use crate::worldgen::generator::{GENERATION_STEPS, Generator};
 use crate::worldgen::structure::placement::structure_placement::StructurePlacement;
+use crate::worldgen::structure::placement::structure_placement::StructurePlacementKind;
+use crate::worldgen::structure::structure::BiomeHolderSet;
 use crate::worldgen::structure::structure_set::{StructureSelectionEntry, StructureSet};
 use crate::worldgen::structure::{self};
 
@@ -31,7 +32,10 @@ impl Generator {
                 .filter(|set| {
                     set.structures.iter().any(|entry| {
                         entry.structure.biomes().is_some_and(|biomes| {
-                            self.possible_biomes.iter().copied().any(|biome| biomes.contains(biome))
+                            self.possible_biomes
+                                .iter()
+                                .copied()
+                                .any(|biome| biomes.contains(biome))
                         })
                     })
                 })
@@ -76,7 +80,11 @@ impl Generator {
             .expect("center chunk should be inside the region");
         let writable_area = BoundingBox::new(
             IVec3::new(center.0.x * 16, region.min_y() + 1, center.0.y * 16),
-            IVec3::new(center.0.x * 16 + 15, region.max_y() - 1, center.0.y * 16 + 15),
+            IVec3::new(
+                center.0.x * 16 + 15,
+                region.max_y() - 1,
+                center.0.y * 16 + 15,
+            ),
         );
 
         for (index, (key, _)) in structures.iter().enumerate() {
@@ -196,7 +204,7 @@ impl Generator {
         let mut position_in_circle = 0;
         let mut circle = 0;
         let mut spread = spread;
-        let mut positions = Vec::with_capacity(count as usize);
+        let mut searches = Vec::with_capacity(count as usize);
 
         for index in 0..count {
             let dist = f64::from(4 * distance)
@@ -204,20 +212,7 @@ impl Generator {
                 + (random.next_f64() - 0.5) * f64::from(distance) * 2.5;
             let initial_x = (angle.cos() * dist).round() as i32;
             let initial_z = (angle.sin() * dist).round() as i32;
-            let mut search_random = random.fork();
-
-            let allowed = |biome: BiomeRef| preferred_biomes.contains(biome);
-            let found = self.biome_source().find_biome_horizontal(
-                initial_x * 16 + 8,
-                initial_z * 16 + 8,
-                112,
-                &allowed,
-                &mut search_random,
-            );
-            positions.push(match found {
-                Some((block_x, block_z)) => ChunkPos::new(block_x >> 4, block_z >> 4),
-                None => ChunkPos::new(initial_x, initial_z),
-            });
+            searches.push((initial_x, initial_z, random.fork()));
 
             angle += TAU / f64::from(spread);
             position_in_circle += 1;
@@ -230,15 +225,26 @@ impl Generator {
             }
         }
 
-        positions
+        searches
+            .into_par_iter()
+            .map(|(initial_x, initial_z, mut search_random)| {
+                let allowed = |biome: BiomeRef| preferred_biomes.contains(biome);
+                let found = self.biome_source().find_biome_horizontal(
+                    initial_x * 16 + 8,
+                    initial_z * 16 + 8,
+                    112,
+                    &allowed,
+                    &mut search_random,
+                );
+                match found {
+                    Some((block_x, block_z)) => ChunkPos::new(block_x >> 4, block_z >> 4),
+                    None => ChunkPos::new(initial_x, initial_z),
+                }
+            })
+            .collect()
     }
 
-    fn is_structure_chunk(
-        &self,
-        set: &StructureSet,
-        source_x: i32,
-        source_z: i32,
-    ) -> bool {
+    fn is_structure_chunk(&self, set: &StructureSet, source_x: i32, source_z: i32) -> bool {
         let placement = &set.placement;
         placement.is_placement_chunk(self.seed(), source_x, source_z, self.ring_positions(set))
             && placement.apply_additional_chunk_restrictions(source_x, source_z, self.seed())
@@ -285,8 +291,7 @@ impl Generator {
             .map_or(0, |start| start.references());
 
         let biomes = entry.structure.biomes();
-        let valid_biome =
-            |biome: BiomeRef| biomes.is_some_and(|allowed| allowed.contains(biome));
+        let valid_biome = |biome: BiomeRef| biomes.is_some_and(|allowed| allowed.contains(biome));
         let start = entry.structure.generate(
             self,
             self.seed(),
@@ -313,9 +318,8 @@ impl Generator {
             for (key, sources) in &references {
                 for source_key in sources {
                     let source_pos = unpack_chunk_pos(*source_key);
-                    let Some(source_chunk) = neighbors
-                        .iter()
-                        .find(|chunk| chunk.pos() == source_pos)
+                    let Some(source_chunk) =
+                        neighbors.iter().find(|chunk| chunk.pos() == source_pos)
                     else {
                         continue;
                     };

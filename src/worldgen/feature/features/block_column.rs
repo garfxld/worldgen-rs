@@ -9,7 +9,6 @@ use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Layer {
     pub height: IntProvider,
     #[serde(rename = "provider")]
@@ -17,7 +16,6 @@ pub struct Layer {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct BlockColumnConfig {
     pub layers: Vec<Layer>,
     pub direction: Direction,

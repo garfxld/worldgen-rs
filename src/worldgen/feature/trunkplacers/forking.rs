@@ -9,7 +9,6 @@ use crate::worldgen::feature::foliageplacers::FoliageAttachment;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ForkingTrunkPlacer {
     pub base_height: i32,
     pub height_rand_a: i32,
@@ -17,7 +16,10 @@ pub struct ForkingTrunkPlacer {
 }
 
 impl ForkingTrunkPlacer {
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla ForkingTrunkPlacer.placeTrunk")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla ForkingTrunkPlacer.placeTrunk"
+    )]
     pub fn place_trunk(
         &self,
         placer: &super::TrunkPlacer,
@@ -45,7 +47,13 @@ impl ForkingTrunkPlacer {
                 lean_steps -= 1;
             }
 
-            if placer.place_log(region, trunk_setter, random, BlockPos::new(tx, yy, tz), config) {
+            if placer.place_log(
+                region,
+                trunk_setter,
+                random,
+                BlockPos::new(tx, yy, tz),
+                config,
+            ) {
                 ey = Some(yy + 1);
             }
         }
@@ -72,7 +80,13 @@ impl ForkingTrunkPlacer {
                     let yy = origin.y() + yo;
                     tx += branch_direction.offset().0;
                     tz += branch_direction.offset().2;
-                    if placer.place_log(region, trunk_setter, random, BlockPos::new(tx, yy, tz), config) {
+                    if placer.place_log(
+                        region,
+                        trunk_setter,
+                        random,
+                        BlockPos::new(tx, yy, tz),
+                        config,
+                    ) {
                         ey = Some(yy + 1);
                     }
                 }

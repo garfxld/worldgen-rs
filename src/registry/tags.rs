@@ -3,9 +3,7 @@ use std::path::Path;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 
-use crate::util::datapack::{
-    DatapackError, collect_json_files, path_to_id, read_and_parse_normalized,
-};
+use crate::datapack::{DatapackError, collect_json_files, path_to_id, read_and_parse_normalized};
 use crate::util::ident::Identifier;
 
 #[derive(Debug, Default)]

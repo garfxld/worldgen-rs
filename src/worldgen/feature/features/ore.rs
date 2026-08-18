@@ -13,7 +13,6 @@ use crate::worldgen::feature::rule_test::RuleTest;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct OreConfig {
     pub size: i32,
     pub discard_chance_on_air_exposure: f32,
@@ -21,7 +20,6 @@ pub struct OreConfig {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TargetBlockState {
     pub target: RuleTest,
     pub state: BlockState,

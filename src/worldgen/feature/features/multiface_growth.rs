@@ -9,10 +9,10 @@ use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 use crate::util::shuffle;
+use crate::worldgen::block_predicate::HolderSet;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MultifaceGrowthConfig {
     pub block: Identifier,
     #[serde(default = "default_search_range")]
@@ -25,7 +25,7 @@ pub struct MultifaceGrowthConfig {
     pub can_place_on_wall: bool,
     #[serde(default = "default_chance_of_spreading")]
     pub chance_of_spreading: f32,
-    pub can_be_placed_on: Vec<Identifier>,
+    pub can_be_placed_on: HolderSet,
 }
 
 const fn default_search_range() -> i32 {
@@ -48,7 +48,9 @@ const fn face_property(direction: Direction) -> &'static BoolProperty {
 }
 
 fn has_face(state: BlockState, direction: Direction) -> bool {
-    state.try_get_value(face_property(direction)).unwrap_or(false)
+    state
+        .try_get_value(face_property(direction))
+        .unwrap_or(false)
 }
 
 fn with_face(state: BlockState, direction: Direction, value: bool) -> BlockState {
@@ -77,7 +79,10 @@ fn valid_directions(config: &MultifaceGrowthConfig) -> Vec<Direction> {
     dirs
 }
 
-fn shuffled_directions(config: &MultifaceGrowthConfig, random: &mut RandomSource) -> Vec<Direction> {
+fn shuffled_directions(
+    config: &MultifaceGrowthConfig,
+    random: &mut RandomSource,
+) -> Vec<Direction> {
     let mut dirs = valid_directions(config);
     shuffle(&mut dirs, random);
     dirs
@@ -135,7 +140,7 @@ fn place_growth_if_possible(
 ) -> bool {
     for &dir in placement_dirs {
         let neighbor = region.get_block(dir.relative(pos));
-        if config.can_be_placed_on.iter().any(|id| id == &neighbor.get_block().key) {
+        if config.can_be_placed_on.contains_block(neighbor) {
             set_face(region, config, pos, dir);
             if random.next_f32() < config.chance_of_spreading {
                 spread(region, config, random, pos, dir);
@@ -205,7 +210,12 @@ fn can_spread_into(
     is_offset_face_full(support.get_support_shape_at(support_pos), face.opposite())
 }
 
-fn set_face(region: &WorldGenRegion<'_>, config: &MultifaceGrowthConfig, pos: BlockPos, face: Direction) {
+fn set_face(
+    region: &WorldGenRegion<'_>,
+    config: &MultifaceGrowthConfig,
+    pos: BlockPos,
+    face: Direction,
+) {
     let existing = region.get_block(pos);
     let base = if existing.get_block().key == config.block {
         existing
@@ -215,7 +225,9 @@ fn set_face(region: &WorldGenRegion<'_>, config: &MultifaceGrowthConfig, pos: Bl
             .by_key(&config.block)
             .expect("multiface growth block must be registered");
         let mut state = REGISTRY.blocks.get_default_state_id(block);
-        if existing.get_block() == &vanilla_blocks::WATER && state.try_get_value(&Properties::WATERLOGGED).is_some() {
+        if existing.get_block() == &vanilla_blocks::WATER
+            && state.try_get_value(&Properties::WATERLOGGED).is_some()
+        {
             state = state.set_value(&Properties::WATERLOGGED, true);
         }
         state

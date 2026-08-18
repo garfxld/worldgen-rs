@@ -557,7 +557,9 @@ mod tests {
     fn cos_is_sin_quarter_turn_ahead() {
         for angle in [0.2_f32, 1.3, 2.5, -0.8] {
             assert!(
-                (f64::from(cos(angle)) - f64::from(sin(angle + core::f32::consts::FRAC_PI_2))).abs() < 1e-6
+                (f64::from(cos(angle)) - f64::from(sin(angle + core::f32::consts::FRAC_PI_2)))
+                    .abs()
+                    < 1e-6
             );
         }
     }

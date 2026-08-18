@@ -13,7 +13,6 @@ use crate::worldgen::feature::features::blockpos_iter::between_closed;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct EndSpikeConfig {
     #[serde(default)]
     pub crystal_invulnerable: bool,
@@ -24,7 +23,6 @@ pub struct EndSpikeConfig {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct EndSpike {
     #[serde(default, rename = "centerX")]
     pub center_x: i32,
@@ -99,7 +97,11 @@ fn place_spike(region: &WorldGenRegion<'_>, random: &mut RandomSource, spike: &E
     let air = vanilla_blocks::AIR.default_state();
 
     for pos in between_closed(
-        BlockPos::new(spike.center_x - radius, region.min_y(), spike.center_z - radius),
+        BlockPos::new(
+            spike.center_x - radius,
+            region.min_y(),
+            spike.center_z - radius,
+        ),
         BlockPos::new(
             spike.center_x + radius,
             spike.height + 10,

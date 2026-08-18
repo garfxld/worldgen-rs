@@ -10,7 +10,6 @@ use crate::worldgen::block_predicate::HolderSet;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SpringConfig {
     #[serde(deserialize_with = "fluid_as_block_state")]
     pub state: BlockState,
@@ -39,7 +38,6 @@ fn fluid_as_block_state<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<BlockState, D::Error> {
     #[derive(Deserialize)]
-    #[serde(deny_unknown_fields)]
     struct FluidState {
         #[serde(rename = "Name")]
         name: Identifier,

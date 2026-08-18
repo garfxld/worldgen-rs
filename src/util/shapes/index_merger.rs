@@ -166,11 +166,7 @@ impl IndexMerger {
             } => {
                 let size = result.size() - 1;
                 for index in 0..size as i32 {
-                    if !consumer(
-                        index / *second_div as i32,
-                        index / *first_div as i32,
-                        index,
-                    ) {
+                    if !consumer(index / *second_div as i32, index / *first_div as i32, index) {
                         return false;
                     }
                 }

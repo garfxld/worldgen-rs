@@ -1,24 +1,25 @@
 pub mod pieces;
-pub mod scattered_feature_piece;
 pub mod placement;
 pub mod pools;
+pub mod scattered_feature_piece;
 #[expect(clippy::module_inception, reason = "mirrors vanilla's Structure class")]
 pub mod structure;
 pub mod structure_piece;
-pub mod template_structure_piece;
 pub mod structure_set;
 pub mod structure_start;
 pub mod structures;
+pub mod template_structure_piece;
 pub mod templatesystem;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::LazyLock;
 
 use glam::IVec3;
 use rustc_hash::FxHashMap;
 use serde_json::Value;
 
-use crate::util::datapack::{collect_json_files, parse_id, parse_json, path_to_id, read};
+use crate::datapack::{self, Datapack};
+use crate::datapack::{collect_json_files, parse_id, parse_json, path_to_id, read};
 use crate::util::ident::Identifier;
 use crate::worldgen::feature::features;
 use crate::worldgen::structure::placement::structure_placement::{
@@ -40,13 +41,13 @@ use crate::worldgen::structure::structure::{
     BiomeHolderSet, GenerationStep, Structure, StructureSettings, TerrainAdjustment,
 };
 use crate::worldgen::structure::structure_set::{StructureSelectionEntry, StructureSet};
-use crate::worldgen::structure::structures::ocean_ruin_pieces;
-use crate::worldgen::structure::structures::mineshaft_pieces::MineshaftType;
-use crate::worldgen::structure::structures::ruined_portal;
-use crate::worldgen::structure::structures::ruined_portal_piece::VerticalPlacement;
 use crate::worldgen::structure::structures::jigsaw::{
     DEFAULT_DIMENSION_PADDING, DEFAULT_LIQUID_SETTINGS, JigsawStructure, MaxDistance,
 };
+use crate::worldgen::structure::structures::mineshaft_pieces::MineshaftType;
+use crate::worldgen::structure::structures::ocean_ruin_pieces;
+use crate::worldgen::structure::structures::ruined_portal;
+use crate::worldgen::structure::structures::ruined_portal_piece::VerticalPlacement;
 use crate::worldgen::structure::templatesystem::liquid_settings::LiquidSettings;
 use crate::worldgen::structure::templatesystem::structure_processor::StructureProcessor;
 use crate::worldgen::structure::templatesystem::structure_template_manager::processor_list;
@@ -81,10 +82,6 @@ pub fn registry() -> &'static StructureRegistry {
     &REGISTRY
 }
 
-fn worldgen_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-}
-
 fn read_json(path: &Path) -> Value {
     let content = read(path).unwrap_or_else(|error| panic!("failed to read: {error}"));
     serde_json::from_str(&content)
@@ -92,10 +89,10 @@ fn read_json(path: &Path) -> Value {
 }
 
 fn load_registry() -> StructureRegistry {
-    let root = worldgen_dir();
-    let template_pools = load_template_pools(&root.join("template_pool"));
-    let structures = load_structures(&root.join("structure"));
-    let sets = load_structure_sets(&root.join("structure_set"), &structures);
+    let root = datapack::active();
+    let template_pools = load_template_pools(root);
+    let structures = load_structures(root);
+    let sets = load_structure_sets(root, &structures);
 
     StructureRegistry {
         structures,
@@ -104,31 +101,33 @@ fn load_registry() -> StructureRegistry {
     }
 }
 
-fn load_template_pools(dir: &Path) -> FxHashMap<Identifier, &'static StructureTemplatePool> {
+fn load_template_pools(pack: &Datapack) -> FxHashMap<Identifier, &'static StructureTemplatePool> {
     let mut pools = FxHashMap::default();
-    for file in collect_json_files(dir) {
-        let key: Identifier = path_to_id("minecraft", &file, dir)
-            .parse()
-            .expect("template pool path should be a valid identifier");
-        let json = read_json(&file);
-        let fallback = parse_id(json["fallback"].as_str().unwrap_or("minecraft:empty"));
+    for (namespace, dir) in pack.namespaced_dirs("worldgen/template_pool") {
+        for file in collect_json_files(&dir) {
+            let key: Identifier = path_to_id(&namespace, &file, &dir)
+                .parse()
+                .expect("template pool path should be a valid identifier");
+            let json = read_json(&file);
+            let fallback = parse_id(json["fallback"].as_str().unwrap_or("minecraft:empty"));
 
-        let elements = json["elements"]
-            .as_array()
-            .map(Vec::as_slice)
-            .unwrap_or_default()
-            .iter()
-            .map(|entry| {
-                let element: &'static StructurePoolElement =
-                    Box::leak(Box::new(parse_pool_element(&entry["element"])));
-                let weight = entry["weight"].as_i64().unwrap_or(1) as i32;
-                (element, weight)
-            })
-            .collect();
+            let elements = json["elements"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+                .iter()
+                .map(|entry| {
+                    let element: &'static StructurePoolElement =
+                        Box::leak(Box::new(parse_pool_element(&entry["element"])));
+                    let weight = entry["weight"].as_i64().unwrap_or(1) as i32;
+                    (element, weight)
+                })
+                .collect();
 
-        let pool: &'static StructureTemplatePool =
-            Box::leak(Box::new(StructureTemplatePool::new(fallback, elements)));
-        pools.insert(key, pool);
+            let pool: &'static StructureTemplatePool =
+                Box::leak(Box::new(StructureTemplatePool::new(fallback, elements)));
+            pools.insert(key, pool);
+        }
     }
     pools
 }
@@ -210,15 +209,17 @@ fn parse_processors(json: &Value) -> Vec<StructureProcessor> {
     }
 }
 
-fn load_structures(dir: &Path) -> FxHashMap<Identifier, &'static Structure> {
+fn load_structures(pack: &Datapack) -> FxHashMap<Identifier, &'static Structure> {
     let mut structures = FxHashMap::default();
-    for file in collect_json_files(dir) {
-        let key: Identifier = path_to_id("minecraft", &file, dir)
-            .parse()
-            .expect("structure path should be a valid identifier");
-        let json = read_json(&file);
-        let structure: &'static Structure = Box::leak(Box::new(parse_structure(&json)));
-        structures.insert(key, structure);
+    for (namespace, dir) in pack.namespaced_dirs("worldgen/structure") {
+        for file in collect_json_files(&dir) {
+            let key: Identifier = path_to_id(&namespace, &file, &dir)
+                .parse()
+                .expect("structure path should be a valid identifier");
+            let json = read_json(&file);
+            let structure: &'static Structure = Box::leak(Box::new(parse_structure(&json)));
+            structures.insert(key, structure);
+        }
     }
     structures
 }
@@ -300,9 +301,7 @@ fn parse_structure(json: &Value) -> Structure {
         max_depth: json["size"].as_i64().unwrap_or_default() as i32,
         start_height: parse_json(&json["start_height"]),
         use_expansion_hack: json["use_expansion_hack"].as_bool().unwrap_or_default(),
-        project_start_to_heightmap: json
-            .get("project_start_to_heightmap")
-            .map(parse_json),
+        project_start_to_heightmap: json.get("project_start_to_heightmap").map(parse_json),
         max_distance_from_center: parse_max_distance(&json["max_distance_from_center"]),
         pool_aliases: json
             .get("pool_aliases")
@@ -326,7 +325,9 @@ fn parse_ruined_portal_setup(json: &Value) -> ruined_portal::Setup {
         overgrown: json["overgrown"].as_bool().unwrap_or_default(),
         vines: json["vines"].as_bool().unwrap_or_default(),
         can_be_cold: json["can_be_cold"].as_bool().unwrap_or_default(),
-        replace_with_blackstone: json["replace_with_blackstone"].as_bool().unwrap_or_default(),
+        replace_with_blackstone: json["replace_with_blackstone"]
+            .as_bool()
+            .unwrap_or_default(),
         weight: json["weight"].as_f64().unwrap_or(1.0) as f32,
     }
 }
@@ -412,38 +413,40 @@ fn parse_pool_alias(json: &Value) -> PoolAliasBinding {
 }
 
 fn load_structure_sets(
-    dir: &Path,
+    pack: &Datapack,
     structures: &FxHashMap<Identifier, &'static Structure>,
 ) -> Vec<&'static StructureSet> {
     let mut sets = Vec::new();
-    for file in collect_json_files(dir) {
-        let key: Identifier = path_to_id("minecraft", &file, dir)
-            .parse()
-            .expect("structure set path should be a valid identifier");
-        let json = read_json(&file);
+    for (namespace, dir) in pack.namespaced_dirs("worldgen/structure_set") {
+        for file in collect_json_files(&dir) {
+            let key: Identifier = path_to_id(&namespace, &file, &dir)
+                .parse()
+                .expect("structure set path should be a valid identifier");
+            let json = read_json(&file);
 
-        let entries = json["structures"]
-            .as_array()
-            .map(Vec::as_slice)
-            .unwrap_or_default()
-            .iter()
-            .filter_map(|entry| {
-                let structure_key = parse_id(entry["structure"].as_str().unwrap_or_default());
-                let structure = structures.get(&structure_key)?;
-                Some(StructureSelectionEntry {
-                    key: structure_key,
-                    structure,
-                    weight: entry["weight"].as_i64().unwrap_or(1) as i32,
+            let entries = json["structures"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|entry| {
+                    let structure_key = parse_id(entry["structure"].as_str().unwrap_or_default());
+                    let structure = structures.get(&structure_key)?;
+                    Some(StructureSelectionEntry {
+                        key: structure_key,
+                        structure,
+                        weight: entry["weight"].as_i64().unwrap_or(1) as i32,
+                    })
                 })
-            })
-            .collect();
+                .collect();
 
-        let set: &'static StructureSet = Box::leak(Box::new(StructureSet {
-            key,
-            structures: entries,
-            placement: parse_placement(&json["placement"]),
-        }));
-        sets.push(set);
+            let set: &'static StructureSet = Box::leak(Box::new(StructureSet {
+                key,
+                structures: entries,
+                placement: parse_placement(&json["placement"]),
+            }));
+            sets.push(set);
+        }
     }
     sets.sort_by_key(|set| set.key.to_string());
     sets

@@ -8,7 +8,6 @@ use crate::worldgen::feature::foliageplacers::FoliageAttachment;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct StraightTrunkPlacer {
     pub base_height: i32,
     pub height_rand_a: i32,
@@ -16,7 +15,10 @@ pub struct StraightTrunkPlacer {
 }
 
 impl StraightTrunkPlacer {
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla StraightTrunkPlacer.placeTrunk")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla StraightTrunkPlacer.placeTrunk"
+    )]
     pub fn place_trunk(
         &self,
         placer: &super::TrunkPlacer,

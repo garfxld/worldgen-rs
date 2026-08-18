@@ -127,11 +127,29 @@ pub fn start_house_tower(
 ) {
     let mut ship_created = false;
     let (_, mut last) = add_helper(pieces, new_piece("base_floor", origin, rotation, true));
-    let piece = add_piece(&last, BlockPos::new(-1, 0, -1), "second_floor_1", rotation, false);
+    let piece = add_piece(
+        &last,
+        BlockPos::new(-1, 0, -1),
+        "second_floor_1",
+        rotation,
+        false,
+    );
     (_, last) = add_helper(pieces, piece);
-    let piece = add_piece(&last, BlockPos::new(-1, 4, -1), "third_floor_1", rotation, false);
+    let piece = add_piece(
+        &last,
+        BlockPos::new(-1, 4, -1),
+        "third_floor_1",
+        rotation,
+        false,
+    );
     (_, last) = add_helper(pieces, piece);
-    let piece = add_piece(&last, BlockPos::new(-1, 8, -1), "third_roof", rotation, true);
+    let piece = add_piece(
+        &last,
+        BlockPos::new(-1, 8, -1),
+        "third_roof",
+        rotation,
+        true,
+    );
     (_, last) = add_helper(pieces, piece);
     recursive_children(
         SectionGenerator::Tower,
@@ -144,7 +162,10 @@ pub fn start_house_tower(
     );
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla recursiveChildren")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla recursiveChildren"
+)]
 fn recursive_children(
     generator: SectionGenerator,
     gen_depth: i32,
@@ -193,7 +214,10 @@ fn recursive_children(
     true
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla SectionGenerator")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla SectionGenerator"
+)]
 fn generate(
     generator: SectionGenerator,
     gen_depth: i32,
@@ -207,9 +231,7 @@ fn generate(
         SectionGenerator::HouseTower => {
             generate_house_tower(gen_depth, parent, offset, pieces, random, ship_created)
         }
-        SectionGenerator::Tower => {
-            generate_tower(gen_depth, parent, pieces, random, ship_created)
-        }
+        SectionGenerator::Tower => generate_tower(gen_depth, parent, pieces, random, ship_created),
         SectionGenerator::TowerBridge => {
             generate_tower_bridge(gen_depth, parent, pieces, random, ship_created)
         }
@@ -250,7 +272,13 @@ fn generate_house_tower(
             false,
         );
         (_, last) = add_helper(pieces, piece);
-        let piece = add_piece(&last, BlockPos::new(-1, 8, -1), "second_roof", rotation, false);
+        let piece = add_piece(
+            &last,
+            BlockPos::new(-1, 8, -1),
+            "second_roof",
+            rotation,
+            false,
+        );
         (_, last) = add_helper(pieces, piece);
         recursive_children(
             SectionGenerator::Tower,
@@ -278,7 +306,13 @@ fn generate_house_tower(
             false,
         );
         (_, last) = add_helper(pieces, piece);
-        let piece = add_piece(&last, BlockPos::new(-1, 8, -1), "third_roof", rotation, true);
+        let piece = add_piece(
+            &last,
+            BlockPos::new(-1, 8, -1),
+            "third_roof",
+            rotation,
+            true,
+        );
         (_, last) = add_helper(pieces, piece);
         recursive_children(
             SectionGenerator::Tower,
@@ -375,7 +409,13 @@ fn generate_tower_bridge(
 ) -> bool {
     let rotation = parent.place_settings.rotation();
     let bridge_length = random.next_i32_bounded(4) + 1;
-    let piece = add_piece(parent, BlockPos::new(0, 0, -4), "bridge_piece", rotation, true);
+    let piece = add_piece(
+        parent,
+        BlockPos::new(0, 0, -4),
+        "bridge_piece",
+        rotation,
+        true,
+    );
     let (mut index, mut last) = add_helper(pieces, piece);
     pieces[index].base.gen_depth = -1;
     let mut next_y = 0;
@@ -544,8 +584,7 @@ impl EndCityPiece {
                 if marker_id.starts_with("Chest") {
                     let chest_position = position.below();
                     if chunk_bb.is_inside(chest_position)
-                        && region.get_block(chest_position).get_block()
-                            == &vanilla_blocks::CHEST
+                        && region.get_block(chest_position).get_block() == &vanilla_blocks::CHEST
                     {
                         random.next_i64();
                     }

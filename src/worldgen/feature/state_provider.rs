@@ -13,7 +13,7 @@ use crate::worldgen::block_predicate::BlockPredicate;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", deny_unknown_fields)]
+#[serde(tag = "type")]
 pub enum BlockStateProvider {
     #[serde(rename = "minecraft:simple_state_provider")]
     Simple { state: BlockState },
@@ -42,7 +42,6 @@ pub enum BlockStateProvider {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct WeightedState {
     #[serde(rename = "data")]
     pub state: BlockState,
@@ -50,7 +49,6 @@ pub struct WeightedState {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct StateRule {
     pub if_true: BlockPredicate,
     pub then: BlockStateProvider,
@@ -88,7 +86,6 @@ pub struct DualNoiseProvider {
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct NoiseParameters {
     #[serde(rename = "firstOctave")]
     first_octave: i32,
@@ -103,7 +100,6 @@ impl NoiseParameters {
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct RawNoiseProvider {
     seed: i64,
     noise: NoiseParameters,
@@ -122,7 +118,6 @@ impl From<RawNoiseProvider> for NoiseProvider {
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct RawNoiseThresholdProvider {
     seed: i64,
     noise: NoiseParameters,
@@ -149,7 +144,6 @@ impl From<RawNoiseThresholdProvider> for NoiseThresholdProvider {
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct RawDualNoiseProvider {
     seed: i64,
     noise: NoiseParameters,

@@ -4,8 +4,10 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
+use crate::datapack::Lenient;
 use crate::util::ident::Identifier;
 
 #[derive(Debug)]
@@ -50,7 +52,16 @@ pub fn read(path: &Path) -> Result<String, DatapackError> {
 pub fn parse_normalized<T: DeserializeOwned>(content: &str) -> Result<T, serde_json::Error> {
     let mut value: serde_json::Value = serde_json::from_str(content)?;
     normalize_type_tags(&mut value);
-    serde_json::from_value(value)
+    T::deserialize(Lenient(value))
+}
+
+pub fn lenient_or_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: DeserializeOwned + Default,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(T::deserialize(Lenient(value)).unwrap_or_default())
 }
 
 pub fn read_and_parse_normalized<T: DeserializeOwned>(path: &Path) -> Result<T, DatapackError> {
@@ -132,5 +143,5 @@ pub fn value_list(value: &serde_json::Value) -> &[serde_json::Value] {
 }
 
 pub fn parse_json<T: DeserializeOwned>(value: &serde_json::Value) -> T {
-    T::deserialize(value).unwrap_or_else(|e| panic!("invalid json {value}: {e}"))
+    T::deserialize(Lenient(value.clone())).unwrap_or_else(|e| panic!("invalid json {value}: {e}"))
 }

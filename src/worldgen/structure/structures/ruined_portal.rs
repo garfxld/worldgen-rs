@@ -9,8 +9,8 @@ use crate::worldgen::structure::structure::{GenerationContext, GenerationStub};
 use crate::worldgen::structure::structures::ruined_portal_piece::{
     PortalProperties, RuinedPortalPiece, VerticalPlacement,
 };
-use crate::worldgen::structure::templatesystem::structure_template_manager::templates;
 use crate::worldgen::structure::templatesystem::structure_template::bounding_box_of;
+use crate::worldgen::structure::templatesystem::structure_template_manager::templates;
 
 const STRUCTURE_LOCATION_PORTALS: &[&str] = &[
     "ruined_portal/portal_1",
@@ -94,9 +94,7 @@ fn find_suitable_y(
         VerticalPlacement::PartlyBuried => {
             surface_y_at_center - y_span + random.next_i32_between(2, 8)
         }
-        VerticalPlacement::OnLandSurface | VerticalPlacement::OnOceanFloor => {
-            surface_y_at_center
-        }
+        VerticalPlacement::OnLandSurface | VerticalPlacement::OnOceanFloor => surface_y_at_center,
     };
 
     let corners = [
@@ -175,14 +173,7 @@ pub fn find_generation_point<'a>(
     let pivot = BlockPos::new(size.x / 2, 0, size.z / 2);
     let chunk_pos = context.chunk_pos;
     let base_position = BlockPos::new(chunk_pos.0.x * 16, 0, chunk_pos.0.y * 16);
-    let bounding_box =
-        bounding_box_of(
-            base_position,
-            rotation,
-            pivot,
-            mirror,
-            size,
-        );
+    let bounding_box = bounding_box_of(base_position, rotation, pivot, mirror, size);
     let center = bounding_box.center();
     let surface_y = context.generator.get_base_height(
         center.x(),

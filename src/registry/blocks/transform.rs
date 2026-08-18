@@ -43,7 +43,9 @@ pub fn rotate(state: BlockState, rotation: Rotation) -> BlockState {
     }
     match transform_of(state) {
         BlockTransform::None => state,
-        BlockTransform::Facing | BlockTransform::FacingRod | BlockTransform::Stairs
+        BlockTransform::Facing
+        | BlockTransform::FacingRod
+        | BlockTransform::Stairs
         | BlockTransform::Door => rotate_facing(state, rotation),
         BlockTransform::Rotation16 => map_property(state, "rotation", |value| {
             let index = value.parse::<i32>().unwrap_or(0);
@@ -75,11 +77,9 @@ pub fn mirror(state: BlockState, mirror: Mirror) -> BlockState {
     match transform_of(state) {
         BlockTransform::None => state,
         BlockTransform::Facing => rotate(state, mirror.get_rotation(facing_of(state))),
-        BlockTransform::FacingRod => {
-            map_property(state, "facing", |value| {
-                mirror.mirror(direction_from_str(value)).as_str().to_owned()
-            })
-        }
+        BlockTransform::FacingRod => map_property(state, "facing", |value| {
+            mirror.mirror(direction_from_str(value)).as_str().to_owned()
+        }),
         BlockTransform::Stairs => mirror_stairs(state, mirror),
         BlockTransform::Door => {
             let rotated = rotate(state, mirror.get_rotation(facing_of(state)));
@@ -114,7 +114,10 @@ fn transform_of(state: BlockState) -> BlockTransform {
 
 fn rotate_facing(state: BlockState, rotation: Rotation) -> BlockState {
     map_property(state, "facing", |value| {
-        rotation.rotate(direction_from_str(value)).as_str().to_owned()
+        rotation
+            .rotate(direction_from_str(value))
+            .as_str()
+            .to_owned()
     })
 }
 
@@ -127,11 +130,7 @@ fn facing_of(state: BlockState) -> Direction {
         .map_or(Direction::North, |(_, value)| direction_from_str(value))
 }
 
-fn map_property(
-    state: BlockState,
-    name: &str,
-    transform: impl Fn(&str) -> String,
-) -> BlockState {
+fn map_property(state: BlockState, name: &str, transform: impl Fn(&str) -> String) -> BlockState {
     let Some(block) = REGISTRY.blocks.by_state_id(state) else {
         return state;
     };

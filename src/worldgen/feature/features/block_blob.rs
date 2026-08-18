@@ -7,7 +7,6 @@ use crate::worldgen::block_predicate::BlockPredicate;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct BlockBlobConfig {
     pub state: BlockState,
     pub can_place_on: BlockPredicate,
@@ -20,9 +19,7 @@ pub fn place(
     config: &BlockBlobConfig,
 ) -> bool {
     let mut origin = origin;
-    while origin.y() > region.min_y() + 3
-        && !config.can_place_on.test(region, origin.below())
-    {
+    while origin.y() > region.min_y() + 3 && !config.can_place_on.test(region, origin.below()) {
         origin = origin.below();
     }
 

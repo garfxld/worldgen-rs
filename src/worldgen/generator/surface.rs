@@ -188,7 +188,8 @@ impl Generator {
                 pending_writes.clear();
                 let mut xz = TemperatureXzCache::new(block_x, block_z);
 
-                for y in (min_y..=start_height).rev() {
+                let column_top = min_y + column_buf.len() as i32 - 1;
+                for y in (min_y..=start_height.min(column_top)).rev() {
                     let relative_y = (y - min_y) as usize;
                     let state = column_buf[relative_y];
 

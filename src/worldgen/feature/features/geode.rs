@@ -9,13 +9,12 @@ use crate::util::rng::RandomSource;
 use crate::util::rng::legacy_random::LegacyRandomSource;
 use crate::util::value_providers::int::IntProvider;
 use crate::worldgen::block_predicate::HolderSet;
-use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::feature::features::DIRECTIONS;
 use crate::worldgen::feature::features::blockpos_iter::between_closed;
+use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct GeodeConfig {
     pub blocks: GeodeBlockSettings,
     pub layers: GeodeLayerSettings,
@@ -42,7 +41,6 @@ pub struct GeodeConfig {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct GeodeBlockSettings {
     pub filling_provider: BlockStateProvider,
     pub inner_layer_provider: BlockStateProvider,
@@ -55,7 +53,6 @@ pub struct GeodeBlockSettings {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct GeodeLayerSettings {
     #[serde(default = "default_filling")]
     pub filling: f64,
@@ -68,7 +65,6 @@ pub struct GeodeLayerSettings {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct GeodeCrackSettings {
     #[serde(default = "default_generate_crack_chance")]
     pub generate_crack_chance: f64,
@@ -184,11 +180,11 @@ pub fn place(
     let max_gen_offset = config.max_gen_offset;
     let mut points = Vec::new();
     let num_points = config.distribution_points.sample(random);
-    let mut noise_random = RandomSource::Legacy(LegacyRandomSource::from_seed(region.seed() as u64));
+    let mut noise_random =
+        RandomSource::Legacy(LegacyRandomSource::from_seed(region.seed() as u64));
     let noise = NormalNoise::create_from_random(&mut noise_random, -4, &[1.0]);
     let mut crack_points = Vec::new();
-    let crack_size_adjustment =
-        f64::from(num_points) / f64::from(config.outer_wall_distance.max());
+    let crack_size_adjustment = f64::from(num_points) / f64::from(config.outer_wall_distance.max());
 
     let layers = &config.layers;
     let blocks = &config.blocks;
@@ -261,9 +257,9 @@ pub fn place(
         }
 
         for point in &crack_points {
-            dist_sum_crack += inv_sqrt(
-                dist_sqr(point_inside, *point) + f64::from(crack.crack_point_offset),
-            ) + noise_offset;
+            dist_sum_crack +=
+                inv_sqrt(dist_sqr(point_inside, *point) + f64::from(crack.crack_point_offset))
+                    + noise_offset;
         }
 
         if dist_sum_shell < outer_crust {

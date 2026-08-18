@@ -37,12 +37,12 @@ use std::sync::OnceLock;
 
 use glam::DVec3;
 
+use crate::datapack::DatapackError;
 use crate::registry::blocks::config::BlockConfig;
 use crate::registry::blocks::properties::Property;
 use crate::registry::blocks::shapes::ShapeKind;
 use crate::registry::fluid::{FluidRef, FluidState};
 use crate::registry::{REGISTRY, Registry};
-use crate::util::datapack::DatapackError;
 use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 
@@ -579,6 +579,36 @@ impl BlockRegistry {
 
         let mut property_indices = Self::decode_property_indices(block, block.default_state_offset);
         Self::apply_property_overrides(block, &mut property_indices, properties)?;
+
+        Some(BlockState(
+            base_state_id + Self::encode_property_indices(block, &property_indices),
+        ))
+    }
+
+    pub fn state_id_from_block_lenient_properties<'a>(
+        &self,
+        block: BlockRef,
+        properties: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> Option<BlockState> {
+        let block_id = self.try_block_index(block)?;
+        let base_state_id = self.block_to_base_state[block_id];
+
+        let mut property_indices = Self::decode_property_indices(block, block.default_state_offset);
+        for (prop_name, prop_value) in properties {
+            let Some(prop_idx) = block
+                .properties
+                .iter()
+                .position(|p| p.get_name() == prop_name)
+            else {
+                continue;
+            };
+            let prop = block.properties[prop_idx];
+            if let Some(value_idx) = (0..prop.value_count())
+                .find(|&index| prop.value_name_from_index(index) == prop_value)
+            {
+                property_indices[prop_idx] = value_idx;
+            }
+        }
 
         Some(BlockState(
             base_state_id + Self::encode_property_indices(block, &property_indices),
@@ -1386,10 +1416,16 @@ mod tests {
         init_global_registry();
 
         let default_log = vanilla_blocks::OAK_LOG.default_state();
-        assert_eq!(default_log.get_value(&Properties::AXIS), crate::util::axis::Axis::Y);
+        assert_eq!(
+            default_log.get_value(&Properties::AXIS),
+            crate::util::axis::Axis::Y
+        );
 
         let x_log = default_log.set_value(&Properties::AXIS, crate::util::axis::Axis::X);
-        assert_eq!(x_log.get_value(&Properties::AXIS), crate::util::axis::Axis::X);
+        assert_eq!(
+            x_log.get_value(&Properties::AXIS),
+            crate::util::axis::Axis::X
+        );
         assert_eq!(
             REGISTRY
                 .blocks
@@ -1401,7 +1437,10 @@ mod tests {
         );
 
         let z_log = default_log.set_value(&Properties::AXIS, crate::util::axis::Axis::Z);
-        assert_eq!(z_log.get_value(&Properties::AXIS), crate::util::axis::Axis::Z);
+        assert_eq!(
+            z_log.get_value(&Properties::AXIS),
+            crate::util::axis::Axis::Z
+        );
     }
 
     #[test]

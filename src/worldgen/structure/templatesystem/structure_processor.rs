@@ -1,18 +1,19 @@
 use serde::Deserialize;
 
 use crate::chunk::heightmap::HeightmapType;
+use crate::datapack::lenient_or_default;
 use crate::registry::REGISTRY;
 use crate::registry::blocks::BlockRef;
 use crate::registry::blocks::properties::{Half, Properties};
 use crate::registry::blocks::shapes;
 use crate::registry::blocks::vanilla_blocks;
-use crate::util::direction::Direction;
-use crate::util::shuffle;
 use crate::util::axis::Axis;
+use crate::util::direction::Direction;
 use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 use crate::util::rng::legacy_random::LegacyRandomSource;
 use crate::util::rng::{RandomSource, get_seed};
+use crate::util::shuffle;
 use crate::util::value_providers::int::IntProvider;
 use crate::worldgen::block_predicate::HolderSet;
 use crate::worldgen::feature::rule_test::RuleTest;
@@ -20,9 +21,10 @@ use crate::worldgen::region::WorldGenRegion;
 use crate::worldgen::structure::templatesystem::structure_place_settings::StructurePlaceSettings;
 use crate::worldgen::structure::templatesystem::structure_template::StructureBlockInfo;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(tag = "predicate_type")]
 pub enum PosRuleTest {
+    #[default]
     #[serde(rename = "minecraft:always_true")]
     AlwaysTrue,
     #[serde(rename = "minecraft:linear_pos")]
@@ -125,15 +127,9 @@ fn chance_test(
 pub struct ProcessorRule {
     pub input_predicate: RuleTest,
     pub location_predicate: RuleTest,
-    #[serde(default = "PosRuleTest::always_true")]
+    #[serde(default, deserialize_with = "lenient_or_default")]
     pub position_predicate: PosRuleTest,
     pub output_state: BlockState,
-}
-
-impl PosRuleTest {
-    const fn always_true() -> Self {
-        Self::AlwaysTrue
-    }
 }
 
 impl ProcessorRule {
@@ -243,11 +239,9 @@ impl StructureProcessor {
                 }
             }
             Self::Rule { rules } => {
-                let mut rule_random = RandomSource::Legacy(LegacyRandomSource::from_seed(get_seed(
-                    processed.pos.x(),
-                    processed.pos.y(),
-                    processed.pos.z(),
-                ) as u64));
+                let mut rule_random = RandomSource::Legacy(LegacyRandomSource::from_seed(
+                    get_seed(processed.pos.x(), processed.pos.y(), processed.pos.z()) as u64,
+                ));
                 for rule in rules {
                     if rule.test(
                         region,
@@ -319,8 +313,7 @@ impl StructureProcessor {
                 })
             }
             Self::LavaSubmergedBlock => {
-                let was_lava =
-                    region.get_block(processed.pos).get_block() == &vanilla_blocks::LAVA;
+                let was_lava = region.get_block(processed.pos).get_block() == &vanilla_blocks::LAVA;
                 if was_lava
                     && !shapes::is_shape_full_block(processed.state.get_static_collision_shape())
                 {
@@ -497,8 +490,7 @@ fn age_block(state: BlockState, mossiness: f32, random: &mut RandomSource) -> Op
     }
 
     if block == &vanilla_blocks::OBSIDIAN {
-        return (random.next_f32() < 0.15)
-            .then(|| vanilla_blocks::CRYING_OBSIDIAN.default_state());
+        return (random.next_f32() < 0.15).then(|| vanilla_blocks::CRYING_OBSIDIAN.default_state());
     }
 
     None
@@ -511,8 +503,7 @@ fn blackstone_replacement(block: BlockRef) -> Option<BlockRef> {
         &vanilla_blocks::BLACKSTONE
     } else if block == &vanilla_blocks::STONE {
         &vanilla_blocks::POLISHED_BLACKSTONE
-    } else if block == &vanilla_blocks::STONE_BRICKS
-        || block == &vanilla_blocks::MOSSY_STONE_BRICKS
+    } else if block == &vanilla_blocks::STONE_BRICKS || block == &vanilla_blocks::MOSSY_STONE_BRICKS
     {
         &vanilla_blocks::POLISHED_BLACKSTONE_BRICKS
     } else if block == &vanilla_blocks::COBBLESTONE_STAIRS
@@ -529,9 +520,7 @@ fn blackstone_replacement(block: BlockRef) -> Option<BlockRef> {
         || block == &vanilla_blocks::MOSSY_COBBLESTONE_SLAB
     {
         &vanilla_blocks::BLACKSTONE_SLAB
-    } else if block == &vanilla_blocks::SMOOTH_STONE_SLAB
-        || block == &vanilla_blocks::STONE_SLAB
-    {
+    } else if block == &vanilla_blocks::SMOOTH_STONE_SLAB || block == &vanilla_blocks::STONE_SLAB {
         &vanilla_blocks::POLISHED_BLACKSTONE_SLAB
     } else if block == &vanilla_blocks::STONE_BRICK_SLAB
         || block == &vanilla_blocks::MOSSY_STONE_BRICK_SLAB

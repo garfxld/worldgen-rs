@@ -9,7 +9,6 @@ use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct LakeConfig {
     pub fluid: BlockStateProvider,
     pub barrier: BlockStateProvider,
@@ -136,4 +135,3 @@ pub fn place(
 
     true
 }
-

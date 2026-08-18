@@ -11,7 +11,6 @@ pub use types::*;
 pub struct DensityProgram {
     pub registry: BTreeMap<String, DensityFunction>,
     pub router_entries: BTreeMap<String, DensityFunction>,
-    pub prefix: String,
     pub cell_width: i32,
     pub legacy_random_source: bool,
 }

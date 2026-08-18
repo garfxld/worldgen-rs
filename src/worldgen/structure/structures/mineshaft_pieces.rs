@@ -1,8 +1,8 @@
 use crate::registry::REGISTRY;
+use crate::registry::blocks::BlockRef;
 use crate::registry::blocks::properties::{Properties, RailShape};
 use crate::registry::blocks::shapes::SupportType;
 use crate::registry::blocks::vanilla_blocks;
-use crate::registry::blocks::BlockRef;
 use crate::util::axis::Axis;
 use crate::util::direction::Direction;
 use crate::util::geometry::BoundingBox;
@@ -31,7 +31,11 @@ pub enum MineshaftType {
 
 impl MineshaftType {
     pub const fn parse(value: &str) -> Self {
-        if value == "mesa" { Self::Mesa } else { Self::Normal }
+        if value == "mesa" {
+            Self::Mesa
+        } else {
+            Self::Normal
+        }
     }
 
     pub fn wood_state(self) -> BlockState {
@@ -161,7 +165,11 @@ fn find_crossing(
     foot_z: i32,
     direction: Direction,
 ) -> Option<BoundingBox> {
-    let y1 = if random.next_i32_bounded(4) == 0 { 6 } else { 2 };
+    let y1 = if random.next_i32_bounded(4) == 0 {
+        6
+    } else {
+        2
+    };
     let box_ = match direction {
         Direction::South => BoundingBox::from_coords(-1, 0, 0, 3, y1, 4),
         Direction::West => BoundingBox::from_coords(-4, 0, -1, 0, y1, 3),
@@ -249,7 +257,10 @@ fn create_random_shaft_piece(
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateAndAddPiece")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateAndAddPiece"
+)]
 fn generate_and_add_piece(
     start_bb: BoundingBox,
     mineshaft_type: MineshaftType,
@@ -301,7 +312,15 @@ pub fn add_children(
 
     match &mineshaft.kind {
         MineShaftPieceKind::Corridor { .. } => {
-            corridor_add_children(start_bb, mineshaft_type, builder, random, box_, depth, orientation);
+            corridor_add_children(
+                start_bb,
+                mineshaft_type,
+                builder,
+                random,
+                box_,
+                depth,
+                orientation,
+            );
         }
         MineShaftPieceKind::Crossing {
             direction,
@@ -320,10 +339,26 @@ pub fn add_children(
             );
         }
         MineShaftPieceKind::Room { .. } => {
-            room_add_children(index, start_bb, mineshaft_type, builder, random, box_, depth);
+            room_add_children(
+                index,
+                start_bb,
+                mineshaft_type,
+                builder,
+                random,
+                box_,
+                depth,
+            );
         }
         MineShaftPieceKind::Stairs => {
-            stairs_add_children(start_bb, mineshaft_type, builder, random, box_, depth, orientation);
+            stairs_add_children(
+                start_bb,
+                mineshaft_type,
+                builder,
+                random,
+                box_,
+                depth,
+                orientation,
+            );
         }
     }
 }
@@ -343,12 +378,12 @@ fn corridor_add_children(
     };
 
     let generate = |builder: &mut StructurePiecesBuilder,
-                        random: &mut RandomSource,
-                        x: i32,
-                        y: i32,
-                        z: i32,
-                        direction: Direction,
-                        depth: i32| {
+                    random: &mut RandomSource,
+                    x: i32,
+                    y: i32,
+                    z: i32,
+                    direction: Direction,
+                    depth: i32| {
         generate_and_add_piece(
             start_bb,
             mineshaft_type,
@@ -366,7 +401,15 @@ fn corridor_add_children(
         Direction::South => {
             if end_selection <= 1 {
                 let y = box_.min_y() - 1 + random.next_i32_bounded(3);
-                generate(builder, random, box_.min_x(), y, box_.max_z() + 1, orientation, depth);
+                generate(
+                    builder,
+                    random,
+                    box_.min_x(),
+                    y,
+                    box_.max_z() + 1,
+                    orientation,
+                    depth,
+                );
             } else if end_selection == 2 {
                 let y = box_.min_y() - 1 + random.next_i32_bounded(3);
                 generate(
@@ -394,7 +437,15 @@ fn corridor_add_children(
         Direction::West => {
             if end_selection <= 1 {
                 let y = box_.min_y() - 1 + random.next_i32_bounded(3);
-                generate(builder, random, box_.min_x() - 1, y, box_.min_z(), orientation, depth);
+                generate(
+                    builder,
+                    random,
+                    box_.min_x() - 1,
+                    y,
+                    box_.min_z(),
+                    orientation,
+                    depth,
+                );
             } else if end_selection == 2 {
                 let y = box_.min_y() - 1 + random.next_i32_bounded(3);
                 generate(
@@ -422,7 +473,15 @@ fn corridor_add_children(
         Direction::East => {
             if end_selection <= 1 {
                 let y = box_.min_y() - 1 + random.next_i32_bounded(3);
-                generate(builder, random, box_.max_x() + 1, y, box_.min_z(), orientation, depth);
+                generate(
+                    builder,
+                    random,
+                    box_.max_x() + 1,
+                    y,
+                    box_.min_z(),
+                    orientation,
+                    depth,
+                );
             } else if end_selection == 2 {
                 let y = box_.min_y() - 1 + random.next_i32_bounded(3);
                 generate(
@@ -450,7 +509,15 @@ fn corridor_add_children(
         _ => {
             if end_selection <= 1 {
                 let y = box_.min_y() - 1 + random.next_i32_bounded(3);
-                generate(builder, random, box_.min_x(), y, box_.min_z() - 1, orientation, depth);
+                generate(
+                    builder,
+                    random,
+                    box_.min_x(),
+                    y,
+                    box_.min_z() - 1,
+                    orientation,
+                    depth,
+                );
             } else if end_selection == 2 {
                 let y = box_.min_y() - 1 + random.next_i32_bounded(3);
                 generate(
@@ -550,11 +617,11 @@ fn crossing_add_children(
     is_two_floored: bool,
 ) {
     let generate = |builder: &mut StructurePiecesBuilder,
-                        random: &mut RandomSource,
-                        x: i32,
-                        y: i32,
-                        z: i32,
-                        dir: Direction| {
+                    random: &mut RandomSource,
+                    x: i32,
+                    y: i32,
+                    z: i32,
+                    dir: Direction| {
         generate_and_add_piece(
             start_bb,
             mineshaft_type,
@@ -975,13 +1042,9 @@ impl MineShaftPiece {
                 has_placed_spider,
                 *num_sections,
             ),
-            MineShaftPieceKind::Crossing { is_two_floored, .. } => crossing_post_process(
-                base,
-                region,
-                chunk_bb,
-                mineshaft_type,
-                *is_two_floored,
-            ),
+            MineShaftPieceKind::Crossing { is_two_floored, .. } => {
+                crossing_post_process(base, region, chunk_bb, mineshaft_type, *is_two_floored)
+            }
             MineShaftPieceKind::Room {
                 child_entrance_boxes,
             } => room_post_process(base, region, chunk_bb, child_entrance_boxes),
@@ -1212,7 +1275,10 @@ fn has_sturdy_neighbours(
     false
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla maybePlaceCobWeb")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla maybePlaceCobWeb"
+)]
 fn maybe_place_cob_web(
     base: &PieceBase,
     region: &WorldGenRegion<'_>,
@@ -1284,10 +1350,16 @@ fn place_support(
         false,
     );
     if random.next_i32_bounded(4) == 0 {
-        base.generate_box(region, chunk_bb, x0, y1, z, x0, y1, z, planks, cave_air, false);
-        base.generate_box(region, chunk_bb, x1, y1, z, x1, y1, z, planks, cave_air, false);
+        base.generate_box(
+            region, chunk_bb, x0, y1, z, x0, y1, z, planks, cave_air, false,
+        );
+        base.generate_box(
+            region, chunk_bb, x1, y1, z, x1, y1, z, planks, cave_air, false,
+        );
     } else {
-        base.generate_box(region, chunk_bb, x0, y1, z, x1, y1, z, planks, cave_air, false);
+        base.generate_box(
+            region, chunk_bb, x0, y1, z, x1, y1, z, planks, cave_air, false,
+        );
         base.maybe_generate_block(
             region,
             chunk_bb,
@@ -1391,7 +1463,18 @@ fn corridor_post_process(
 
     for section in 0..num_sections {
         let z = 2 + section * 5;
-        place_support(piece, region, chunk_bb, mineshaft_type, 0, 0, z, 2, 2, random);
+        place_support(
+            piece,
+            region,
+            chunk_bb,
+            mineshaft_type,
+            0,
+            0,
+            z,
+            2,
+            2,
+            random,
+        );
         maybe_place_cob_web(piece, region, chunk_bb, random, 0.1, 0, 2, z - 1);
         maybe_place_cob_web(piece, region, chunk_bb, random, 0.1, 2, 2, z - 1);
         maybe_place_cob_web(piece, region, chunk_bb, random, 0.1, 0, 2, z + 1);
@@ -1558,10 +1641,30 @@ fn crossing_post_process(
             );
         }
     };
-    place_support_pillar(box_.min_x() + 1, box_.min_y(), box_.min_z() + 1, box_.max_y());
-    place_support_pillar(box_.min_x() + 1, box_.min_y(), box_.max_z() - 1, box_.max_y());
-    place_support_pillar(box_.max_x() - 1, box_.min_y(), box_.min_z() + 1, box_.max_y());
-    place_support_pillar(box_.max_x() - 1, box_.min_y(), box_.max_z() - 1, box_.max_y());
+    place_support_pillar(
+        box_.min_x() + 1,
+        box_.min_y(),
+        box_.min_z() + 1,
+        box_.max_y(),
+    );
+    place_support_pillar(
+        box_.min_x() + 1,
+        box_.min_y(),
+        box_.max_z() - 1,
+        box_.max_y(),
+    );
+    place_support_pillar(
+        box_.max_x() - 1,
+        box_.min_y(),
+        box_.min_z() + 1,
+        box_.max_y(),
+    );
+    place_support_pillar(
+        box_.max_x() - 1,
+        box_.min_y(),
+        box_.max_z() - 1,
+        box_.max_y(),
+    );
 
     let y = box_.min_y() - 1;
     for x in box_.min_x()..=box_.max_x() {
@@ -1625,11 +1728,7 @@ fn room_post_process(
     );
 }
 
-fn stairs_post_process(
-    base: &mut PieceBase,
-    region: &WorldGenRegion<'_>,
-    chunk_bb: BoundingBox,
-) {
+fn stairs_post_process(base: &mut PieceBase, region: &WorldGenRegion<'_>, chunk_bb: BoundingBox) {
     let piece = &*base;
     let cave_air = cave_air();
     piece.generate_box(

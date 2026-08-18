@@ -41,6 +41,7 @@ pub(crate) struct DimensionCompiler<'a> {
     end_islands: Option<*const EndIslands>,
     named_ids: FxHashMap<String, FuncId>,
     end_islands_id: Option<FuncId>,
+    fill_id: Option<FuncId>,
     inlining: InlinePolicy,
 }
 
@@ -117,6 +118,7 @@ impl<'a> DimensionCompiler<'a> {
             end_islands,
             named_ids: FxHashMap::default(),
             end_islands_id: None,
+            fill_id: None,
             inlining: InlinePolicy::new(program, analysis),
         }
     }
@@ -213,6 +215,15 @@ impl<'a> DimensionCompiler<'a> {
             named_refs.insert(name.clone(), func_ref);
         }
 
+        let fill_ref = match (shape, self.fill_id) {
+            (Shape::Fill4x, Some(id)) => Some(
+                self.module
+                    .inner_mut()
+                    .declare_func_in_func(id, builder.func),
+            ),
+            _ => None,
+        };
+
         let (cache, pos, fill, interpolated, out) = match shape {
             Shape::Full => (
                 params[0],
@@ -289,6 +300,7 @@ impl<'a> DimensionCompiler<'a> {
             interpolated,
             end_islands,
             interp_index: interp_start,
+            ref_memo: FxHashMap::default(),
         };
 
         let store_flags = MemFlagsData::trusted();
@@ -301,7 +313,9 @@ impl<'a> DimensionCompiler<'a> {
                 builder.ins().store(store_flags, value, out, offset);
             }
             builder.ins().return_(&[]);
-        } else if let (Shape::Fill4x, Some(channels), Some(out)) = (shape, channels, out) {
+        } else if let (Shape::Fill4x, Some(channels), Some(out), Some(fill_ref)) =
+            (shape, channels, out, fill_ref)
+        {
             let ys_ptr = params[2];
             let blended_ptr = params[4];
             let count = channels.len();
@@ -313,17 +327,13 @@ impl<'a> DimensionCompiler<'a> {
                 let blended = builder
                     .ins()
                     .load(types::F64, flags, blended_ptr, lane_offset);
-
-                ctx.pos.y = y;
-                ctx.fill = Some(blended);
-
-                for (index, channel) in channels.iter().enumerate() {
-                    ctx.interp_index = 0;
-                    let value = emit_expr(&mut builder, &mut ctx, unwrap_markers(channel))?;
-                    let offset = i32::try_from((lane * count + index) * size_of::<f64>())
-                        .map_err(|_| CompileError::TooManyChannels)?;
-                    builder.ins().store(store_flags, value, out, offset);
-                }
+                let out_offset = i64::try_from(lane * count * size_of::<f64>())
+                    .map_err(|_| CompileError::TooManyChannels)?;
+                let lane_out = builder.ins().iadd_imm(out, out_offset);
+                builder.ins().call(
+                    fill_ref,
+                    &[ctx.cache, ctx.pos.x, y, ctx.pos.z, blended, lane_out],
+                );
             }
             builder.ins().return_(&[]);
         } else {
@@ -347,9 +357,44 @@ pub(crate) struct FlatStep {
     pub(crate) func: DensityFn,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) enum RouterEntry {
     Cached(usize),
     Computed(DensityFn),
+}
+
+#[derive(Clone, Copy, Default)]
+pub(crate) struct WellKnownRouters {
+    pub(crate) temperature: Option<RouterEntry>,
+    pub(crate) vegetation: Option<RouterEntry>,
+    pub(crate) continentalness: Option<RouterEntry>,
+    pub(crate) erosion: Option<RouterEntry>,
+    pub(crate) depth: Option<RouterEntry>,
+    pub(crate) ridges: Option<RouterEntry>,
+    pub(crate) barrier: Option<RouterEntry>,
+    pub(crate) fluid_level_floodedness: Option<RouterEntry>,
+    pub(crate) fluid_level_spread: Option<RouterEntry>,
+    pub(crate) lava: Option<RouterEntry>,
+    pub(crate) preliminary_surface_level: Option<RouterEntry>,
+}
+
+impl WellKnownRouters {
+    fn from_map(routers: &FxHashMap<String, RouterEntry>) -> Self {
+        let get = |name: &str| routers.get(name).copied();
+        Self {
+            temperature: get("temperature"),
+            vegetation: get("vegetation"),
+            continentalness: get("continentalness"),
+            erosion: get("erosion"),
+            depth: get("depth"),
+            ridges: get("ridges"),
+            barrier: get("barrier"),
+            fluid_level_floodedness: get("fluid_level_floodedness"),
+            fluid_level_spread: get("fluid_level_spread"),
+            lava: get("lava"),
+            preliminary_surface_level: get("preliminary_surface_level"),
+        }
+    }
 }
 
 struct CodeMapping(JitModule);
@@ -368,6 +413,7 @@ pub struct CompiledDimension {
     module: Option<CodeMapping>,
     flat_steps: Vec<FlatStep>,
     routers: FxHashMap<String, RouterEntry>,
+    well_known_routers: WellKnownRouters,
     fill: FillFn,
     fill_4x: Fill4xFn,
     combine_final: CombineFn,
@@ -386,6 +432,10 @@ impl CompiledDimension {
 
     pub(crate) fn router(&self, name: &str) -> Option<&RouterEntry> {
         self.routers.get(name)
+    }
+
+    pub(crate) const fn routers(&self) -> &WellKnownRouters {
+        &self.well_known_routers
     }
 
     pub(crate) const fn fill(&self) -> FillFn {
@@ -524,6 +574,7 @@ impl DimensionCompiler<'_> {
             .inner_mut()
             .declare_function("fill_cell_corner_densities", Linkage::Local, &fill_sig)
             .map_err(JitError::from)?;
+        self.fill_id = Some(fill_id);
         let zero_df = DensityFunction::constant(0.0);
         self.define(fill_id, Shape::Fill, &zero_df, false, Some(&channels), 0)?;
 
@@ -639,6 +690,7 @@ impl DimensionCompiler<'_> {
         Ok(CompiledDimension {
             module: Some(CodeMapping(self.module)),
             flat_steps,
+            well_known_routers: WellKnownRouters::from_map(&routers),
             routers,
             fill,
             fill_4x,

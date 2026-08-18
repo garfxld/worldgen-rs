@@ -12,20 +12,17 @@ use crate::worldgen::structure::templatesystem::structure_template::StructureTem
 use crate::worldgen::structure::templatesystem::structure_template_manager::templates;
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TemplateConfig {
     pub templates: Vec<WeightedTemplateEntry>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct WeightedTemplateEntry {
     pub data: TemplateEntry,
     pub weight: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TemplateEntry {
     pub id: Identifier,
     #[serde(default = "all_rotations")]

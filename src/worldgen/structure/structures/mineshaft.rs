@@ -15,11 +15,7 @@ pub fn find_generation_point<'a>(
     });
 
     let chunk_pos = context.chunk_pos;
-    let start_pos = BlockPos::new(
-        chunk_pos.0.x * 16 + 8,
-        MAGIC_START_Y,
-        chunk_pos.0.y * 16,
-    );
+    let start_pos = BlockPos::new(chunk_pos.0.x * 16 + 8, MAGIC_START_Y, chunk_pos.0.y * 16);
 
     let mut builder = StructurePiecesBuilder::new();
     let y_offset = generate_pieces_and_adjust(&mut builder, context, mineshaft_type);

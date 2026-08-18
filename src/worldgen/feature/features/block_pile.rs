@@ -4,14 +4,13 @@ use crate::util::direction::Direction;
 use crate::util::ident::Identifier;
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
-use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::feature::features::blockpos_iter::between_closed;
+use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 const DIRT_PATH: Identifier = Identifier::const_vanilla("dirt_path");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct BlockPileConfig {
     pub state_provider: BlockStateProvider,
 }

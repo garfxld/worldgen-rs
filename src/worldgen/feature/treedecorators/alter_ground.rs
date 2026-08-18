@@ -6,7 +6,6 @@ use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::feature::treedecorators::TreeDecoratorContext;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct AlterGroundDecorator {
     pub provider: BlockStateProvider,
 }
@@ -50,9 +49,9 @@ impl AlterGroundDecorator {
     fn place_block_at(&self, context: &mut TreeDecoratorContext<'_, '_>, pos: BlockPos) {
         for dy in (-3..=2).rev() {
             let cursor = pos.offset(0, dy, 0);
-            if let Some(state) = self
-                .provider
-                .get_optional_state(context.region, context.random, cursor)
+            if let Some(state) =
+                self.provider
+                    .get_optional_state(context.region, context.random, cursor)
             {
                 context.set_block(cursor, state);
                 break;

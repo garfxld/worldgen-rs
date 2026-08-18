@@ -1,3 +1,9 @@
+use std::path::Path;
+
+use serde::Deserialize;
+
+use crate::datapack::{DatapackError, collect_json_files, parse_id, path_to_id};
+use crate::datapack::read_and_parse_normalized;
 use crate::registry::Registry;
 use crate::util::ident::Identifier;
 use crate::util::rng::legacy_random::LegacyRandomSource;
@@ -90,6 +96,124 @@ impl ConfiguredCarver {
 
 pub type ConfiguredCarverRef = &'static ConfiguredCarver;
 pub type ConfiguredCarverRegistry = Registry<ConfiguredCarver>;
+
+#[derive(Deserialize)]
+#[serde(tag = "type", content = "config")]
+enum ConfiguredCarverJson {
+    #[serde(rename = "minecraft:cave")]
+    Cave(CaveCarverJson),
+    #[serde(rename = "minecraft:nether_cave")]
+    NetherCave(CaveCarverJson),
+    #[serde(rename = "minecraft:canyon")]
+    Canyon(CanyonCarverJson),
+}
+
+#[derive(Deserialize)]
+struct CarverConfigJson {
+    probability: f32,
+    y: HeightProvider,
+    #[serde(rename = "yScale")]
+    y_scale: FloatProvider,
+    lava_level: VerticalAnchor,
+    replaceable: String,
+}
+
+#[derive(Deserialize)]
+struct CaveCarverJson {
+    #[serde(flatten)]
+    base: CarverConfigJson,
+    horizontal_radius_multiplier: FloatProvider,
+    vertical_radius_multiplier: FloatProvider,
+    floor_level: FloatProvider,
+}
+
+#[derive(Deserialize)]
+struct CanyonCarverJson {
+    #[serde(flatten)]
+    base: CarverConfigJson,
+    vertical_rotation: FloatProvider,
+    shape: CanyonShapeJson,
+}
+
+#[derive(Deserialize)]
+struct CanyonShapeJson {
+    distance_factor: FloatProvider,
+    thickness: FloatProvider,
+    width_smoothness: i32,
+    horizontal_radius_factor: FloatProvider,
+    vertical_radius_default_factor: f32,
+    vertical_radius_center_factor: f32,
+}
+
+impl CarverConfigJson {
+    fn into_config(self) -> CarverConfig {
+        let replaceable_tag = self.replaceable.strip_prefix('#').unwrap_or_else(|| {
+            panic!(
+                "carver replaceable {} is not a block tag, which is the only form supported",
+                self.replaceable
+            )
+        });
+        CarverConfig {
+            probability: self.probability,
+            y: self.y,
+            y_scale: self.y_scale,
+            lava_level: self.lava_level,
+            replaceable_tag: parse_id(replaceable_tag),
+        }
+    }
+}
+
+impl ConfiguredCarverJson {
+    fn into_kind(self) -> ConfiguredCarverKind {
+        match self {
+            Self::Cave(cave) => ConfiguredCarverKind::Cave(cave.into_config()),
+            Self::NetherCave(cave) => ConfiguredCarverKind::NetherCave(cave.into_config()),
+            Self::Canyon(canyon) => ConfiguredCarverKind::Canyon(CanyonCarverConfig {
+                base: canyon.base.into_config(),
+                vertical_rotation: canyon.vertical_rotation,
+                shape: CanyonShapeConfig {
+                    distance_factor: canyon.shape.distance_factor,
+                    thickness: canyon.shape.thickness,
+                    width_smoothness: canyon.shape.width_smoothness,
+                    horizontal_radius_factor: canyon.shape.horizontal_radius_factor,
+                    vertical_radius_default_factor: canyon.shape.vertical_radius_default_factor,
+                    vertical_radius_center_factor: canyon.shape.vertical_radius_center_factor,
+                },
+            }),
+        }
+    }
+}
+
+impl CaveCarverJson {
+    fn into_config(self) -> CaveCarverConfig {
+        CaveCarverConfig {
+            base: self.base.into_config(),
+            horizontal_radius_multiplier: self.horizontal_radius_multiplier,
+            vertical_radius_multiplier: self.vertical_radius_multiplier,
+            floor_level: self.floor_level,
+        }
+    }
+}
+
+impl ConfiguredCarverRegistry {
+    pub fn load_from_datapack(
+        &mut self,
+        namespace: &str,
+        worldgen_dir: &Path,
+    ) -> Result<(), DatapackError> {
+        let dir = worldgen_dir.join("configured_carver");
+        for file in collect_json_files(&dir) {
+            let json: ConfiguredCarverJson = read_and_parse_normalized(&file)?;
+            let key = parse_id(&path_to_id(namespace, &file, &dir));
+            let carver = Box::leak(Box::new(ConfiguredCarver {
+                key: key.clone(),
+                kind: json.into_kind(),
+            }));
+            self.register(key, carver);
+        }
+        Ok(())
+    }
+}
 
 pub mod vanilla_carvers {
     use super::{

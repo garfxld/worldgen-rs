@@ -1,6 +1,6 @@
 use crate::registry::blocks::properties::Properties;
-use crate::registry::blocks::vanilla_blocks;
 use crate::registry::blocks::transform;
+use crate::registry::blocks::vanilla_blocks;
 use crate::util::direction::Direction;
 use crate::util::geometry::BoundingBox;
 use crate::util::ident::BlockState;
@@ -24,7 +24,10 @@ pub struct DesertPyramidPiece {
 }
 
 impl DesertPyramidPiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     pub fn new(random: &mut RandomSource, west: i32, north: i32) -> StructurePiece {
         let direction = Direction::get_random_horizontal(random);
         let base = ScatteredFeature::make_base(west, 64, north, WIDTH, 15, DEPTH, direction);
@@ -79,9 +82,10 @@ impl DesertPyramidPiece {
         let place = |state: BlockState, x: i32, y: i32, z: i32| {
             piece.place_block(region, state, x, y, z, chunk_bb);
         };
-        let gbox = |x0: i32, y0: i32, z0: i32, x1: i32, y1: i32, z1: i32, e: BlockState, f: BlockState| {
-            piece.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, e, f, false);
-        };
+        let gbox =
+            |x0: i32, y0: i32, z0: i32, x1: i32, y1: i32, z1: i32, e: BlockState, f: BlockState| {
+                piece.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, e, f, false);
+            };
 
         gbox(0, -4, 0, width - 1, 0, depth - 1, sandstone, sandstone);
 
@@ -174,7 +178,12 @@ impl DesertPyramidPiece {
         place(sandstone, 1, 1, 2);
         place(sandstone, width - 2, 1, 2);
         place(vanilla_blocks::SANDSTONE_SLAB.default_state(), 1, 2, 2);
-        place(vanilla_blocks::SANDSTONE_SLAB.default_state(), width - 2, 2, 2);
+        place(
+            vanilla_blocks::SANDSTONE_SLAB.default_state(),
+            width - 2,
+            2,
+            2,
+        );
         place(west_stairs, 2, 1, 2);
         place(east_stairs, width - 3, 1, 2);
         gbox(4, 3, 5, 4, 3, 17, sandstone, sandstone);
@@ -268,8 +277,22 @@ impl DesertPyramidPiece {
         gbox(8, -9, 8, 12, -9, 12, cut, cut);
         gbox(8, -8, 8, 12, -1, 12, sandstone, sandstone);
         gbox(9, -11, 9, 11, -1, 11, air, air);
-        place(vanilla_blocks::STONE_PRESSURE_PLATE.default_state(), 10, -11, 10);
-        gbox(9, -13, 9, 11, -13, 11, vanilla_blocks::TNT.default_state(), air);
+        place(
+            vanilla_blocks::STONE_PRESSURE_PLATE.default_state(),
+            10,
+            -11,
+            10,
+        );
+        gbox(
+            9,
+            -13,
+            9,
+            11,
+            -13,
+            11,
+            vanilla_blocks::TNT.default_state(),
+            air,
+        );
         place(air, 8, -11, 10);
         place(air, 8, -10, 10);
         place(chiseled, 7, -10, 10);
@@ -291,26 +314,15 @@ impl DesertPyramidPiece {
             let index = direction.get_2d_data_value() as usize;
             if !self.has_placed_chest[index] {
                 let (xo, _, zo) = direction.offset();
-                self.has_placed_chest[index] = piece.create_chest(
-                    region,
-                    chunk_bb,
-                    random,
-                    10 + xo * 2,
-                    -11,
-                    10 + zo * 2,
-                );
+                self.has_placed_chest[index] =
+                    piece.create_chest(region, chunk_bb, random, 10 + xo * 2, -11, 10 + zo * 2);
             }
         }
 
         self.add_cellar(base, region, chunk_bb);
     }
 
-    fn add_cellar(
-        &mut self,
-        base: &PieceBase,
-        region: &WorldGenRegion<'_>,
-        chunk_bb: BoundingBox,
-    ) {
+    fn add_cellar(&mut self, base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: BoundingBox) {
         let room_center = BlockPos::new(16, -4, 13);
         self.add_cellar_stairs(room_center, base, region, chunk_bb);
         self.add_cellar_room(room_center, base, region, chunk_bb);

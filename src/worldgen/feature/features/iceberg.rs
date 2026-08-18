@@ -10,7 +10,6 @@ use crate::util::rng::RandomSource;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct IcebergConfig {
     pub state: BlockState,
 }
@@ -31,7 +30,14 @@ fn is_iceberg_state(state: BlockState) -> bool {
         || block == &vanilla_blocks::BLUE_ICE
 }
 
-fn signed_distance_ellipse(xo: i32, zo: i32, origin: (i32, i32), a: i32, c: i32, angle: f64) -> f64 {
+fn signed_distance_ellipse(
+    xo: i32,
+    zo: i32,
+    origin: (i32, i32),
+    a: i32,
+    c: i32,
+    angle: f64,
+) -> f64 {
     let dx = f64::from(xo - origin.0);
     let dz = f64::from(zo - origin.1);
     ((dx * angle.cos() - dz * angle.sin()) / f64::from(a)).powi(2)
@@ -47,9 +53,7 @@ fn signed_distance_circle(
     random: &mut RandomSource,
 ) -> f64 {
     let off = 10.0 * random.next_f32().clamp(0.2, 0.8) / radius as f32;
-    f64::from(off)
-        + f64::from(xo - origin.0).powi(2)
-        + f64::from(zo - origin.1).powi(2)
+    f64::from(off) + f64::from(xo - origin.0).powi(2) + f64::from(zo - origin.1).powi(2)
         - f64::from(radius).powi(2)
 }
 
@@ -273,13 +277,7 @@ fn generate_cut_out(
     }
 }
 
-fn smooth(
-    region: &WorldGenRegion<'_>,
-    shape: &Shape,
-    origin: BlockPos,
-    width: i32,
-    height: i32,
-) {
+fn smooth(region: &WorldGenRegion<'_>, shape: &Shape, origin: BlockPos, width: i32, height: i32) {
     let a = if shape.is_ellipse {
         shape.ellipse_a
     } else {
@@ -302,8 +300,10 @@ fn smooth(
                             region.get_block(pos.north()),
                             region.get_block(pos.south()),
                         ];
-                        let non_iceberg =
-                            sides.iter().filter(|&&side| !is_iceberg_state(side)).count();
+                        let non_iceberg = sides
+                            .iter()
+                            .filter(|&&side| !is_iceberg_state(side))
+                            .count();
                         if non_iceberg >= 3 {
                             region.set_block(pos, vanilla_blocks::AIR.default_state());
                         }
@@ -383,7 +383,8 @@ pub fn place(
             while y_off > -under_water_height {
                 let new_a = if is_ellipse {
                     ceil_f32(
-                        a as f32 * (1.0 - (y_off as f32).powi(2) / (under_water_height as f32 * 8.0)),
+                        a as f32
+                            * (1.0 - (y_off as f32).powi(2) / (under_water_height as f32 * 8.0)),
                     )
                 } else {
                     a

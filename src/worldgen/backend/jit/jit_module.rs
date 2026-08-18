@@ -55,6 +55,7 @@ impl JitModule {
         flags.set("use_colocated_libcalls", "false")?;
         flags.set("is_pic", "false")?;
         flags.set("opt_level", "speed")?;
+        flags.set("enable_verifier", "false")?;
 
         let isa_builder =
             cranelift_native::builder().map_err(|e| JitError::UnsupportedHost(e.to_string()))?;

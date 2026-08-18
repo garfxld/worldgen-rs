@@ -2,47 +2,49 @@ use crate::util::ident::Identifier;
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 use crate::worldgen::feature::PlacedFeature;
+use crate::worldgen::feature::features::bamboo::{self, BambooConfig};
+use crate::worldgen::feature::features::basalt_columns::{self, ColumnConfig};
 use crate::worldgen::feature::features::block_blob::{self, BlockBlobConfig};
 use crate::worldgen::feature::features::block_column::{self, BlockColumnConfig};
 use crate::worldgen::feature::features::block_pile::{self, BlockPileConfig};
+use crate::worldgen::feature::features::delta_feature::{self, DeltaConfig};
 use crate::worldgen::feature::features::disk::{self, DiskConfig};
 use crate::worldgen::feature::features::end_gateway::{self, EndGatewayConfig};
-use crate::worldgen::feature::features::fossil::{self, FossilConfig};
-use crate::worldgen::feature::features::fallen_tree::{self, FallenTreeConfig};
 use crate::worldgen::feature::features::end_spike::{self, EndSpikeConfig};
+use crate::worldgen::feature::features::fallen_tree::{self, FallenTreeConfig};
+use crate::worldgen::feature::features::fossil::{self, FossilConfig};
 use crate::worldgen::feature::features::geode::{self, GeodeConfig};
 use crate::worldgen::feature::features::huge_fungus::{self, HugeFungusConfig};
+use crate::worldgen::feature::features::huge_mushroom::{
+    self, HugeMushroomConfig, MushroomVariant,
+};
 use crate::worldgen::feature::features::iceberg::{self, IcebergConfig};
-use crate::worldgen::feature::features::huge_mushroom::{self, HugeMushroomConfig, MushroomVariant};
 use crate::worldgen::feature::features::lake::{self, LakeConfig};
 use crate::worldgen::feature::features::large_dripstone::{self, LargeDripstoneConfig};
 use crate::worldgen::feature::features::multiface_growth::{self, MultifaceGrowthConfig};
-use crate::worldgen::feature::features::ore::{self, OreConfig};
-use crate::worldgen::feature::features::simple_block::{self, SimpleBlockConfig};
-use crate::worldgen::feature::features::spring::{self, SpringConfig};
-use crate::worldgen::feature::features::template::{self, TemplateConfig};
-use crate::worldgen::feature::features::tree::{self, TreeConfig};
-use crate::worldgen::feature::features::bamboo::{self, BambooConfig};
-use crate::worldgen::feature::features::basalt_columns::{self, ColumnConfig};
-use crate::worldgen::feature::features::delta_feature::{self, DeltaConfig};
 use crate::worldgen::feature::features::nether_forest_vegetation::{
     self, NetherForestVegetationConfig,
 };
 use crate::worldgen::feature::features::netherrack_replace_blobs::{self, ReplaceSphereConfig};
+use crate::worldgen::feature::features::ore::{self, OreConfig};
 use crate::worldgen::feature::features::root_system::{self, RootSystemConfig};
 use crate::worldgen::feature::features::sculk_patch::{self, SculkPatchConfig};
 use crate::worldgen::feature::features::sea_pickle::{self, SeaPickleConfig};
 use crate::worldgen::feature::features::seagrass::{self, SeagrassConfig};
-use crate::worldgen::feature::features::twisting_vines::{self, TwistingVinesConfig};
+use crate::worldgen::feature::features::simple_block::{self, SimpleBlockConfig};
 use crate::worldgen::feature::features::speleothem::{self, SpeleothemConfig};
 use crate::worldgen::feature::features::speleothem_cluster::{self, SpeleothemClusterConfig};
 use crate::worldgen::feature::features::spike::{self, SpikeConfig};
+use crate::worldgen::feature::features::spring::{self, SpringConfig};
+use crate::worldgen::feature::features::template::{self, TemplateConfig};
+use crate::worldgen::feature::features::tree::{self, TreeConfig};
+use crate::worldgen::feature::features::twisting_vines::{self, TwistingVinesConfig};
 use crate::worldgen::feature::features::underwater_magma::{self, UnderwaterMagmaConfig};
 use crate::worldgen::feature::features::vegetation_patch::{self, VegetationPatchConfig};
 use crate::worldgen::feature::features::{
-    basalt_pillar, blue_ice, end_island, end_platform, glowstone_blob, kelp, scattered_ore, vines,
-    bonus_chest, chorus_plant, coral_claw, coral_mushroom, coral_tree, desert_well,
-    freeze_top_layer, monster_room, void_start_platform, weeping_vines,
+    basalt_pillar, blue_ice, bonus_chest, chorus_plant, coral_claw, coral_mushroom, coral_tree,
+    desert_well, end_island, end_platform, freeze_top_layer, glowstone_blob, kelp, monster_room,
+    scattered_ore, vines, void_start_platform, weeping_vines,
 };
 use crate::worldgen::placement::PlacementContext;
 
@@ -207,9 +209,13 @@ impl ConfiguredFeature {
             Self::HugeRedMushroom(config) => {
                 huge_mushroom::place(context.region, random, origin, config, MushroomVariant::Red)
             }
-            Self::HugeBrownMushroom(config) => {
-                huge_mushroom::place(context.region, random, origin, config, MushroomVariant::Brown)
-            }
+            Self::HugeBrownMushroom(config) => huge_mushroom::place(
+                context.region,
+                random,
+                origin,
+                config,
+                MushroomVariant::Brown,
+            ),
             Self::MultifaceGrowth(config) => {
                 multiface_growth::place(context.region, random, origin, config)
             }

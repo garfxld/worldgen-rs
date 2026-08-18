@@ -260,7 +260,10 @@ fn join_discrete(
         y_merger.for_merged_indexes(&mut |y1, y2, yr| {
             let mut updated_column = false;
             z_merger.for_merged_indexes(&mut |z1, z2, zr| {
-                if op.apply(first.is_full_wide(x1, y1, z1), second.is_full_wide(x2, y2, z2)) {
+                if op.apply(
+                    first.is_full_wide(x1, y1, z1),
+                    second.is_full_wide(x2, y2, z2),
+                ) {
                     shape.set(xr, yr, zr);
                     bounds[2] = bounds[2].min(zr);
                     bounds[5] = bounds[5].max(zr);

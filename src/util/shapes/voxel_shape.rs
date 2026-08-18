@@ -84,16 +84,17 @@ impl VoxelShape {
         let x_coords = self.get_coords(Axis::X);
         let y_coords = self.get_coords(Axis::Y);
         let z_coords = self.get_coords(Axis::Z);
-        self.shape().for_all_boxes(&mut |xi1, yi1, zi1, xi2, yi2, zi2| {
-            consumer(
-                x_coords.get(xi1 as usize),
-                y_coords.get(yi1 as usize),
-                z_coords.get(zi1 as usize),
-                x_coords.get(xi2 as usize),
-                y_coords.get(yi2 as usize),
-                z_coords.get(zi2 as usize),
-            );
-        });
+        self.shape()
+            .for_all_boxes(&mut |xi1, yi1, zi1, xi2, yi2, zi2| {
+                consumer(
+                    x_coords.get(xi1 as usize),
+                    y_coords.get(yi1 as usize),
+                    z_coords.get(zi1 as usize),
+                    x_coords.get(xi2 as usize),
+                    y_coords.get(yi2 as usize),
+                    z_coords.get(zi2 as usize),
+                );
+            });
     }
 
     pub fn optimize(&self) -> Self {

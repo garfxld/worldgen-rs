@@ -3,12 +3,12 @@ use std::sync::{LazyLock, OnceLock};
 
 use serde::{Deserialize, Deserializer};
 
-use crate::registry::{REGISTRY, Registry};
-use crate::util::datapack::{
-    DatapackError, collect_json_files, path_to_id, read_and_parse_normalized,
+use crate::datapack::{
+    DatapackError, collect_json_files, parse_id, path_to_id, read_and_parse_normalized,
 };
 use crate::registry::blocks::vanilla_blocks;
 use crate::registry::fluid::is_water_fluid;
+use crate::registry::{REGISTRY, Registry};
 use crate::util::ident::Identifier;
 use crate::util::noise::perlin_simplex_noise::PerlinSimplexNoise;
 use crate::util::pos::BlockPos;
@@ -195,14 +195,6 @@ fn one_or_many<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error>
     })
 }
 
-fn identifier(namespace: &str, raw: &str) -> Identifier {
-    if let Some((ns, path)) = raw.split_once(':') {
-        Identifier::new(ns.to_owned(), path.to_owned())
-    } else {
-        Identifier::new(namespace.to_owned(), raw.to_owned())
-    }
-}
-
 pub struct BiomeRegistry {
     registry: Registry<Biome>,
 }
@@ -235,7 +227,7 @@ impl BiomeRegistry {
         let dir = worldgen_dir.join("biome");
         for file in collect_json_files(&dir) {
             let json: BiomeJson = read_and_parse_normalized(&file)?;
-            let key = identifier(namespace, &path_to_id(namespace, &file, &dir));
+            let key = parse_id(&path_to_id(namespace, &file, &dir));
 
             let temperature_modifier = match json.temperature_modifier.as_deref() {
                 Some("frozen") => TemperatureModifier::Frozen,
@@ -244,12 +236,12 @@ impl BiomeRegistry {
             let carvers = json
                 .carvers
                 .iter()
-                .map(|raw| identifier(namespace, raw))
+                .map(|raw| parse_id(raw))
                 .collect();
             let features = json
                 .features
                 .into_iter()
-                .map(|step| step.iter().map(|raw| identifier(namespace, raw)).collect())
+                .map(|step| step.iter().map(|raw| parse_id(raw)).collect())
                 .collect();
 
             let biome = Box::leak(Box::new(Biome {
@@ -282,7 +274,7 @@ impl BiomeRegistry {
         &mut self,
         namespace: &str,
         directory: &std::path::Path,
-    ) -> Result<(), crate::util::datapack::DatapackError> {
+    ) -> Result<(), crate::datapack::DatapackError> {
         self.registry.load_tags_from_datapack(namespace, directory)
     }
 
@@ -305,19 +297,14 @@ impl BiomeRegistry {
     reason = "biome registry tests assert required vanilla properties are present"
 )]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
-
-    fn datapack_worldgen_dir() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
+    use crate::datapack::Datapack;
 
     fn create_test_registry() -> BiomeRegistry {
         let mut registry = BiomeRegistry::new();
-        registry
-            .load_from_datapack("minecraft", &datapack_worldgen_dir())
-            .unwrap();
+        for (namespace, dir) in Datapack::builtin().namespaced_dirs("worldgen") {
+            registry.load_from_datapack(&namespace, &dir).unwrap();
+        }
         registry.freeze();
         registry
     }

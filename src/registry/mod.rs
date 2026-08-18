@@ -6,12 +6,13 @@ pub mod fluid;
 pub mod tags;
 
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::OnceLock;
 
 use rustc_hash::FxHashMap;
 
-use crate::util::datapack::DatapackError;
+use crate::datapack::Datapack;
+use crate::datapack::DatapackError;
 use crate::util::ident::Identifier;
 
 pub use tags::RegistryTags;
@@ -198,47 +199,40 @@ pub struct Registries {
     pub dimension_types: dimension_type::DimensionTypeRegistry,
 }
 
-fn vanilla_datapack_worldgen_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-}
-
-fn vanilla_datapack_tags_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/tags")
-}
-
 impl Registries {
     pub fn new_vanilla() -> Result<Self, DatapackError> {
-        Self::new_with_overlay(None)
+        Self::new_with_datapack(&Datapack::builtin())
     }
 
-    pub fn new_with_datapack(overlay_worldgen_dir: &Path) -> Result<Self, DatapackError> {
-        Self::new_with_overlay(Some(overlay_worldgen_dir))
-    }
-
-    fn new_with_overlay(overlay_worldgen_dir: Option<&Path>) -> Result<Self, DatapackError> {
+    pub fn new_with_datapack(pack: &Datapack) -> Result<Self, DatapackError> {
         let mut fluids = fluid::FluidRegistry::new();
         fluid::vanilla_fluids::register_fluids(&mut fluids);
-        fluids.load_tags_from_datapack("minecraft", &vanilla_datapack_tags_dir().join("fluid"))?;
+        for (namespace, dir) in pack.namespaced_dirs("tags/fluid") {
+            fluids.load_tags_from_datapack(&namespace, &dir)?;
+        }
 
         let mut blocks = blocks::BlockRegistry::new();
         blocks::vanilla_blocks::register_blocks(&mut blocks);
-        blocks.load_tags_from_datapack("minecraft", &vanilla_datapack_tags_dir())?;
+        for (namespace, dir) in pack.namespaced_dirs("tags") {
+            blocks.load_tags_from_datapack(&namespace, &dir)?;
+        }
 
         let mut biomes = biome::BiomeRegistry::new();
-        biomes.load_from_datapack("minecraft", &vanilla_datapack_worldgen_dir())?;
-        biomes.load_tags_from_datapack(
-            "minecraft",
-            &vanilla_datapack_tags_dir().join("worldgen/biome"),
-        )?;
-        if let Some(overlay) = overlay_worldgen_dir {
-            biomes.load_from_datapack("minecraft", overlay)?;
+        for (namespace, dir) in pack.namespaced_dirs("worldgen") {
+            biomes.load_from_datapack(&namespace, &dir)?;
+        }
+        for (namespace, dir) in pack.namespaced_dirs("tags/worldgen/biome") {
+            biomes.load_tags_from_datapack(&namespace, &dir)?;
         }
 
         let mut carvers = carver::ConfiguredCarverRegistry::new();
         carver::vanilla_carvers::register_carvers(&mut carvers);
+        for (namespace, dir) in pack.namespaced_dirs("worldgen") {
+            carvers.load_from_datapack(&namespace, &dir)?;
+        }
 
         let mut dimension_types = dimension_type::DimensionTypeRegistry::new();
-        dimension_type::vanilla_dimension_types::register_dimension_types(&mut dimension_types);
+        dimension_type::load_dimension_types(&mut dimension_types, pack)?;
 
         Ok(Self {
             blocks,

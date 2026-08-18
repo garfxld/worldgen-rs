@@ -1,4 +1,6 @@
 /target
 /src/registry/generated
-*.zip
 perf.data*
+
+# avoid including datapacks
+*.zip

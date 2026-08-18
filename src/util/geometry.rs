@@ -90,11 +90,7 @@ impl BlockLocalAabb {
 
     pub const fn of(box_: BoundingBox) -> Self {
         Self {
-            min: DVec3::new(
-                box_.min.x as f64,
-                box_.min.y as f64,
-                box_.min.z as f64,
-            ),
+            min: DVec3::new(box_.min.x as f64, box_.min.y as f64, box_.min.z as f64),
             max: DVec3::new(
                 (box_.max.x + 1) as f64,
                 (box_.max.y + 1) as f64,
@@ -161,7 +157,10 @@ impl BoundingBox {
         )
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla BoundingBox::orientBox")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla BoundingBox::orientBox"
+    )]
     pub const fn orient_box(
         foot_x: i32,
         foot_y: i32,
@@ -305,14 +304,38 @@ impl BoundingBox {
     pub const fn encapsulate_box(self, other: Self) -> Self {
         Self {
             min: IVec3::new(
-                if self.min.x < other.min.x { self.min.x } else { other.min.x },
-                if self.min.y < other.min.y { self.min.y } else { other.min.y },
-                if self.min.z < other.min.z { self.min.z } else { other.min.z },
+                if self.min.x < other.min.x {
+                    self.min.x
+                } else {
+                    other.min.x
+                },
+                if self.min.y < other.min.y {
+                    self.min.y
+                } else {
+                    other.min.y
+                },
+                if self.min.z < other.min.z {
+                    self.min.z
+                } else {
+                    other.min.z
+                },
             ),
             max: IVec3::new(
-                if self.max.x > other.max.x { self.max.x } else { other.max.x },
-                if self.max.y > other.max.y { self.max.y } else { other.max.y },
-                if self.max.z > other.max.z { self.max.z } else { other.max.z },
+                if self.max.x > other.max.x {
+                    self.max.x
+                } else {
+                    other.max.x
+                },
+                if self.max.y > other.max.y {
+                    self.max.y
+                } else {
+                    other.max.y
+                },
+                if self.max.z > other.max.z {
+                    self.max.z
+                } else {
+                    other.max.z
+                },
             ),
         }
     }

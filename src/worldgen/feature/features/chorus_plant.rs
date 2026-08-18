@@ -28,9 +28,10 @@ fn is_plant_or_flower(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
 }
 
 fn supports_chorus_plant(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
-    REGISTRY
-        .blocks
-        .is_in_tag(&region.get_block(pos).get_block().key, &SUPPORTS_CHORUS_PLANT)
+    REGISTRY.blocks.is_in_tag(
+        &region.get_block(pos).get_block().key,
+        &SUPPORTS_CHORUS_PLANT,
+    )
 }
 
 fn state_with_connections(region: &WorldGenRegion<'_>, pos: BlockPos) -> BlockState {

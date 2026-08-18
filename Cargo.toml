@@ -66,10 +66,9 @@ debug = true
 opt-level = 3
 codegen-units = 16
 debug = 0
-
-[profile.dev.package.worldgen-rs]
 debug-assertions = false
 overflow-checks = false
+
 
 [lints.clippy]
 absolute_paths = "warn"

@@ -11,7 +11,6 @@ use crate::worldgen::region::WorldGenRegion;
 const NYLIUM: Identifier = Identifier::const_vanilla("nylium");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct NetherForestVegetationConfig {
     pub state_provider: BlockStateProvider,
     pub spread_width: i32,

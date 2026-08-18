@@ -110,7 +110,13 @@ impl MansionGrid {
             entrance_y + 1,
             START_ROOM,
         );
-        base_grid.set_area(entrance_x - 1, entrance_y, entrance_x - 1, entrance_y + 1, ROOM);
+        base_grid.set_area(
+            entrance_x - 1,
+            entrance_y,
+            entrance_x - 1,
+            entrance_y + 1,
+            ROOM,
+        );
         base_grid.set_area(
             entrance_x + 2,
             entrance_y - 2,
@@ -320,16 +326,21 @@ fn recursive_corridor(
 
     for _ in 0..8 {
         let next_dir = Direction::from_2d_data_value(random.next_i32_bounded(4));
-        if next_dir != heading.opposite()
-            && (next_dir != Direction::East || !random.next_bool())
-        {
+        if next_dir != heading.opposite() && (next_dir != Direction::East || !random.next_bool()) {
             let nx = x + hx;
             let ny = y + hz;
             let (ndx, ndz) = next_dir.offset_xz();
             if grid.get(nx + ndx, ny + ndz) == CLEAR
                 && grid.get(nx + ndx * 2, ny + ndz * 2) == CLEAR
             {
-                recursive_corridor(grid, random, x + hx + ndx, y + hz + ndz, next_dir, depth - 1);
+                recursive_corridor(
+                    grid,
+                    random,
+                    x + hx + ndx,
+                    y + hz + ndz,
+                    next_dir,
+                    depth - 1,
+                );
                 break;
             }
         }
@@ -884,8 +895,7 @@ impl MansionPiecePlacer {
                         && let Some(door_dir) = door_dir
                     {
                         let room_dir = mansion.get_1x2_room_direction(x, y, floor_num, room_id);
-                        let is_stairs_room =
-                            (room_data & ROOM_STAIRS_FLAG) == ROOM_STAIRS_FLAG;
+                        let is_stairs_room = (room_data & ROOM_STAIRS_FLAG) == ROOM_STAIRS_FLAG;
                         if let Some(room_dir) = room_dir {
                             add_room_1x2(
                                 pieces,
@@ -988,7 +998,12 @@ impl MansionPiecePlacer {
                 position = position.relative_n(east, (x - self.start_x) * 8);
                 let is_above = above_grid.is_some_and(|above| is_house(above, x, y));
                 if is_house(grid, x, y) && !is_above {
-                    pieces.push(new_piece("roof", position.above_n(3), rotation, Mirror::None));
+                    pieces.push(new_piece(
+                        "roof",
+                        position.above_n(3),
+                        rotation,
+                        Mirror::None,
+                    ));
                     if !is_house(grid, x + 1, y) {
                         let p2 = position.relative_n(east, 6);
                         pieces.push(new_piece("roof_front", p2, rotation, Mirror::None));
@@ -1067,12 +1082,7 @@ impl MansionPiecePlacer {
                     if !is_house(grid, x + 1, y) {
                         if !is_house(grid, x, y - 1) {
                             let p2 = position.relative_n(east, 7).relative_n(north, 2);
-                            pieces.push(new_piece(
-                                "small_wall_corner",
-                                p2,
-                                rotation,
-                                Mirror::None,
-                            ));
+                            pieces.push(new_piece("small_wall_corner", p2, rotation, Mirror::None));
                         }
                         if !is_house(grid, x, y + 1) {
                             let p2 = position.relative_n(east, 8).relative_n(south, 7);
@@ -1541,17 +1551,15 @@ impl WoodlandMansionPiece {
                         _ => None,
                     };
                     if let Some(facing) = facing {
-                        chest_state = chest_state.set_value(
-                            &Properties::HORIZONTAL_FACING,
-                            rotation.rotate(facing),
-                        );
+                        chest_state = chest_state
+                            .set_value(&Properties::HORIZONTAL_FACING, rotation.rotate(facing));
                     }
                     create_chest_at(region, chunk_bb, random, position, Some(chest_state));
                 } else if matches!(marker_id, "Mage" | "Warrior") {
                     region.set_block(position, vanilla_blocks::AIR.default_state());
                 } else if marker_id == "Group of Allays" {
-                    let count = region
-                        .with_random(|level_random| level_random.next_i32_bounded(3) + 1);
+                    let count =
+                        region.with_random(|level_random| level_random.next_i32_bounded(3) + 1);
                     if count > 0 {
                         region.set_block(position, vanilla_blocks::AIR.default_state());
                     }

@@ -9,9 +9,7 @@ use crate::worldgen::structure::structure::{
 };
 use crate::worldgen::structure::structures::woodland_mansion_pieces;
 
-pub fn find_generation_point<'a>(
-    context: &'a GenerationContext<'a>,
-) -> Option<GenerationStub<'a>> {
+pub fn find_generation_point<'a>(context: &'a GenerationContext<'a>) -> Option<GenerationStub<'a>> {
     let rotation = context.with_random(Rotation::get_random);
     let start_pos = get_lowest_y_in_5by5_box_offset_7_blocks(context, rotation);
     if start_pos.y() < 60 {
@@ -22,12 +20,7 @@ pub fn find_generation_point<'a>(
         build: Box::new(move |builder| {
             let mut pieces = Vec::new();
             context.with_random(|random| {
-                woodland_mansion_pieces::generate_mansion(
-                    start_pos,
-                    rotation,
-                    &mut pieces,
-                    random,
-                );
+                woodland_mansion_pieces::generate_mansion(start_pos, rotation, &mut pieces, random);
             });
             for piece in pieces {
                 builder.add_piece(piece);
@@ -36,11 +29,7 @@ pub fn find_generation_point<'a>(
     })
 }
 
-pub fn after_place(
-    region: &WorldGenRegion<'_>,
-    chunk_bb: BoundingBox,
-    pieces: &PiecesContainer,
-) {
+pub fn after_place(region: &WorldGenRegion<'_>, chunk_bb: BoundingBox, pieces: &PiecesContainer) {
     let min_y = region.min_y();
     let bounding_box = pieces.calculate_bounding_box();
     let y_start = bounding_box.min_y();

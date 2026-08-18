@@ -1,8 +1,8 @@
 use crate::chunk::heightmap::HeightmapType;
 use crate::registry::blocks::properties::BoolProperty;
 use crate::registry::blocks::properties::Properties;
-use crate::registry::blocks::vanilla_blocks;
 use crate::registry::blocks::shapes;
+use crate::registry::blocks::vanilla_blocks;
 use crate::util::direction::Direction;
 use crate::util::geometry::BoundingBox;
 use crate::util::ident::{BlockState, Identifier};
@@ -160,7 +160,10 @@ pub struct RuinedPortalPiece {
 }
 
 impl RuinedPortalPiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     pub fn new(
         template_position: BlockPos,
         vertical_placement: VerticalPlacement,
@@ -194,10 +197,10 @@ impl RuinedPortalPiece {
         chunk_bb: BoundingBox,
         reference_pos: BlockPos,
     ) {
-        let bounding_box = self
-            .template
-            .template
-            .get_bounding_box(&self.template.place_settings, self.template.template_position);
+        let bounding_box = self.template.template.get_bounding_box(
+            &self.template.place_settings,
+            self.template.template_position,
+        );
         if !chunk_bb.is_inside(bounding_box.center()) {
             return;
         }
@@ -314,8 +317,7 @@ impl RuinedPortalPiece {
                 if random.next_f64() >= f64::from(probability) {
                     continue;
                 }
-                let surface_y =
-                    region.get_height(self.vertical_placement.heightmap(), x, z) - 1;
+                let surface_y = region.get_height(self.vertical_placement.heightmap(), x, z) - 1;
                 let y = if follow_ground_surface {
                     surface_y
                 } else {

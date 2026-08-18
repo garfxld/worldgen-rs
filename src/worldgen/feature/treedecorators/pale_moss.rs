@@ -5,12 +5,11 @@ use crate::registry::blocks::vanilla_blocks;
 use crate::util::ident::Identifier;
 use crate::util::pos::BlockPos;
 use crate::util::shuffle;
-use crate::worldgen::feature::treedecorators::TreeDecoratorContext;
 use crate::worldgen::feature::features as feature_registry_fn;
+use crate::worldgen::feature::treedecorators::TreeDecoratorContext;
 use crate::worldgen::placement::PlacementContext;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct PaleMossDecorator {
     pub leaves_probability: f32,
     pub trunk_probability: f32,
@@ -25,7 +24,10 @@ impl PaleMossDecorator {
             return;
         }
 
-        let origin = *logs.iter().min_by_key(|pos| pos.y()).expect("logs is non-empty");
+        let origin = *logs
+            .iter()
+            .min_by_key(|pos| pos.y())
+            .expect("logs is non-empty");
         if context.random.next_f32() < self.ground_probability
             && let Some(moss_patch) =
                 feature_registry_fn().configured(&Identifier::const_vanilla("pale_moss_patch"))

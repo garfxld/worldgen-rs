@@ -9,15 +9,14 @@ use crate::util::ident::{BlockState, Identifier};
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 use crate::worldgen::block_survival::{can_survive, is_carpet_base, is_double_plant};
-use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::feature::features::HORIZONTAL_DIRECTIONS;
+use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::region::WorldGenRegion;
 
 const PALE_MOSS_CARPET: Identifier = Identifier::const_vanilla("pale_moss_carpet");
 const WATER: Identifier = Identifier::const_vanilla("water");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SimpleBlockConfig {
     pub to_place: BlockStateProvider,
     #[serde(default)]

@@ -12,7 +12,10 @@ use crate::worldgen::structure::structure_piece::{PieceBase, PieceKind, Structur
 pub struct BuriedTreasurePiece;
 
 impl BuriedTreasurePiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     pub const fn new(offset: BlockPos) -> StructurePiece {
         StructurePiece::new(
             PieceBase::new(0, BoundingBox::from_point(offset)),

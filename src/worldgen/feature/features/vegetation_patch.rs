@@ -86,8 +86,7 @@ fn place_ground_patch(
 
             let below_pos = inwards.relative(pos);
             let below_state = region.get_block(below_pos);
-            if region.get_block(pos).is_air()
-                && below_state.is_face_sturdy_at(below_pos, outwards)
+            if region.get_block(pos).is_air() && below_state.is_face_sturdy_at(below_pos, outwards)
             {
                 let depth = config.depth.sample(random)
                     + i32::from(

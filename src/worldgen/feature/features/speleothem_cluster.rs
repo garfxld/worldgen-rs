@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
-use crate::registry::fluid::is_water_fluid;
 use crate::registry::blocks::vanilla_blocks;
+use crate::registry::fluid::is_water_fluid;
 use crate::util::direction::Direction;
 use crate::util::ident::{BlockState, Identifier};
 use crate::util::math::map;
@@ -19,7 +19,6 @@ use crate::worldgen::region::WorldGenRegion;
 const BASE_STONE_OVERWORLD: Identifier = Identifier::const_vanilla("base_stone_overworld");
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SpeleothemClusterConfig {
     pub base_block: BlockState,
     pub pointed_block: BlockState,
@@ -127,9 +126,7 @@ fn place_column(
 
     let want_pool = random.next_f32() < chance_of_water;
     let column = match base_floor {
-        Some(floor_y)
-            if want_pool && can_place_pool(region, pos.at_y(floor_y), config) =>
-        {
+        Some(floor_y) if want_pool && can_place_pool(region, pos.at_y(floor_y), config) => {
             region.set_block(pos.at_y(floor_y), vanilla_blocks::WATER.default_state());
             base_column.with_floor(Some(floor_y - 1))
         }

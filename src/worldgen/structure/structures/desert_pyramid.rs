@@ -1,17 +1,13 @@
 use crate::registry::blocks::vanilla_blocks;
-use std::cmp::Ordering;
 use crate::util::geometry::BoundingBox;
 use crate::util::pos::BlockPos;
 use crate::util::rng::legacy_random::LegacyRandomSource;
 use crate::worldgen::region::WorldGenRegion;
 use crate::worldgen::structure::pieces::pieces_container::PiecesContainer;
 use crate::worldgen::structure::structure_piece::PieceKind;
+use std::cmp::Ordering;
 
-pub fn after_place(
-    region: &WorldGenRegion<'_>,
-    chunk_bb: BoundingBox,
-    pieces: &PiecesContainer,
-) {
+pub fn after_place(region: &WorldGenRegion<'_>, chunk_bb: BoundingBox, pieces: &PiecesContainer) {
     let mut unique_sand_placements: Vec<BlockPos> = Vec::new();
 
     for piece in pieces.pieces() {

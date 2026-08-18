@@ -70,7 +70,9 @@ impl<'a, 'b> TreeDecoratorContext<'a, 'b> {
     }
 
     pub fn place_vine(&mut self, pos: BlockPos, direction: &BoolProperty) {
-        let state = vanilla_blocks::VINE.default_state().set_value(direction, true);
+        let state = vanilla_blocks::VINE
+            .default_state()
+            .set_value(direction, true);
         self.set_block(pos, state);
     }
 
@@ -80,7 +82,7 @@ impl<'a, 'b> TreeDecoratorContext<'a, 'b> {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", deny_unknown_fields)]
+#[serde(tag = "type")]
 pub enum TreeDecorator {
     #[serde(rename = "minecraft:place_on_ground")]
     PlaceOnGround(PlaceOnGroundDecorator),

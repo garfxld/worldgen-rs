@@ -8,8 +8,6 @@ use crate::worldgen::feature::features;
 use crate::worldgen::generator::{GENERATION_STEPS, Generator};
 use crate::worldgen::region::WorldGenRegion;
 
-
-
 impl Generator {
     pub fn apply_biome_decoration(&self, region: &WorldGenRegion<'_>) {
         let center = region.center();

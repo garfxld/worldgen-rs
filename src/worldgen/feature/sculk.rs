@@ -404,8 +404,7 @@ fn get_decay_penalty(
 fn can_place_growth(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
     let above = region.get_block(pos.above());
     let above_fluid = above.get_fluid_state();
-    if !(above.is_air()
-        || (above.get_block() == &vanilla_blocks::WATER && above_fluid.is_source()))
+    if !(above.is_air() || (above.get_block() == &vanilla_blocks::WATER && above_fluid.is_source()))
     {
         return false;
     }
@@ -484,10 +483,10 @@ fn attempt_place_sculk(
 
         let support_pos = support.relative(pos);
         let support_state = region.get_block(support_pos);
-        if !REGISTRY.blocks.is_in_tag(
-            &support_state.get_block().key,
-            &SCULK_REPLACEABLE_WORLD_GEN,
-        ) {
+        if !REGISTRY
+            .blocks
+            .is_in_tag(&support_state.get_block().key, &SCULK_REPLACEABLE_WORLD_GEN)
+        {
             continue;
         }
 
@@ -525,7 +524,8 @@ fn get_valid_movement_pos(
     for offset in offsets {
         let neighbour = pos.offset(offset.0, offset.1, offset.2);
         let transferee = region.get_block(neighbour);
-        if is_sculk_behaviour_block(transferee) && is_movement_unobstructed(region, pos, neighbour) {
+        if is_sculk_behaviour_block(transferee) && is_movement_unobstructed(region, pos, neighbour)
+        {
             sculk_position = neighbour;
             if has_substrate_access(region, transferee, neighbour) {
                 break;

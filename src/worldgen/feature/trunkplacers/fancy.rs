@@ -11,7 +11,6 @@ use crate::worldgen::feature::foliageplacers::FoliageAttachment;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct FancyTrunkPlacer {
     pub base_height: i32,
     pub height_rand_a: i32,
@@ -19,7 +18,10 @@ pub struct FancyTrunkPlacer {
 }
 
 impl FancyTrunkPlacer {
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla FancyTrunkPlacer.placeTrunk")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla FancyTrunkPlacer.placeTrunk"
+    )]
     pub fn place_trunk(
         &self,
         placer: &super::TrunkPlacer,
@@ -33,7 +35,9 @@ impl FancyTrunkPlacer {
         let height = tree_height + 2;
         let trunk_height = math::fast_floor(f64::from(height) * 0.618);
         super::place_below_trunk_block(region, trunk_setter, random, origin.below(), config);
-        let clusters_per_y = 1.min(math::fast_floor(1.382 + (f64::from(height) / 13.0).powf(2.0)));
+        let clusters_per_y = 1.min(math::fast_floor(
+            1.382 + (f64::from(height) / 13.0).powf(2.0),
+        ));
         let trunk_top = origin.y() + trunk_height;
         let mut foliage_coords: Vec<(BlockPos, i32)> =
             vec![(origin.above_n(height - 5), trunk_top)];
@@ -105,7 +109,16 @@ impl FancyTrunkPlacer {
         for &(pos, branch_base) in &foliage_coords {
             let base_coord = origin.at_y(branch_base);
             if base_coord != pos && super::trim_branches(height, branch_base - origin.y()) {
-                super::make_limb(placer, region, trunk_setter, random, base_coord, pos, true, config);
+                super::make_limb(
+                    placer,
+                    region,
+                    trunk_setter,
+                    random,
+                    base_coord,
+                    pos,
+                    true,
+                    config,
+                );
             }
         }
 

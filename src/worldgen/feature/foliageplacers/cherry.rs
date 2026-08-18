@@ -4,7 +4,6 @@ use crate::util::rng::RandomSource;
 use crate::util::value_providers::int::IntProvider;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct CherryFoliagePlacer {
     pub radius: IntProvider,
     pub offset: IntProvider,
@@ -35,7 +34,8 @@ impl CherryFoliagePlacer {
         let corner = dx == current_radius && dz == current_radius;
         let wide_layer = current_radius > 2;
         if wide_layer {
-            corner || (dx + dz > current_radius * 2 - 2 && random.next_f32() < self.corner_hole_chance)
+            corner
+                || (dx + dz > current_radius * 2 - 2 && random.next_f32() < self.corner_hole_chance)
         } else {
             corner && random.next_f32() < self.corner_hole_chance
         }

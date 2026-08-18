@@ -20,7 +20,7 @@ use crate::util::math::floor_f32;
 use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 use crate::util::value_providers::int::IntProvider;
-use crate::worldgen::feature::features::tree::{valid_tree_pos, TreeConfig};
+use crate::worldgen::feature::features::tree::{TreeConfig, valid_tree_pos};
 use crate::worldgen::region::WorldGenRegion;
 
 use acacia::AcaciaFoliagePlacer;
@@ -42,7 +42,7 @@ pub struct FoliageAttachment {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", deny_unknown_fields)]
+#[serde(tag = "type")]
 pub enum FoliagePlacer {
     #[serde(rename = "minecraft:dark_oak_foliage_placer")]
     DarkOak(DarkOakFoliagePlacer),
@@ -126,7 +126,10 @@ impl FoliagePlacer {
         }
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla FoliagePlacer.createFoliage")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla FoliagePlacer.createFoliage"
+    )]
     pub fn create_foliage(
         &self,
         region: &WorldGenRegion<'_>,
@@ -144,27 +147,101 @@ impl FoliagePlacer {
                 let pos = attachment.pos.above_n(offset);
                 let double_trunk = attachment.double_trunk;
                 if double_trunk {
-                    self.place_leaves_row(region, foliage_setter, random, config, pos, leaf_radius + 2, -1, double_trunk);
-                    self.place_leaves_row(region, foliage_setter, random, config, pos, leaf_radius + 3, 0, double_trunk);
-                    self.place_leaves_row(region, foliage_setter, random, config, pos, leaf_radius + 2, 1, double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        pos,
+                        leaf_radius + 2,
+                        -1,
+                        double_trunk,
+                    );
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        pos,
+                        leaf_radius + 3,
+                        0,
+                        double_trunk,
+                    );
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        pos,
+                        leaf_radius + 2,
+                        1,
+                        double_trunk,
+                    );
                     if random.next_bool() {
-                        self.place_leaves_row(region, foliage_setter, random, config, pos, leaf_radius, 2, double_trunk);
+                        self.place_leaves_row(
+                            region,
+                            foliage_setter,
+                            random,
+                            config,
+                            pos,
+                            leaf_radius,
+                            2,
+                            double_trunk,
+                        );
                     }
                 } else {
-                    self.place_leaves_row(region, foliage_setter, random, config, pos, leaf_radius + 2, -1, double_trunk);
-                    self.place_leaves_row(region, foliage_setter, random, config, pos, leaf_radius + 1, 0, double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        pos,
+                        leaf_radius + 2,
+                        -1,
+                        double_trunk,
+                    );
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        pos,
+                        leaf_radius + 1,
+                        0,
+                        double_trunk,
+                    );
                 }
             }
             Self::Blob(_) => {
                 for yo in (offset - foliage_height..=offset).rev() {
-                    let current_radius = (leaf_radius + attachment.radius_offset - 1 - yo / 2).max(0);
-                    self.place_leaves_row(region, foliage_setter, random, config, attachment.pos, current_radius, yo, attachment.double_trunk);
+                    let current_radius =
+                        (leaf_radius + attachment.radius_offset - 1 - yo / 2).max(0);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        attachment.pos,
+                        current_radius,
+                        yo,
+                        attachment.double_trunk,
+                    );
                 }
             }
             Self::Fancy(_) => {
                 for yo in (offset - foliage_height..=offset).rev() {
-                    let current_radius = leaf_radius + i32::from(yo != offset && yo != offset - foliage_height);
-                    self.place_leaves_row(region, foliage_setter, random, config, attachment.pos, current_radius, yo, attachment.double_trunk);
+                    let current_radius =
+                        leaf_radius + i32::from(yo != offset && yo != offset - foliage_height);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        attachment.pos,
+                        current_radius,
+                        yo,
+                        attachment.double_trunk,
+                    );
                 }
             }
             Self::Acacia(_) => {
@@ -175,7 +252,16 @@ impl FoliagePlacer {
                     (leaf_radius - 1, -foliage_height),
                     (leaf_radius + attachment.radius_offset - 1, 0),
                 ] {
-                    self.place_leaves_row(region, foliage_setter, random, config, foliage_pos, current_radius, y, double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        foliage_pos,
+                        current_radius,
+                        y,
+                        double_trunk,
+                    );
                 }
             }
             Self::Pine(_) => {
@@ -183,7 +269,16 @@ impl FoliagePlacer {
                 let y_start = offset;
                 let y_end = offset - foliage_height;
                 for yo in (y_end..=y_start).rev() {
-                    self.place_leaves_row(region, foliage_setter, random, config, attachment.pos, current_radius, yo, attachment.double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        attachment.pos,
+                        current_radius,
+                        yo,
+                        attachment.double_trunk,
+                    );
                     if current_radius >= 1 && yo == y_end + 1 {
                         current_radius -= 1;
                     } else if current_radius < leaf_radius + attachment.radius_offset {
@@ -196,7 +291,16 @@ impl FoliagePlacer {
                 let mut max_radius = 1;
                 let mut min_radius = 0;
                 for yo in (-foliage_height..=offset).rev() {
-                    self.place_leaves_row(region, foliage_setter, random, config, attachment.pos, current_radius, yo, attachment.double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        attachment.pos,
+                        current_radius,
+                        yo,
+                        attachment.double_trunk,
+                    );
                     if current_radius >= max_radius {
                         current_radius = min_radius;
                         min_radius = 1;
@@ -214,25 +318,77 @@ impl FoliagePlacer {
                 };
                 for yo in (offset - leaf_height..=offset).rev() {
                     let current_radius = leaf_radius + attachment.radius_offset + 1 - yo;
-                    self.place_leaves_row(region, foliage_setter, random, config, attachment.pos, current_radius, yo, attachment.double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        attachment.pos,
+                        current_radius,
+                        yo,
+                        attachment.double_trunk,
+                    );
                 }
             }
             Self::Cherry(p) => {
                 let double_trunk = attachment.double_trunk;
                 let foliage_pos = attachment.pos.above_n(offset);
                 let current_radius = leaf_radius + attachment.radius_offset - 1;
-                self.place_leaves_row(region, foliage_setter, random, config, foliage_pos, current_radius - 2, foliage_height - 3, double_trunk);
-                self.place_leaves_row(region, foliage_setter, random, config, foliage_pos, current_radius - 1, foliage_height - 4, double_trunk);
+                self.place_leaves_row(
+                    region,
+                    foliage_setter,
+                    random,
+                    config,
+                    foliage_pos,
+                    current_radius - 2,
+                    foliage_height - 3,
+                    double_trunk,
+                );
+                self.place_leaves_row(
+                    region,
+                    foliage_setter,
+                    random,
+                    config,
+                    foliage_pos,
+                    current_radius - 1,
+                    foliage_height - 4,
+                    double_trunk,
+                );
                 for y in (0..=foliage_height - 5).rev() {
-                    self.place_leaves_row(region, foliage_setter, random, config, foliage_pos, current_radius, y, double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        foliage_pos,
+                        current_radius,
+                        y,
+                        double_trunk,
+                    );
                 }
                 self.place_leaves_row_with_hanging_leaves_below(
-                    region, foliage_setter, random, config, foliage_pos, current_radius, -1, double_trunk,
-                    p.hanging_leaves_chance, p.hanging_leaves_extension_chance,
+                    region,
+                    foliage_setter,
+                    random,
+                    config,
+                    foliage_pos,
+                    current_radius,
+                    -1,
+                    double_trunk,
+                    p.hanging_leaves_chance,
+                    p.hanging_leaves_extension_chance,
                 );
                 self.place_leaves_row_with_hanging_leaves_below(
-                    region, foliage_setter, random, config, foliage_pos, current_radius - 1, -2, double_trunk,
-                    p.hanging_leaves_chance, p.hanging_leaves_extension_chance,
+                    region,
+                    foliage_setter,
+                    random,
+                    config,
+                    foliage_pos,
+                    current_radius - 1,
+                    -2,
+                    double_trunk,
+                    p.hanging_leaves_chance,
+                    p.hanging_leaves_extension_chance,
                 );
             }
             Self::MegaPine(_) => {
@@ -248,23 +404,44 @@ impl FoliagePlacer {
                     } else {
                         smooth_radius
                     };
-                    self.place_leaves_row(region, foliage_setter, random, config, foliage_pos.at_y(yy), jagged_radius, 0, attachment.double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        foliage_pos.at_y(yy),
+                        jagged_radius,
+                        0,
+                        attachment.double_trunk,
+                    );
                     prev_radius = smooth_radius;
                 }
             }
             Self::Bush(_) => {
                 for yo in (offset - foliage_height..=offset).rev() {
                     let current_radius = leaf_radius + attachment.radius_offset - 1 - yo;
-                    self.place_leaves_row(region, foliage_setter, random, config, attachment.pos, current_radius, yo, attachment.double_trunk);
+                    self.place_leaves_row(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        attachment.pos,
+                        current_radius,
+                        yo,
+                        attachment.double_trunk,
+                    );
                 }
             }
             Self::RandomSpread(p) => {
                 let origin = attachment.pos;
                 for _ in 0..p.leaf_placement_attempts {
                     let pos = BlockPos::new(
-                        origin.x() + random.next_i32_bounded(leaf_radius) - random.next_i32_bounded(leaf_radius),
-                        origin.y() + random.next_i32_bounded(foliage_height) - random.next_i32_bounded(foliage_height),
-                        origin.z() + random.next_i32_bounded(leaf_radius) - random.next_i32_bounded(leaf_radius),
+                        origin.x() + random.next_i32_bounded(leaf_radius)
+                            - random.next_i32_bounded(leaf_radius),
+                        origin.y() + random.next_i32_bounded(foliage_height)
+                            - random.next_i32_bounded(foliage_height),
+                        origin.z() + random.next_i32_bounded(leaf_radius)
+                            - random.next_i32_bounded(leaf_radius),
                     );
                     try_place_leaf(region, foliage_setter, random, config, pos);
                 }
@@ -272,7 +449,10 @@ impl FoliagePlacer {
         }
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla FoliagePlacer.placeLeavesRow")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla FoliagePlacer.placeLeavesRow"
+    )]
     fn place_leaves_row(
         &self,
         region: &WorldGenRegion<'_>,
@@ -287,7 +467,14 @@ impl FoliagePlacer {
         let offset = if double_trunk { 1 } else { 0 };
         for dx in -current_radius..=current_radius + offset {
             for dz in -current_radius..=current_radius + offset {
-                if !self.should_skip_location_signed(random, dx, y, dz, current_radius, double_trunk) {
+                if !self.should_skip_location_signed(
+                    random,
+                    dx,
+                    y,
+                    dz,
+                    current_radius,
+                    double_trunk,
+                ) {
                     let pos = origin.offset(dx, y, dz);
                     try_place_leaf(region, foliage_setter, random, config, pos);
                 }
@@ -312,7 +499,16 @@ impl FoliagePlacer {
         hanging_leaves_chance: f32,
         hanging_leaves_extension_chance: f32,
     ) {
-        self.place_leaves_row(region, foliage_setter, random, config, origin, current_radius, y, double_trunk);
+        self.place_leaves_row(
+            region,
+            foliage_setter,
+            random,
+            config,
+            origin,
+            current_radius,
+            y,
+            double_trunk,
+        );
         let offset = if double_trunk { 1 } else { 0 };
         let log_pos = origin.below();
 
@@ -324,18 +520,36 @@ impl FoliagePlacer {
                 current_radius
             };
             let mut pos = BlockPos::new(
-                origin.x() + to_edge.offset().0 * offset_to_edge - along_edge.offset().0 * current_radius,
+                origin.x() + to_edge.offset().0 * offset_to_edge
+                    - along_edge.offset().0 * current_radius,
                 origin.y() + y - 1,
-                origin.z() + to_edge.offset().2 * offset_to_edge - along_edge.offset().2 * current_radius,
+                origin.z() + to_edge.offset().2 * offset_to_edge
+                    - along_edge.offset().2 * current_radius,
             );
             let mut offset_along_edge = -current_radius;
 
             while offset_along_edge < current_radius + offset {
                 let leaves_above = foliage_setter.is_set(pos.above());
                 if leaves_above
-                    && try_place_extension(region, foliage_setter, random, config, hanging_leaves_chance, log_pos, pos)
+                    && try_place_extension(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        hanging_leaves_chance,
+                        log_pos,
+                        pos,
+                    )
                 {
-                    try_place_extension(region, foliage_setter, random, config, hanging_leaves_extension_chance, log_pos, pos.below());
+                    try_place_extension(
+                        region,
+                        foliage_setter,
+                        random,
+                        config,
+                        hanging_leaves_extension_chance,
+                        log_pos,
+                        pos.below(),
+                    );
                 }
 
                 offset_along_edge += 1;
@@ -380,17 +594,39 @@ impl FoliagePlacer {
         double_trunk: bool,
     ) -> bool {
         match self {
-            Self::DarkOak(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::Blob(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::Fancy(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::Acacia(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::Pine(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::Spruce(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::Jungle(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::Cherry(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::MegaPine(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::Bush(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
-            Self::RandomSpread(p) => p.should_skip_location(random, dx, y, dz, current_radius, double_trunk),
+            Self::DarkOak(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::Blob(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::Fancy(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::Acacia(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::Pine(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::Spruce(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::Jungle(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::Cherry(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::MegaPine(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::Bush(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
+            Self::RandomSpread(p) => {
+                p.should_skip_location(random, dx, y, dz, current_radius, double_trunk)
+            }
         }
     }
 }
@@ -431,7 +667,9 @@ fn try_place_extension(
     log_pos: BlockPos,
     pos: BlockPos,
 ) -> bool {
-    let distance = (pos.x() - log_pos.x()).abs() + (pos.y() - log_pos.y()).abs() + (pos.z() - log_pos.z()).abs();
+    let distance = (pos.x() - log_pos.x()).abs()
+        + (pos.y() - log_pos.y()).abs()
+        + (pos.z() - log_pos.z()).abs();
     #[expect(
         clippy::if_same_then_else,
         reason = "branches match but the second short-circuits an RNG draw vanilla only takes when the distance check passes"

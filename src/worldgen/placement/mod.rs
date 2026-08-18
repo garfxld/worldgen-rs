@@ -89,7 +89,7 @@ impl CaveSurface {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", deny_unknown_fields)]
+#[serde(tag = "type")]
 pub enum PlacementModifier {
     #[serde(rename = "minecraft:count")]
     Count { count: IntProvider },
@@ -415,7 +415,14 @@ fn is_bedrock(state: BlockState) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use crate::util::ident::Identifier;
+    use crate::worldgen::dimension::DimensionSpec;
+
+    fn spec(source: &DatapackSource, dimension: &str) -> DimensionSpec {
+        let id = Identifier::new(Identifier::VANILLA_NAMESPACE, dimension.to_owned());
+        crate::worldgen::dimension::resolve(source, &id).expect("dimension should resolve")
+    }
+
     use std::sync::Once;
 
     use super::*;
@@ -426,7 +433,7 @@ mod tests {
     use crate::util::rng::worldgen_random::WorldgenRandom;
     use crate::worldgen::backend::ir::loader::DatapackSource;
     use crate::worldgen::feature::features;
-    use crate::worldgen::generator::{BiomeSourceDimension, Generator};
+    use crate::worldgen::generator::Generator;
     use crate::worldgen::scheduler::ChunkStore;
 
     fn init_global_registry() {
@@ -438,23 +445,13 @@ mod tests {
         });
     }
 
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
-
     #[test]
     fn ore_placement_chain_yields_in_chunk_positions() {
         init_global_registry();
 
-        let source = DatapackSource::new(datapack_root());
-        let generator = Generator::new(
-            &source,
-            "overworld",
-            "Overworld",
-            BiomeSourceDimension::Overworld,
-            42,
-        )
-        .expect("generator should build");
+        let source = DatapackSource::builtin();
+        let generator = Generator::new(&source, &spec(&source, "overworld"), 42)
+            .expect("generator should build");
         let store = ChunkStore::new(generator);
 
         let center = ChunkPos::new(0, 0);

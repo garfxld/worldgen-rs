@@ -11,7 +11,6 @@ use crate::worldgen::feature::features::DIRECTIONS;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct DeltaConfig {
     pub contents: BlockState,
     pub rim: BlockState,

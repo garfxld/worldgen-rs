@@ -1,3 +1,9 @@
+use std::path::Path;
+
+use serde::Deserialize;
+
+use crate::datapack::Datapack;
+use crate::datapack::{DatapackError, collect_json_files, path_to_id, read_and_parse_normalized};
 use crate::registry::Registry;
 use crate::util::ident::Identifier;
 
@@ -14,52 +20,56 @@ pub struct DimensionType {
 pub type DimensionTypeRef = &'static DimensionType;
 pub type DimensionTypeRegistry = Registry<DimensionType>;
 
-pub mod vanilla_dimension_types {
-    use super::{DimensionType, DimensionTypeRegistry};
-    use crate::util::ident::Identifier;
+#[derive(Deserialize)]
+struct DimensionTypeJson {
+    min_y: i32,
+    height: i32,
+    has_skylight: bool,
+    #[serde(default)]
+    ambient_light: f32,
+    #[serde(default)]
+    attributes: serde_json::Map<String, serde_json::Value>,
+}
 
-    pub static OVERWORLD: DimensionType = DimensionType {
-        key: Identifier::const_vanilla("overworld"),
-        min_y: -64,
-        height: 384,
-        has_skylight: true,
-        ambient_light: 0.0,
-        fast_lava: false,
-    };
-
-    pub static OVERWORLD_CAVES: DimensionType = DimensionType {
-        key: Identifier::const_vanilla("overworld_caves"),
-        min_y: -64,
-        height: 384,
-        has_skylight: true,
-        ambient_light: 0.0,
-        fast_lava: false,
-    };
-
-    pub static THE_END: DimensionType = DimensionType {
-        key: Identifier::const_vanilla("the_end"),
-        min_y: 0,
-        height: 256,
-        has_skylight: true,
-        ambient_light: 0.25,
-        fast_lava: false,
-    };
-
-    pub static THE_NETHER: DimensionType = DimensionType {
-        key: Identifier::const_vanilla("the_nether"),
-        min_y: 0,
-        height: 256,
-        has_skylight: false,
-        ambient_light: 0.1,
-        fast_lava: true,
-    };
-
-    pub fn register_dimension_types(registry: &mut DimensionTypeRegistry) {
-        registry.register(OVERWORLD.key.clone(), &OVERWORLD);
-        registry.register(OVERWORLD_CAVES.key.clone(), &OVERWORLD_CAVES);
-        registry.register(THE_END.key.clone(), &THE_END);
-        registry.register(THE_NETHER.key.clone(), &THE_NETHER);
+pub fn load_dimension_types(
+    registry: &mut DimensionTypeRegistry,
+    pack: &Datapack,
+) -> Result<(), DatapackError> {
+    for (namespace, dir) in pack.namespaced_dirs("dimension_type") {
+        load_directory(registry, &namespace, &dir)?;
     }
+    Ok(())
+}
+
+fn load_directory(
+    registry: &mut DimensionTypeRegistry,
+    namespace: &str,
+    dir: &Path,
+) -> Result<(), DatapackError> {
+    for file in collect_json_files(dir) {
+        let json: DimensionTypeJson = read_and_parse_normalized(&file)?;
+        let key: Identifier = path_to_id(namespace, &file, dir)
+            .parse()
+            .expect("dimension type path should be a valid identifier");
+        let fast_lava = json
+            .attributes
+            .get("minecraft:gameplay/fast_lava")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+
+        registry.register(
+            key.clone(),
+            Box::leak(Box::new(DimensionType {
+                key,
+                min_y: json.min_y,
+                height: json.height,
+                has_skylight: json.has_skylight,
+                ambient_light: json.ambient_light,
+                fast_lava,
+            })),
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -68,12 +78,11 @@ pub mod vanilla_dimension_types {
     reason = "dimension type registry tests assert required vanilla properties are present"
 )]
 mod tests {
-    use super::vanilla_dimension_types;
-    use super::{DimensionTypeRegistry, Identifier};
+    use super::{Datapack, DimensionTypeRegistry, Identifier, load_dimension_types};
 
     fn create_test_registry() -> DimensionTypeRegistry {
         let mut registry = DimensionTypeRegistry::new();
-        vanilla_dimension_types::register_dimension_types(&mut registry);
+        load_dimension_types(&mut registry, &Datapack::builtin()).unwrap();
         registry.freeze();
         registry
     }

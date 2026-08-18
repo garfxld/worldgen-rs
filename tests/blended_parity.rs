@@ -13,7 +13,6 @@ fn empty_program() -> DensityProgram {
     DensityProgram {
         registry: BTreeMap::new(),
         router_entries: BTreeMap::new(),
-        prefix: "Test".to_string(),
         cell_width: 4,
         legacy_random_source: false,
     }

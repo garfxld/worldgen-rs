@@ -123,7 +123,6 @@ impl TryFrom<String> for Identifier {
 pub struct BlockState(pub u16);
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct RawBlockState {
     #[serde(rename = "Name")]
     name: Identifier,
@@ -150,7 +149,7 @@ impl TryFrom<RawBlockState> for BlockState {
             .map(|(name, value)| (name.as_str(), value.as_str()));
         REGISTRY
             .blocks
-            .state_id_from_block_defaulted_properties(block, overrides)
+            .state_id_from_block_lenient_properties(block, overrides)
             .ok_or_else(|| format!("invalid properties {:?} for {}", raw.properties, raw.name))
     }
 }

@@ -13,7 +13,10 @@ pub struct SwampHutPiece {
 }
 
 impl SwampHutPiece {
-    #[expect(clippy::new_ret_no_self, reason = "mirrors the vanilla piece constructor")]
+    #[expect(
+        clippy::new_ret_no_self,
+        reason = "mirrors the vanilla piece constructor"
+    )]
     pub fn new(random: &mut RandomSource, west: i32, north: i32) -> StructurePiece {
         let direction = Direction::get_random_horizontal(random);
         let base = ScatteredFeature::make_base(west, 64, north, 7, 7, 9, direction);

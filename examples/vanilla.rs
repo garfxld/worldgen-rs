@@ -15,6 +15,7 @@ use cerium::world::biome::Biome as CeriumBiome;
 use cerium::world::block::BlockState;
 use cerium::world::chunk::Chunk;
 use cerium::world::{DimensionType, World};
+use worldgen_rs::datapack::Datapack;
 use worldgen_rs::registry::REGISTRY;
 use worldgen_rs::{ChunkPos, ChunkStatus, Identifier, Worldgen, WorldgenSettings};
 
@@ -115,6 +116,7 @@ fn main() {
         Worldgen::new(WorldgenSettings {
             seed: 42,
             dimension: Identifier::const_vanilla("overworld"),
+            datapack: Datapack::builtin(),
         })
         .expect("worldgen should build"),
     );
@@ -133,8 +135,7 @@ fn main() {
             max: Some(MAX_FLY_MULTIPLIER),
         },
     )));
-    // dispatcher.executes(&command, |event|)
-    
+
     server
         .events()
         .subscribe(move |event: &mut PlayerConfigEvent| {

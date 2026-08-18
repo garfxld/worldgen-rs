@@ -1,6 +1,7 @@
 use std::f64::consts::PI;
 
 use crate::util::pos::BlockPos;
+use crate::worldgen::backend::jit::{RouterEntry, WellKnownRouters};
 use crate::worldgen::biome::climate::{Parameter, ParameterPoint, TargetPoint, quantize_coord};
 use crate::worldgen::density::{ColumnCache, Noises};
 
@@ -8,11 +9,13 @@ const MAX_SPAWN_SEARCH_RADIUS: f32 = 2048.0;
 
 pub struct ClimateSampler {
     noises: Noises,
+    routers: WellKnownRouters,
 }
 
 impl ClimateSampler {
-    pub const fn new(noises: Noises) -> Self {
-        Self { noises }
+    pub fn new(noises: Noises) -> Self {
+        let routers = *noises.compiled().routers();
+        Self { noises, routers }
     }
 
     pub const fn noises(&self) -> &Noises {
@@ -32,14 +35,16 @@ impl ClimateSampler {
 
         cache.ensure(block_x, block_z, &self.noises);
 
-        let temperature =
-            cache.router("temperature", block_x, block_y, block_z, &self.noises) as f32;
-        let humidity = cache.router("vegetation", block_x, block_y, block_z, &self.noises) as f32;
-        let continentalness =
-            cache.router("continentalness", block_x, block_y, block_z, &self.noises) as f32;
-        let erosion = cache.router("erosion", block_x, block_y, block_z, &self.noises) as f32;
-        let depth = cache.router("depth", block_x, block_y, block_z, &self.noises) as f32;
-        let weirdness = cache.router("ridges", block_x, block_y, block_z, &self.noises) as f32;
+        let sample = |entry: Option<RouterEntry>, name: &str| -> f32 {
+            let entry = entry.unwrap_or_else(|| panic!("no router entry named {name}"));
+            cache.router_at(entry, block_x, block_y, block_z, &self.noises) as f32
+        };
+        let temperature = sample(self.routers.temperature, "temperature");
+        let humidity = sample(self.routers.vegetation, "vegetation");
+        let continentalness = sample(self.routers.continentalness, "continentalness");
+        let erosion = sample(self.routers.erosion, "erosion");
+        let depth = sample(self.routers.depth, "depth");
+        let weirdness = sample(self.routers.ridges, "ridges");
 
         TargetPoint::new(
             quantize_coord(f64::from(temperature)),

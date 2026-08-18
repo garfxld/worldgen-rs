@@ -5,7 +5,7 @@ use crate::util::ident::{BlockState, Identifier};
 use crate::util::rng::RandomSource;
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "predicate_type", deny_unknown_fields)]
+#[serde(tag = "predicate_type")]
 pub enum RuleTest {
     #[serde(rename = "minecraft:always_true")]
     AlwaysTrue,

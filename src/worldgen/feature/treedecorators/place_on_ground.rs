@@ -10,7 +10,6 @@ use crate::worldgen::feature::state_provider::BlockStateProvider;
 use crate::worldgen::feature::treedecorators::TreeDecoratorContext;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct PlaceOnGroundDecorator {
     #[serde(default = "default_tries")]
     pub tries: i32,
@@ -86,4 +85,3 @@ fn attempt_to_place_block_above(
         context.set_block(above, state);
     }
 }
-

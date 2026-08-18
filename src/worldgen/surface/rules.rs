@@ -448,7 +448,7 @@ fn leak_str_slice(strings: &[String]) -> &'static [&'static str] {
 )]
 mod tests {
     use std::cell::Cell;
-    use std::path::{Path, PathBuf};
+
     use std::sync::Once;
 
     use super::*;
@@ -459,10 +459,6 @@ mod tests {
     use crate::worldgen::surface::{
         SurfaceConditionNoiseCache, SurfaceRuleContext, SurfaceSystem, TemperatureXzCache,
     };
-
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
 
     fn init_global_registry() {
         static INIT: Once = Once::new();
@@ -492,8 +488,10 @@ mod tests {
     #[test]
     fn compiles_overworld_surface_rules_with_a_large_node_count() {
         init_global_registry();
-        let source = DatapackSource::new(datapack_root());
-        let settings = source.noise_settings("overworld").unwrap();
+        let source = DatapackSource::builtin();
+        let settings = source
+            .noise_settings(&Identifier::new(Identifier::VANILLA_NAMESPACE, "overworld"))
+            .unwrap();
         let rule_json = settings
             .surface_rule
             .as_ref()
@@ -517,10 +515,15 @@ mod tests {
     #[test]
     fn compiles_nether_and_end_surface_rules_without_panicking() {
         init_global_registry();
-        let source = DatapackSource::new(datapack_root());
+        let source = DatapackSource::builtin();
 
         for dimension in ["nether", "end"] {
-            let settings = source.noise_settings(dimension).unwrap();
+            let settings = source
+                .noise_settings(&Identifier::new(
+                    Identifier::VANILLA_NAMESPACE,
+                    dimension.to_owned(),
+                ))
+                .unwrap();
             let rule_json = settings
                 .surface_rule
                 .as_ref()
@@ -557,8 +560,10 @@ mod tests {
     #[test]
     fn resolves_grass_on_dry_plains_surface_and_none_deep_underground() {
         init_global_registry();
-        let source = DatapackSource::new(datapack_root());
-        let settings = source.noise_settings("overworld").unwrap();
+        let source = DatapackSource::builtin();
+        let settings = source
+            .noise_settings(&Identifier::new(Identifier::VANILLA_NAMESPACE, "overworld"))
+            .unwrap();
         let rule_json = settings.surface_rule.as_ref().unwrap();
         let rules =
             DatapackSurfaceRules::new(Some(rule_json), settings.noise.min_y, settings.noise.height);

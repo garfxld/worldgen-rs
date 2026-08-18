@@ -9,7 +9,6 @@ use crate::worldgen::feature::features::weeping_vines;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct HugeFungusConfig {
     pub valid_base_block: BlockState,
     pub stem_state: BlockState,
@@ -74,8 +73,7 @@ fn place_stem(
 
     for dx in -stem_radius..=stem_radius {
         for dz in -stem_radius..=stem_radius {
-            let corner_of_huge_stem =
-                is_huge && dx.abs() == stem_radius && dz.abs() == stem_radius;
+            let corner_of_huge_stem = is_huge && dx.abs() == stem_radius && dz.abs() == stem_radius;
 
             for dy in 0..total_height {
                 let pos = surface_origin.offset(dx, dy, dz);
@@ -131,7 +129,13 @@ fn place_hat(
                 if is_replaceable(region, pos, config, false) {
                     if is_hat_bottom {
                         if !inside {
-                            place_hat_drop_block(region, random, pos, config.hat_state, place_vines);
+                            place_hat_drop_block(
+                                region,
+                                random,
+                                pos,
+                                config.hat_state,
+                                place_vines,
+                            );
                         }
                     } else if inside {
                         place_hat_block(
@@ -218,6 +222,13 @@ fn try_place_weeping_vines(
             goal_vine_height *= 2;
         }
 
-        weeping_vines::place_weeping_vines_column(region, random, place_pos, goal_vine_height, 23, 25);
+        weeping_vines::place_weeping_vines_column(
+            region,
+            random,
+            place_pos,
+            goal_vine_height,
+            23,
+            25,
+        );
     }
 }

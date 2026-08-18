@@ -8,9 +8,8 @@ pub mod structure_template_pool;
 use rustc_hash::FxHashMap;
 
 use crate::util::ident::Identifier;
-use crate::worldgen::structure::registry;
 use crate::worldgen::structure::pools::structure_template_pool::StructureTemplatePool;
-
+use crate::worldgen::structure::registry;
 
 pub struct TemplatePoolRegistry {
     pools: FxHashMap<Identifier, &'static StructureTemplatePool>,

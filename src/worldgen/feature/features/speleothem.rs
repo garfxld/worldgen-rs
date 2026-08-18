@@ -184,7 +184,6 @@ pub fn place_base_block_if_possible(
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SpeleothemConfig {
     pub base_block: BlockState,
     pub pointed_block: BlockState,

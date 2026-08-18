@@ -5,9 +5,7 @@ use crate::util::ident::BlockState;
 use crate::util::rng::RandomSource;
 use crate::util::shuffle;
 use crate::worldgen::region::WorldGenRegion;
-use crate::worldgen::structure::structure_piece::{
-    PieceBase, PieceKind, StructurePiece, air,
-};
+use crate::worldgen::structure::structure_piece::{PieceBase, PieceKind, StructurePiece, air};
 
 const DOWN: usize = Direction::Down.get_3d_data_value();
 const UP: usize = Direction::Up.get_3d_data_value();
@@ -113,7 +111,12 @@ const fn grid_room(room_grid: &[Option<usize>; GRID_SIZE], index: usize) -> usiz
     room_grid[index].expect("monument grid room should exist")
 }
 
-const fn set_connection(rooms: &mut [RoomDefinition], room: usize, direction: Direction, other: usize) {
+const fn set_connection(
+    rooms: &mut [RoomDefinition],
+    room: usize,
+    direction: Direction,
+    other: usize,
+) {
     rooms[room].connections[direction.get_3d_data_value()] = Some(other);
     rooms[other].connections[direction.opposite().get_3d_data_value()] = Some(room);
 }
@@ -198,9 +201,7 @@ impl Fitter {
             Self::DoubleZ => {
                 definition.has_opening[NORTH] && !connected(rooms, room, NORTH).claimed
             }
-            Self::DoubleX => {
-                definition.has_opening[EAST] && !connected(rooms, room, EAST).claimed
-            }
+            Self::DoubleX => definition.has_opening[EAST] && !connected(rooms, room, EAST).claimed,
             Self::DoubleY => definition.has_opening[UP] && !connected(rooms, room, UP).claimed,
             Self::SimpleTop => {
                 !definition.has_opening[WEST]
@@ -328,17 +329,13 @@ const fn room_bounding_box(
     );
 
     match orientation {
-        Direction::North => bounding_box.moved(
-            room_x * 8,
-            room_y * 4,
-            -(room_z + room_depth) * 8 + 1,
-        ),
+        Direction::North => {
+            bounding_box.moved(room_x * 8, room_y * 4, -(room_z + room_depth) * 8 + 1)
+        }
         Direction::South => bounding_box.moved(room_x * 8, room_y * 4, room_z * 8),
-        Direction::West => bounding_box.moved(
-            -(room_z + room_depth) * 8 + 1,
-            room_y * 4,
-            room_x * 8,
-        ),
+        Direction::West => {
+            bounding_box.moved(-(room_z + room_depth) * 8 + 1, room_y * 4, room_x * 8)
+        }
         _ => bounding_box.moved(room_z * 8, room_y * 4, room_x * 8),
     }
 }
@@ -364,7 +361,11 @@ const fn room_piece(
     ChildPiece { base, room, kind }
 }
 
-const fn boxed_piece(orientation: Direction, bounding_box: BoundingBox, kind: RoomPieceKind) -> ChildPiece {
+const fn boxed_piece(
+    orientation: Direction,
+    bounding_box: BoundingBox,
+    kind: RoomPieceKind,
+) -> ChildPiece {
     let mut base = PieceBase::new(1, bounding_box);
     base.set_orientation(Some(orientation));
     ChildPiece {
@@ -429,9 +430,7 @@ pub fn create_top_piece(
 
     let offset = base.world_pos(9, 0, 22);
     for child in &mut children {
-        child
-            .base
-            .move_by(offset.x(), offset.y(), offset.z());
+        child.base.move_by(offset.x(), offset.y(), offset.z());
     }
 
     let left_wing = BoundingBox::new(base.world_pos(1, 1, 1).0, base.world_pos(23, 8, 21).0);
@@ -621,7 +620,10 @@ fn generate_room_graph(
     (room_order, source_room, core_room)
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateWaterBox")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateWaterBox"
+)]
 fn generate_water_box(
     base: &PieceBase,
     region: &WorldGenRegion<'_>,
@@ -661,11 +663,21 @@ fn generate_default_floor(
     let gray = base_gray();
     let light = base_light();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     if down_opening {
-        gbox(x_off, 0, z_off, x_off + 2, 0, z_off + GRIDROOM_DEPTH - 1, gray);
+        gbox(
+            x_off,
+            0,
+            z_off,
+            x_off + 2,
+            0,
+            z_off + GRIDROOM_DEPTH - 1,
+            gray,
+        );
         gbox(
             x_off + 5,
             0,
@@ -702,7 +714,10 @@ fn generate_default_floor(
     }
 }
 
-#[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateBoxOnFillOnly")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "mirrors vanilla generateBoxOnFillOnly"
+)]
 fn generate_box_on_fill_only(
     base: &PieceBase,
     region: &WorldGenRegion<'_>,
@@ -888,7 +903,9 @@ fn generate_wing(
     let light = base_light();
     let deco = dot_deco_data();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 
@@ -901,7 +918,15 @@ fn generate_wing(
         gbox(xoff + 17 - i, i + 5, i + 7, xoff + 17 - i, i + 5, 20, light);
         gbox(xoff + 24 - i, i + 1, i, xoff + 24 - i, i + 1, 20, light);
         gbox(xoff + i + 1, i + 1, i, xoff + 23 - i, i + 1, i, light);
-        gbox(xoff + i + 8, i + 5, i + 7, xoff + 16 - i, i + 5, i + 7, light);
+        gbox(
+            xoff + i + 8,
+            i + 5,
+            i + 7,
+            xoff + 16 - i,
+            i + 5,
+            i + 7,
+            light,
+        );
     }
 
     gbox(xoff + 4, 4, 4, xoff + 6, 4, 20, gray);
@@ -941,11 +966,7 @@ fn generate_wing(
     gbox(xoff + 12, 1, 11, xoff + 12, 7, 13, gray);
 }
 
-fn generate_entrance_archs(
-    base: &PieceBase,
-    region: &WorldGenRegion<'_>,
-    chunk_bb: BoundingBox,
-) {
+fn generate_entrance_archs(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: BoundingBox) {
     if !chunk_intersects(base, chunk_bb, 22, 5, 35, 17) {
         return;
     }
@@ -954,7 +975,9 @@ fn generate_entrance_archs(
     let light = base_light();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 
@@ -975,11 +998,7 @@ fn generate_entrance_archs(
     }
 }
 
-fn generate_entrance_wall(
-    base: &PieceBase,
-    region: &WorldGenRegion<'_>,
-    chunk_bb: BoundingBox,
-) {
+fn generate_entrance_wall(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: BoundingBox) {
     if !chunk_intersects(base, chunk_bb, 15, 20, 42, 21) {
         return;
     }
@@ -988,7 +1007,9 @@ fn generate_entrance_wall(
     let light = base_light();
     let black = base_black();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
     let water = |x0, y0, z0, x1, y1, z1| {
@@ -1060,7 +1081,9 @@ fn generate_roof_piece(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: 
     let light = base_light();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 
@@ -1102,7 +1125,9 @@ fn generate_lower_wall(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: 
     let light = base_light();
     let deco = dot_deco_data();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 
@@ -1166,7 +1191,9 @@ fn generate_middle_wall(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb:
     let light = base_light();
     let deco = dot_deco_data();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 
@@ -1239,7 +1266,9 @@ fn generate_upper_wall(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: 
     let light = base_light();
     let deco = dot_deco_data();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 
@@ -1301,7 +1330,9 @@ fn core_room(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: BoundingBo
     let lamp = lamp_block();
     let gold = vanilla_blocks::GOLD_BLOCK.default_state();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 
@@ -1383,7 +1414,9 @@ fn double_x_room(
     let light = base_light();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
     let water = |x0, y0, z0, x1, y1, z1| {
@@ -1460,7 +1493,9 @@ fn double_xy_room(
     let light = base_light();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
     let water = |x0, y0, z0, x1, y1, z1| {
@@ -1577,7 +1612,9 @@ fn double_y_room(
     let gray = base_gray();
     let light = base_light();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
 
     if rooms[room].index / GRID_FLOOR_COUNT > 0 {
@@ -1663,7 +1700,9 @@ fn double_yz_room(
     let black = base_black();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let water = |x0, y0, z0, x1, y1, z1| {
         generate_water_box(base, region, chunk_bb, x0, y0, z0, x1, y1, z1);
@@ -1773,7 +1812,9 @@ fn double_z_room(
     let light = base_light();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
     let water = |x0, y0, z0, x1, y1, z1| {
@@ -1867,7 +1908,9 @@ fn entry_room(
 ) {
     let light = base_light();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let water = |x0, y0, z0, x1, y1, z1| {
         generate_water_box(base, region, chunk_bb, x0, y0, z0, x1, y1, z1);
@@ -1903,7 +1946,9 @@ fn penthouse(base: &PieceBase, region: &WorldGenRegion<'_>, chunk_bb: BoundingBo
     let black = base_black();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 
@@ -1966,7 +2011,9 @@ fn simple_room(
     let black = base_black();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
     let water = |x0, y0, z0, x1, y1, z1| {
@@ -2144,7 +2191,9 @@ fn simple_top_room(
     let light = base_light();
     let black = base_black();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let water = |x0, y0, z0, x1, y1, z1| {
         generate_water_box(base, region, chunk_bb, x0, y0, z0, x1, y1, z1);
@@ -2201,7 +2250,9 @@ fn wing_room(
     let black = base_black();
     let lamp = lamp_block();
     let gbox = |x0, y0, z0, x1, y1, z1, state| {
-        base.generate_box(region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false);
+        base.generate_box(
+            region, chunk_bb, x0, y0, z0, x1, y1, z1, state, state, false,
+        );
     };
     let pb = |x, y, z, state| base.place_block(region, state, x, y, z, chunk_bb);
 

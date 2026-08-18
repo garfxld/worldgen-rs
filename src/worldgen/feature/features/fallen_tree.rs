@@ -13,7 +13,6 @@ use crate::worldgen::feature::treedecorators::{TreeDecorator, TreeDecoratorConte
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct FallenTreeConfig {
     pub trunk_provider: BlockStateProvider,
     pub log_length: IntProvider,
@@ -31,7 +30,10 @@ pub fn place(
 
     let direction = Direction::HORIZONTAL[random.next_i32_bounded(4) as usize];
     let log_length = config.log_length.sample(random) - 2;
-    let log_start = set_ground_height(region, origin.relative_n(direction, 2 + random.next_i32_bounded(2)));
+    let log_start = set_ground_height(
+        region,
+        origin.relative_n(direction, 2 + random.next_i32_bounded(2)),
+    );
 
     if can_place_entire_fallen_log(region, log_length, log_start, direction) {
         place_fallen_log(region, random, log_length, log_start, direction, config);
@@ -55,7 +57,9 @@ fn may_place_on(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
 }
 
 fn is_over_solid_ground(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
-    region.get_block(pos.below()).is_face_sturdy_at(pos, Direction::Up)
+    region
+        .get_block(pos.below())
+        .is_face_sturdy_at(pos, Direction::Up)
 }
 
 fn can_place_entire_fallen_log(
@@ -100,7 +104,12 @@ fn place_log_block(
     mark_above_for_post_processing(region, pos);
 }
 
-fn place_stump(region: &WorldGenRegion<'_>, random: &mut RandomSource, origin: BlockPos, config: &FallenTreeConfig) {
+fn place_stump(
+    region: &WorldGenRegion<'_>,
+    random: &mut RandomSource,
+    origin: BlockPos,
+    config: &FallenTreeConfig,
+) {
     place_log_block(region, random, origin, config, None);
     let stump: JavaHashSet = std::iter::once(origin).collect();
     decorate(region, random, &stump, &config.stump_decorators);
@@ -135,7 +144,8 @@ fn decorate(
     }
     let empty = JavaHashSet::new();
     let mut decorations = JavaHashSet::new();
-    let mut context = TreeDecoratorContext::new(region, random, logs, &empty, &empty, &mut decorations);
+    let mut context =
+        TreeDecoratorContext::new(region, random, logs, &empty, &empty, &mut decorations);
     for decorator in decorators {
         decorator.place(&mut context);
     }

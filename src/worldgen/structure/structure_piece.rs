@@ -13,21 +13,21 @@ use crate::util::rotation::Rotation;
 use crate::worldgen::region::WorldGenRegion;
 use crate::worldgen::structure::pools::jigsaw_junction::JigsawJunction;
 use crate::worldgen::structure::pools::structure_pool_element::StructurePoolElement;
-use crate::worldgen::structure::structures::desert_pyramid_piece::DesertPyramidPiece;
 use crate::worldgen::structure::structures::buried_treasure_pieces::BuriedTreasurePiece;
+use crate::worldgen::structure::structures::desert_pyramid_piece::DesertPyramidPiece;
+use crate::worldgen::structure::structures::end_city_pieces::EndCityPiece;
 use crate::worldgen::structure::structures::igloo_pieces::IglooPiece;
-use crate::worldgen::structure::structures::mineshaft_pieces::{MineShaftPiece, MineshaftType};
 use crate::worldgen::structure::structures::jungle_temple_piece::JungleTemplePiece;
+use crate::worldgen::structure::structures::mineshaft_pieces::{MineShaftPiece, MineshaftType};
+use crate::worldgen::structure::structures::nether_fortress_pieces::NetherBridgePiece;
+use crate::worldgen::structure::structures::nether_fossil_pieces::NetherFossilPiece;
 use crate::worldgen::structure::structures::ocean_monument_pieces::MonumentBuilding;
 use crate::worldgen::structure::structures::ocean_ruin_pieces::OceanRuinPiece;
-use crate::worldgen::structure::structures::end_city_pieces::EndCityPiece;
-use crate::worldgen::structure::structures::woodland_mansion_pieces::WoodlandMansionPiece;
-use crate::worldgen::structure::structures::nether_fortress_pieces::NetherBridgePiece;
-use crate::worldgen::structure::structures::stronghold_pieces::StrongholdPiece;
-use crate::worldgen::structure::structures::nether_fossil_pieces::NetherFossilPiece;
 use crate::worldgen::structure::structures::ruined_portal_piece::RuinedPortalPiece;
 use crate::worldgen::structure::structures::shipwreck_pieces::ShipwreckPiece;
+use crate::worldgen::structure::structures::stronghold_pieces::StrongholdPiece;
 use crate::worldgen::structure::structures::swamp_hut_piece::SwampHutPiece;
+use crate::worldgen::structure::structures::woodland_mansion_pieces::WoodlandMansionPiece;
 use crate::worldgen::structure::templatesystem::liquid_settings::LiquidSettings;
 
 const SHAPE_CHECK_BLOCKS: &[BlockRef] = &[
@@ -347,8 +347,7 @@ impl PieceBase {
                     if skip_air && self.get_block(region, x, y, z, chunk_bb).is_air() {
                         continue;
                     }
-                    let is_edge =
-                        y == y0 || y == y1 || x == x0 || x == x1 || z == z0 || z == z1;
+                    let is_edge = y == y0 || y == y1 || x == x0 || x == x1 || z == z0 || z == z1;
                     let state = selector(random, x, y, z, is_edge);
                     self.place_block(region, state, x, y, z, chunk_bb);
                 }
@@ -356,7 +355,10 @@ impl PieceBase {
         }
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla generateMaybeBox")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla generateMaybeBox"
+    )]
     pub fn generate_maybe_box(
         &self,
         region: &WorldGenRegion<'_>,
@@ -396,7 +398,10 @@ impl PieceBase {
         }
     }
 
-    #[expect(clippy::too_many_arguments, reason = "mirrors vanilla maybeGenerateBlock")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors vanilla maybeGenerateBlock"
+    )]
     pub fn maybe_generate_block(
         &self,
         region: &WorldGenRegion<'_>,
@@ -649,11 +654,11 @@ impl StructurePiece {
         Self { base, kind }
     }
 
-    pub const fn pool_element(
-        piece: PoolElementStructurePiece,
-        bounding_box: BoundingBox,
-    ) -> Self {
-        Self::new(PieceBase::new(0, bounding_box), PieceKind::PoolElement(piece))
+    pub const fn pool_element(piece: PoolElementStructurePiece, bounding_box: BoundingBox) -> Self {
+        Self::new(
+            PieceBase::new(0, bounding_box),
+            PieceKind::PoolElement(piece),
+        )
     }
 
     pub const fn bounding_box(&self) -> BoundingBox {

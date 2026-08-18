@@ -1,9 +1,9 @@
 use glam::IVec3;
 
 use crate::util::ident::Identifier;
-use crate::worldgen::structure::structure::BiomeHolderSet;
 use crate::util::pos::{BlockPos, ChunkPos};
 use crate::util::rng::legacy_random::LegacyRandomSource;
+use crate::worldgen::structure::structure::BiomeHolderSet;
 
 const HIGHLY_ARBITRARY_RANDOM_SALT: i32 = 10_387_320;
 
@@ -50,8 +50,9 @@ impl FrequencyReductionMethod {
             Self::LegacyType1 => {
                 let chunk_x = source_x >> 4;
                 let chunk_z = source_z >> 4;
-                let mut random =
-                    LegacyRandomSource::from_seed((chunk_x ^ (chunk_z << 4)) as i64 as u64 ^ seed as u64);
+                let mut random = LegacyRandomSource::from_seed(
+                    (chunk_x ^ (chunk_z << 4)) as i64 as u64 ^ seed as u64,
+                );
                 random.next_i32();
                 random.next_i32_bounded((1.0 / probability) as i32) == 0
             }
@@ -161,12 +162,13 @@ impl StructurePlacement {
             StructurePlacementKind::RandomSpread { .. } => self
                 .get_potential_structure_chunk(seed, source_x, source_z)
                 .is_some_and(|pos| pos.0.x == source_x && pos.0.y == source_z),
-            StructurePlacementKind::ConcentricRings { .. } => ring_positions
-                .is_some_and(|positions| {
+            StructurePlacementKind::ConcentricRings { .. } => {
+                ring_positions.is_some_and(|positions| {
                     positions
                         .iter()
                         .any(|pos| pos.0.x == source_x && pos.0.y == source_z)
-                }),
+                })
+            }
         }
     }
 

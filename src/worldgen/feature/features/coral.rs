@@ -68,7 +68,10 @@ pub fn place_coral_block(
                 && let Some(coral) = random_element_of(&WALL_CORALS, random)
             {
                 let mut fan_state = coral.default_state();
-                if fan_state.try_get_value(&Properties::HORIZONTAL_FACING).is_some() {
+                if fan_state
+                    .try_get_value(&Properties::HORIZONTAL_FACING)
+                    .is_some()
+                {
                     fan_state = fan_state.set_value(&Properties::HORIZONTAL_FACING, direction);
                 }
                 region.set_block(relative, fan_state);

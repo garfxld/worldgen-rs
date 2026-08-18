@@ -84,7 +84,10 @@ pub fn add_pieces<'a>(
     let bottom_y = match project_start_to_heightmap {
         None => adjusted_position.y(),
         Some(heightmap) => {
-            position.y() + context.generator.get_first_free_height(center_x, center_z, heightmap)
+            position.y()
+                + context
+                    .generator
+                    .get_first_free_height(center_x, center_z, heightmap)
         }
     };
     let old_absolute_ground_y = box_.min_y() + center_piece.as_pool_element().ground_level_delta;
@@ -329,9 +332,8 @@ fn try_placing_children(
                             }
                             let child_pool_name = pool_alias_lookup.lookup(&target_jigsaw.pool);
                             let child_pool = template_pools().get(&child_pool_name);
-                            let child_fallback = child_pool.and_then(|pool| {
-                                template_pools().get(pool.fallback())
-                            });
+                            let child_fallback =
+                                child_pool.and_then(|pool| template_pools().get(pool.fallback()));
                             let child_pool_size =
                                 child_pool.map_or(0, StructureTemplatePool::get_max_size);
                             let child_fallback_size =
@@ -350,7 +352,8 @@ fn try_placing_children(
                     }
 
                     let target_jigsaw_local_pos = target_jigsaw.info.pos;
-                    let raw_target_box_pos = BlockPos(target_jigsaw_pos.0 - target_jigsaw_local_pos.0);
+                    let raw_target_box_pos =
+                        BlockPos(target_jigsaw_pos.0 - target_jigsaw_local_pos.0);
                     let raw_target_bb =
                         target_element.get_bounding_box(raw_target_box_pos, target_rotation);
                     let raw_target_y = raw_target_bb.min_y();
@@ -438,20 +441,24 @@ fn try_placing_children(
                         source_jigsaw_base_height + delta_y / 2
                     };
 
-                    pieces[source_index].as_pool_element_mut().add_junction(JigsawJunction::new(
-                        target_jigsaw_pos.x(),
-                        junction_y - source_jigsaw_local_y + source_ground_level_delta,
-                        target_jigsaw_pos.z(),
-                        delta_y,
-                        target_projection,
-                    ));
-                    target_piece.as_pool_element_mut().add_junction(JigsawJunction::new(
-                        source_jigsaw_pos.x(),
-                        junction_y - target_jigsaw_local_y + target_ground_level_delta,
-                        source_jigsaw_pos.z(),
-                        -delta_y,
-                        source_projection,
-                    ));
+                    pieces[source_index]
+                        .as_pool_element_mut()
+                        .add_junction(JigsawJunction::new(
+                            target_jigsaw_pos.x(),
+                            junction_y - source_jigsaw_local_y + source_ground_level_delta,
+                            target_jigsaw_pos.z(),
+                            delta_y,
+                            target_projection,
+                        ));
+                    target_piece
+                        .as_pool_element_mut()
+                        .add_junction(JigsawJunction::new(
+                            source_jigsaw_pos.x(),
+                            junction_y - target_jigsaw_local_y + target_ground_level_delta,
+                            source_jigsaw_pos.z(),
+                            -delta_y,
+                            source_projection,
+                        ));
 
                     pieces.push(target_piece);
                     if depth < max_depth {

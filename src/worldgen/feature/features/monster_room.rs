@@ -6,8 +6,7 @@ use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 use crate::worldgen::region::WorldGenRegion;
 
-const FEATURES_CANNOT_REPLACE: Identifier =
-    Identifier::const_vanilla("features_cannot_replace");
+const FEATURES_CANNOT_REPLACE: Identifier = Identifier::const_vanilla("features_cannot_replace");
 
 fn safe_set_block(region: &WorldGenRegion<'_>, pos: BlockPos, state: BlockState) {
     if !region
@@ -145,11 +144,7 @@ pub fn place(region: &WorldGenRegion<'_>, random: &mut RandomSource, origin: Blo
                 }
 
                 if wall_count == 1 {
-                    let chest = reorient(
-                        region,
-                        chest_pos,
-                        vanilla_blocks::CHEST.default_state(),
-                    );
+                    let chest = reorient(region, chest_pos, vanilla_blocks::CHEST.default_state());
                     safe_set_block(region, chest_pos, chest);
                     random.next_i64();
                     break;

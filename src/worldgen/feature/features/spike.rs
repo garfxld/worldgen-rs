@@ -7,7 +7,6 @@ use crate::worldgen::block_predicate::BlockPredicate;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct SpikeConfig {
     pub state: BlockState,
     pub can_place_on: BlockPredicate,
@@ -50,11 +49,9 @@ pub fn place(
             for zo in -new_width..=new_width {
                 let dz = zo.abs() as f32 - 0.25;
                 let inside_cone = (xo == 0 && zo == 0) || !(dx * dx + dz * dz > scale * scale);
-                let allow_corner_gap = (xo != -new_width
-                    && xo != new_width
-                    && zo != -new_width
-                    && zo != new_width)
-                    || !(random.next_f32() > 0.75);
+                let allow_corner_gap =
+                    (xo != -new_width && xo != new_width && zo != -new_width && zo != new_width)
+                        || !(random.next_f32() > 0.75);
                 if inside_cone && allow_corner_gap {
                     let positive_offset = origin.offset(xo, y_off, zo);
                     if region.get_block(positive_offset).is_air()

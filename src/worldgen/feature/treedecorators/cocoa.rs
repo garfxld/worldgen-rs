@@ -6,7 +6,6 @@ use crate::util::direction::Direction;
 use crate::worldgen::feature::treedecorators::TreeDecoratorContext;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct CocoaDecorator {
     pub probability: f32,
 }
@@ -23,7 +22,11 @@ impl CocoaDecorator {
         }
 
         let base_y = logs[0].y();
-        let eligible: Vec<_> = logs.iter().filter(|pos| pos.y() - base_y <= 2).copied().collect();
+        let eligible: Vec<_> = logs
+            .iter()
+            .filter(|pos| pos.y() - base_y <= 2)
+            .copied()
+            .collect();
 
         for log_pos in eligible {
             for direction in Direction::HORIZONTAL {

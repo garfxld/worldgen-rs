@@ -6,6 +6,7 @@ use cerium::auth::AuthMode;
 use cerium::world::block::{Block, BlockState};
 use cerium::world::chunk::Chunk;
 use cerium::world::{DimensionType, World};
+use worldgen_rs::datapack::Datapack;
 use worldgen_rs::{ChunkPos, ChunkStatus, Identifier, Worldgen, WorldgenSettings};
 
 #[expect(
@@ -57,6 +58,7 @@ fn cerium_world_generator_hook_fills_terrain() {
     let worldgen = Worldgen::new(WorldgenSettings {
         seed: 42,
         dimension: Identifier::const_vanilla("overworld"),
+        datapack: Datapack::builtin(),
     })
     .expect("worldgen should build");
 
@@ -101,8 +103,11 @@ fn cerium_world_generator_hook_fills_terrain() {
             for local_x in 0..16 {
                 for local_z in 0..16 {
                     for world_y in 60..100 {
-                        let state = world.get_block(world_x0 + local_x, world_y, world_z0 + local_z);
-                        if state.as_block() == Block::OakLog && state.state_id() != default_oak_log_state_id {
+                        let state =
+                            world.get_block(world_x0 + local_x, world_y, world_z0 + local_z);
+                        if state.as_block() == Block::OakLog
+                            && state.state_id() != default_oak_log_state_id
+                        {
                             found_non_default_oak_log = true;
                             break 'search;
                         }

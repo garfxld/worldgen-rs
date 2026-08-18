@@ -114,7 +114,10 @@ impl Noises {
             .uses_end_islands
             .then(|| Box::new(EndIslands::new(seed)));
         let end_islands_ptr = end_islands.as_deref().map(ptr::from_ref);
-        tracing::debug!("blended noise + end islands setup done in {:?}", t.elapsed());
+        tracing::debug!(
+            "blended noise + end islands setup done in {:?}",
+            t.elapsed()
+        );
 
         let t = Instant::now();
         let module = JitModule::new()?;
@@ -134,10 +137,7 @@ impl Noises {
             compiled.slots(),
             compiled.interpolated_count()
         );
-        tracing::debug!(
-            "density functions fully compiled in {:?}",
-            total.elapsed()
-        );
+        tracing::debug!("density functions fully compiled in {:?}", total.elapsed());
 
         Ok(Self {
             compiled,
@@ -205,20 +205,21 @@ impl Noises {
     reason = "test loads the checked-in vanilla datapack"
 )]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use crate::util::ident::Identifier;
 
     use super::*;
     use crate::worldgen::backend::ir::loader::DatapackSource;
 
-    fn datapack_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack/worldgen")
-    }
-
     #[test]
     fn overworld_noises_compile_from_seed() {
-        let source = DatapackSource::new(datapack_root());
+        let source = DatapackSource::builtin();
         let registry = source.density_function_registry().unwrap();
-        let (program, settings) = source.program("overworld", "Overworld", &registry).unwrap();
+        let (program, settings) = source
+            .program(
+                &Identifier::new(Identifier::VANILLA_NAMESPACE, "overworld"),
+                &registry,
+            )
+            .unwrap();
         let params = source.noise_parameters().unwrap();
 
         let noises = Noises::new(&program, &settings, &params, 42).unwrap();
@@ -230,9 +231,14 @@ mod tests {
 
     #[test]
     fn end_noises_compile_with_end_islands() {
-        let source = DatapackSource::new(datapack_root());
+        let source = DatapackSource::builtin();
         let registry = source.density_function_registry().unwrap();
-        let (program, settings) = source.program("end", "End", &registry).unwrap();
+        let (program, settings) = source
+            .program(
+                &Identifier::new(Identifier::VANILLA_NAMESPACE, "end"),
+                &registry,
+            )
+            .unwrap();
         let params = source.noise_parameters().unwrap();
 
         let noises = Noises::new(&program, &settings, &params, 42).unwrap();

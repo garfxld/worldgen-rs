@@ -87,8 +87,11 @@ impl ScatteredFeature {
         let box_ = base.bounding_box;
         for z in box_.min_z()..=box_.max_z() {
             for x in box_.min_x()..=box_.max_x() {
-                lowest_ground_height = lowest_ground_height
-                    .min(region.get_height(HeightmapType::MotionBlockingNoLeaves, x, z));
+                lowest_ground_height = lowest_ground_height.min(region.get_height(
+                    HeightmapType::MotionBlockingNoLeaves,
+                    x,
+                    z,
+                ));
                 found = true;
             }
         }

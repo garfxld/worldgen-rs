@@ -19,6 +19,7 @@ use crate::worldgen::biome::{BiomeSourceKind, obfuscate_biome_seed};
 use crate::worldgen::density::{
     Aquifer, AquiferResult, Beardifier, ColumnCache, NoiseChunk, Noises, OreVeinifier,
 };
+use crate::worldgen::dimension::{BiomeSourceSpec, DimensionSpec};
 use crate::worldgen::feature::features;
 use crate::worldgen::feature::sorter::{StepFeatureData, build_features_per_step};
 use crate::worldgen::structure::structure::Structure;
@@ -46,8 +47,8 @@ impl NoiseColumn {
 
 mod carver;
 mod feature;
-mod structure;
 pub mod fuzzed_biome;
+mod structure;
 mod surface;
 
 #[derive(Debug, thiserror::Error)]
@@ -125,16 +126,14 @@ fn resolve_block_state(name: &str) -> BlockState {
 impl Generator {
     pub fn new(
         source: &DatapackSource,
-        dimension: &str,
-        prefix: &str,
-        biome_source_kind: BiomeSourceDimension,
+        spec: &DimensionSpec,
         seed: u64,
     ) -> Result<Self, GeneratorError> {
         let total = Instant::now();
 
         let t = Instant::now();
         let registry = source.density_function_registry()?;
-        let (program, settings) = source.program(dimension, prefix, &registry)?;
+        let (program, settings) = source.program(&spec.noise_settings, &registry)?;
         let params = source.noise_parameters()?;
         tracing::debug!(
             "datapack loaded ({} density functions, {} noise params) in {:?}",
@@ -146,24 +145,21 @@ impl Generator {
         let t = Instant::now();
         let noises = Noises::new(&program, &settings, &params, seed)?;
         tracing::debug!(
-            "primary noises compiled for {dimension} in {:?}",
+            "primary noises compiled for {} in {:?}",
+            spec.noise_settings,
             t.elapsed()
         );
 
-        let biome_source = match biome_source_kind {
-            BiomeSourceDimension::Overworld => {
+        let biome_source = match &spec.biome_source {
+            BiomeSourceSpec::Overworld(parameters) => {
                 let noises = Noises::new(&program, &settings, &params, seed)?;
-                let parameters =
-                    build_parameter_list(&source.multi_noise_biome_parameters(dimension)?);
-                BiomeSourceKind::overworld(seed, noises, parameters)
+                BiomeSourceKind::overworld(seed, noises, build_parameter_list(parameters))
             }
-            BiomeSourceDimension::Nether => {
+            BiomeSourceSpec::Nether(parameters) => {
                 let noises = Noises::new(&program, &settings, &params, seed)?;
-                let parameters =
-                    build_parameter_list(&source.multi_noise_biome_parameters(dimension)?);
-                BiomeSourceKind::nether(seed, noises, parameters)
+                BiomeSourceKind::nether(seed, noises, build_parameter_list(parameters))
             }
-            BiomeSourceDimension::End => BiomeSourceKind::end(seed),
+            BiomeSourceSpec::End => BiomeSourceKind::end(seed),
         };
 
         let noises_sea_level = noises.sea_level();
@@ -197,7 +193,11 @@ impl Generator {
             features().features_for_biome(*biome)
         });
 
-        tracing::debug!("generator for {dimension} fully initialized in {:?}", total.elapsed());
+        tracing::debug!(
+            "generator for {} fully initialized in {:?}",
+            spec.noise_settings,
+            total.elapsed()
+        );
 
         Ok(Self {
             biome_source,
@@ -274,7 +274,9 @@ impl Generator {
                 let state = match aquifer.compute_substance(noises, x, world_y, z, density) {
                     AquiferResult::Solid => default_block_id,
                     AquiferResult::Fluid(state) => state,
-                    AquiferResult::Air => REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR),
+                    AquiferResult::Air => {
+                        REGISTRY.blocks.get_default_state_id(&vanilla_blocks::AIR)
+                    }
                 };
                 heightmap.is_opaque(state)
             })
@@ -467,10 +469,4 @@ impl Generator {
 
         chunk.replace_noise_heightmaps(ocean_floor_wg, world_surface_wg);
     }
-}
-
-pub enum BiomeSourceDimension {
-    Overworld,
-    Nether,
-    End,
 }

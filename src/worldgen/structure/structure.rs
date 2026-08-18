@@ -10,32 +10,35 @@ use crate::util::ident::Identifier;
 use crate::util::pos::{BlockPos, ChunkPos};
 use crate::util::rng::RandomSource;
 use crate::util::rng::legacy_random::LegacyRandomSource;
-use crate::worldgen::generator::Generator;
-use crate::worldgen::structure::pieces::structure_pieces_builder::StructurePiecesBuilder;
-use crate::worldgen::structure::structure_start::StructureStart;
 use crate::util::rotation::Rotation;
+use crate::util::value_providers::height::HeightProvider;
+use crate::worldgen::biome::biome_source::ChunkBiomeSampler;
+use crate::worldgen::generator::Generator;
 use crate::worldgen::region::WorldGenRegion;
 use crate::worldgen::structure::pieces::pieces_container::PiecesContainer;
-use crate::worldgen::structure::structures::desert_pyramid;
-use crate::worldgen::structure::structures::desert_pyramid_piece::{self as desert_pyramid_piece_mod, DesertPyramidPiece};
-use crate::worldgen::structure::structures::buried_treasure_pieces::BuriedTreasurePiece;
+use crate::worldgen::structure::pieces::structure_pieces_builder::StructurePiecesBuilder;
 use crate::worldgen::structure::structure_piece::PieceKind;
-use crate::worldgen::structure::structures::igloo_pieces;
-use crate::worldgen::structure::structures::ocean_ruin_pieces;
-use crate::util::value_providers::height::HeightProvider;
+use crate::worldgen::structure::structure_start::StructureStart;
+use crate::worldgen::structure::structures::buried_treasure_pieces::BuriedTreasurePiece;
+use crate::worldgen::structure::structures::desert_pyramid;
+use crate::worldgen::structure::structures::desert_pyramid_piece::{
+    self as desert_pyramid_piece_mod, DesertPyramidPiece,
+};
 use crate::worldgen::structure::structures::end_city;
-use crate::worldgen::structure::structures::mineshaft;
-use crate::worldgen::structure::structures::nether_fortress;
-use crate::worldgen::structure::structures::ocean_monument;
-use crate::worldgen::structure::structures::stronghold;
-use crate::worldgen::structure::structures::nether_fossil;
-use crate::worldgen::structure::structures::mineshaft_pieces;
-use crate::worldgen::structure::structures::ruined_portal;
-use crate::worldgen::structure::structures::woodland_mansion;
-use crate::worldgen::structure::structures::shipwreck_pieces;
-use crate::worldgen::structure::structures::jungle_temple_piece::{self, JungleTemplePiece};
+use crate::worldgen::structure::structures::igloo_pieces;
 use crate::worldgen::structure::structures::jigsaw::JigsawStructure;
+use crate::worldgen::structure::structures::jungle_temple_piece::{self, JungleTemplePiece};
+use crate::worldgen::structure::structures::mineshaft;
+use crate::worldgen::structure::structures::mineshaft_pieces;
+use crate::worldgen::structure::structures::nether_fortress;
+use crate::worldgen::structure::structures::nether_fossil;
+use crate::worldgen::structure::structures::ocean_monument;
+use crate::worldgen::structure::structures::ocean_ruin_pieces;
+use crate::worldgen::structure::structures::ruined_portal;
+use crate::worldgen::structure::structures::shipwreck_pieces;
+use crate::worldgen::structure::structures::stronghold;
 use crate::worldgen::structure::structures::swamp_hut_piece::SwampHutPiece;
+use crate::worldgen::structure::structures::woodland_mansion;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, PartialOrd, Ord)]
 pub enum GenerationStep {
@@ -107,6 +110,7 @@ pub struct GenerationContext<'a> {
     pub min_y: i32,
     pub height: i32,
     pub valid_biome: &'a dyn Fn(BiomeRef) -> bool,
+    pub biome_sampler: RefCell<ChunkBiomeSampler<'a>>,
 }
 
 impl<'a> GenerationContext<'a> {
@@ -126,6 +130,7 @@ impl<'a> GenerationContext<'a> {
             min_y: generator.noises().min_y(),
             height: generator.noises().height(),
             valid_biome,
+            biome_sampler: RefCell::new(generator.biome_source().chunk_sampler()),
         }
     }
 
@@ -210,10 +215,9 @@ impl Structure {
     }
 
     pub fn terrain_adaptation(&self) -> TerrainAdjustment {
-        self.settings()
-            .map_or(TerrainAdjustment::None, |settings| {
-                settings.terrain_adaptation
-            })
+        self.settings().map_or(TerrainAdjustment::None, |settings| {
+            settings.terrain_adaptation
+        })
     }
 
     pub fn biomes(&self) -> Option<&BiomeHolderSet> {
@@ -321,11 +325,7 @@ impl Structure {
                 HeightmapType::OceanFloorWg,
                 Box::new(|builder| {
                     let chunk_pos = context.chunk_pos;
-                    let offset = BlockPos::new(
-                        chunk_pos.0.x * 16 + 9,
-                        90,
-                        chunk_pos.0.y * 16 + 9,
-                    );
+                    let offset = BlockPos::new(chunk_pos.0.x * 16 + 9, 90, chunk_pos.0.y * 16 + 9);
                     builder.add_piece(BuriedTreasurePiece::new(offset));
                 }),
             )),
@@ -341,8 +341,7 @@ impl Structure {
                     heightmap,
                     Box::new(move |builder| {
                         let chunk_pos = context.chunk_pos;
-                        let offset =
-                            BlockPos::new(chunk_pos.0.x * 16, 90, chunk_pos.0.y * 16);
+                        let offset = BlockPos::new(chunk_pos.0.x * 16, 90, chunk_pos.0.y * 16);
                         let mut piece = context.with_random(|random| {
                             let rotation = Rotation::get_random(random);
                             shipwreck_pieces::random_piece(offset, rotation, random, is_beached)
@@ -569,8 +568,10 @@ fn single_piece_generation_point<'a>(
 
 fn is_valid_biome(stub: &GenerationStub<'_>, context: &GenerationContext<'_>) -> bool {
     let position = stub.position;
-    let mut sampler = context.generator.biome_source().chunk_sampler();
-    sampler.init_grid(position.x() & !15, position.z() & !15);
-    let biome = sampler.sample(position.x() >> 2, position.y() >> 2, position.z() >> 2);
+    let biome = context.biome_sampler.borrow_mut().sample(
+        position.x() >> 2,
+        position.y() >> 2,
+        position.z() >> 2,
+    );
     (context.valid_biome)(biome)
 }

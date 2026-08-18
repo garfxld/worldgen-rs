@@ -9,7 +9,6 @@ use crate::worldgen::feature::features::blockpos_iter::between_closed;
 use crate::worldgen::region::WorldGenRegion;
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct UnderwaterMagmaConfig {
     pub floor_search_range: i32,
     pub placement_radius_around_floor: i32,
@@ -32,7 +31,11 @@ fn get_floor_y(region: &WorldGenRegion<'_>, origin: BlockPos, search_range: i32)
         i += 1;
     }
 
-    if is_water(region, pos) { None } else { Some(pos.y()) }
+    if is_water(region, pos) {
+        None
+    } else {
+        Some(pos.y())
+    }
 }
 
 fn is_water_or_air(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
@@ -45,13 +48,14 @@ fn is_visible_from_outside(
     pos: BlockPos,
     covered_direction: Direction,
 ) -> bool {
-    !shapes::is_face_full(region.get_block(pos).get_occlusion_shape(), covered_direction)
+    !shapes::is_face_full(
+        region.get_block(pos).get_occlusion_shape(),
+        covered_direction,
+    )
 }
 
 fn is_valid_placement(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
-    if is_water_or_air(region, pos)
-        || is_visible_from_outside(region, pos.below(), Direction::Up)
-    {
+    if is_water_or_air(region, pos) || is_visible_from_outside(region, pos.below(), Direction::Up) {
         return false;
     }
 

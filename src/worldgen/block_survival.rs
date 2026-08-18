@@ -1,9 +1,9 @@
 use crate::chunk::heightmap::HeightmapType;
 use crate::registry::REGISTRY;
 use crate::registry::blocks::BlockRef;
-use crate::registry::blocks::vanilla_blocks;
 use crate::registry::blocks::properties::{BoolProperty, DoubleBlockHalf, Properties};
 use crate::registry::blocks::shapes::{self, SupportType};
+use crate::registry::blocks::vanilla_blocks;
 use crate::registry::fluid::FluidState;
 use crate::util::direction::Direction;
 use crate::util::ident::{BlockState, Identifier};
@@ -142,8 +142,7 @@ fn snow_can_survive(region: &WorldGenRegion, pos: BlockPos) -> bool {
     }
 
     shapes::is_offset_face_full(below.get_collision_shape_at(below_pos), Direction::Up)
-        || (below_block == &vanilla_blocks::SNOW
-            && below.get_value(&Properties::LAYERS) == 8)
+        || (below_block == &vanilla_blocks::SNOW && below.get_value(&Properties::LAYERS) == 8)
 }
 
 fn sturdy_below(region: &WorldGenRegion, pos: BlockPos) -> bool {
