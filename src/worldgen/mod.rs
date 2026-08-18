@@ -120,7 +120,6 @@ impl Worldgen {
 }
 
 #[cfg(test)]
-#[expect(clippy::unwrap_used, reason = "test asserts on the Result directly")]
 mod tests {
     use super::*;
 

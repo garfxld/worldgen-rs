@@ -46,4 +46,49 @@ impl<'a> ChunkView<'a> {
         self.chunk
             .get_relative_biome(relative_x, relative_y, relative_z)
     }
+
+    pub fn blocks(&self) -> impl Iterator<Item = (BlockPos, BlockState)> + '_ {
+        let min_y = self.min_y();
+        let height = self.height() as usize;
+        let world_x0 = self.pos().0.x * 16;
+        let world_z0 = self.pos().0.y * 16;
+
+        (0..height).flat_map(move |relative_y| {
+            (0..16usize).flat_map(move |relative_x| {
+                (0..16usize).filter_map(move |relative_z| {
+                    let state = self.get_relative_block(relative_x, relative_y, relative_z)?;
+                    if state.is_air() {
+                        return None;
+                    }
+                    let pos = BlockPos::new(
+                        world_x0 + relative_x as i32,
+                        min_y + relative_y as i32,
+                        world_z0 + relative_z as i32,
+                    );
+                    Some((pos, state))
+                })
+            })
+        })
+    }
+
+    pub fn biomes(&self) -> impl Iterator<Item = (BlockPos, u16)> + '_ {
+        let min_y = self.min_y();
+        let height = self.height() as usize;
+        let world_x0 = self.pos().0.x * 16;
+        let world_z0 = self.pos().0.y * 16;
+
+        (0..height).step_by(4).flat_map(move |relative_y| {
+            (0..16usize).step_by(4).flat_map(move |relative_x| {
+                (0..16usize).step_by(4).filter_map(move |relative_z| {
+                    let biome = self.get_relative_biome(relative_x, relative_y, relative_z)?;
+                    let pos = BlockPos::new(
+                        world_x0 + relative_x as i32,
+                        min_y + relative_y as i32,
+                        world_z0 + relative_z as i32,
+                    );
+                    Some((pos, biome))
+                })
+            })
+        })
+    }
 }

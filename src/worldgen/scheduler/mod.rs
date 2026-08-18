@@ -72,15 +72,11 @@ impl ChunkStore {
         let levels = compute_levels(positions, target);
 
         for index in 0..=target.get_index() {
-            let status =
-                ChunkStatus::from_index(index).expect("index within 0..=target.get_index()");
+            let status = ChunkStatus::try_from(index).expect("index within 0..=target.get_index()");
             let Some(needed) = levels.get(&status) else {
                 continue;
             };
-            // Statuses below Features only write into their own chunk, so running
-            // a level's chunks in parallel cannot change the result. Features
-            // writes into its 3x3 neighborhood, where application order is part
-            // of the generated output, so it stays sequential.
+
             if status < ChunkStatus::Features {
                 let pending: Vec<ChunkPos> = needed
                     .as_slice()
@@ -126,15 +122,6 @@ impl ChunkStore {
         *status = Some(target);
     }
 
-    // Features writes into the full 3x3 write-neighborhood (see
-    // `region::FEATURE_REGION_RADIUS`), not just `pos` itself. Locking only
-    // `pos`'s status mutex lets two concurrently-generating neighboring
-    // chunks race on that shared overlap (e.g. one chunk's tree reads a
-    // block, a neighbor's tree overwrites it, then the first writes back
-    // based on stale state). Lock every chunk in the 3x3 neighborhood, in a
-    // fixed global order, so overlapping neighborhoods from different
-    // threads can never deadlock and never run their Features step at the
-    // same time.
     fn advance_one_features(&self, pos: ChunkPos) {
         let mut positions: Vec<ChunkPos> = (-1..=1)
             .flat_map(|dz| (-1..=1).map(move |dx| ChunkPos::new(pos.0.x + dx, pos.0.y + dz)))
@@ -530,10 +517,6 @@ mod tests {
             .expect("generator should build");
         let store = Arc::new(ChunkStore::new(generator));
 
-        // Dark forest (dark_oak trees) sits reliably around this region on
-        // seed 42; adjacent chunks share Features write-radius, so racing
-        // their generation used to corrupt cross-chunk tree state (see the
-        // TreeFeature.updateLeaves distance-property panic this regresses).
         let positions: Vec<ChunkPos> = (0..6)
             .flat_map(|dx| (0..6).map(move |dz| ChunkPos::new(1500 + dx, -1500 + dz)))
             .collect();
@@ -587,7 +570,6 @@ mod tests {
             .expect("generator should build");
         let store = ChunkStore::new(generator);
 
-        // A dark_forest patch on seed 42 (chunk (-18, -11) and its surroundings).
         let positions: Vec<ChunkPos> = (-2..10)
             .flat_map(|dx| (-8..4).map(move |dz| ChunkPos::new(-18 + dx, -11 + dz)))
             .collect();

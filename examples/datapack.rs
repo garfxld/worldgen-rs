@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -20,7 +21,8 @@ use worldgen_rs::datapack::Datapack;
 use worldgen_rs::registry::REGISTRY;
 use worldgen_rs::{ChunkPos, ChunkStatus, Identifier, Worldgen, WorldgenSettings};
 
-const USAGE: &str = "usage: cargo run --release --example datapack <datapack.zip|directory> [dimension]";
+const USAGE: &str =
+    "usage: cargo run --release --example datapack <datapack.zip|directory> [dimension]";
 
 fn load_datapack(path: &Path) -> Datapack {
     let pack = if path.is_dir() {
@@ -54,64 +56,18 @@ const DEFAULT_FLYING_SPEED: f32 = 0.05;
 const MIN_FLY_MULTIPLIER: f32 = 0.1;
 const MAX_FLY_MULTIPLIER: f32 = 20.0;
 
-#[expect(
-    clippy::similar_names,
-    reason = "world_x0/world_z0 are the chunk's block-space origin, x vs z"
-)]
-fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk, biome_ids: &std::collections::HashMap<u16, i32>) {
+fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk, biome_ids: &HashMap<u16, i32>) {
     let pos = ChunkPos::new(chunk.x(), chunk.z());
     worldgen
         .generate(pos, ChunkStatus::Features, |view| {
-            let min_y = view.min_y();
-            let height = view.height();
-            let world_x0 = chunk.x() * 16;
-            let world_z0 = chunk.z() * 16;
-
-            for relative_y in (0..height as usize).step_by(4) {
-                let world_y = min_y + relative_y as i32;
-                for local_x in (0..16usize).step_by(4) {
-                    for local_z in (0..16usize).step_by(4) {
-                        let Some(worldgen_biome) =
-                            view.get_relative_biome(local_x, relative_y, local_z)
-                        else {
-                            continue;
-                        };
-                        let Some(&cerium_biome) = biome_ids.get(&worldgen_biome) else {
-                            continue;
-                        };
-                        chunk.set_biome(
-                            world_x0 + local_x as i32,
-                            world_y,
-                            world_z0 + local_z as i32,
-                            cerium_biome,
-                        );
-                    }
-                }
-            }
-
-            for relative_y in 0..height as usize {
-                let world_y = min_y + relative_y as i32;
-                for local_x in 0..16usize {
-                    for local_z in 0..16usize {
-                        let Some(state) = view.get_relative_block(local_x, relative_y, local_z)
-                        else {
-                            continue;
-                        };
-                        if state.is_air() {
-                            continue;
-                        }
-                        let Some(cerium_state) = BlockState::from_id(state.0) else {
-                            continue;
-                        };
-                        chunk.set_block(
-                            world_x0 + local_x as i32,
-                            world_y,
-                            world_z0 + local_z as i32,
-                            &cerium_state,
-                        );
-                    }
-                }
-            }
+            chunk.fill_biomes(view.biomes().filter_map(|(pos, biome)| {
+                biome_ids
+                    .get(&biome)
+                    .map(|&id| (pos.x(), pos.y(), pos.z(), id))
+            }));
+            chunk.fill_blocks(view.blocks().filter_map(|(pos, state)| {
+                BlockState::from_id(state.0).map(|s| (pos.x(), pos.y(), pos.z(), s))
+            }));
         })
         .expect("chunk should generate to Features");
 }

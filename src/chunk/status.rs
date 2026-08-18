@@ -21,24 +21,6 @@ impl ChunkStatus {
         self as usize
     }
 
-    pub const fn from_index(index: usize) -> Option<Self> {
-        match index {
-            0 => Some(Self::Empty),
-            1 => Some(Self::StructureStarts),
-            2 => Some(Self::StructureReferences),
-            3 => Some(Self::Biomes),
-            4 => Some(Self::Noise),
-            5 => Some(Self::Surface),
-            6 => Some(Self::Carvers),
-            7 => Some(Self::Features),
-            8 => Some(Self::InitializeLight),
-            9 => Some(Self::Light),
-            10 => Some(Self::Spawn),
-            11 => Some(Self::Full),
-            _ => None,
-        }
-    }
-
     pub const fn next(self) -> Option<Self> {
         match self {
             Self::Empty => Some(Self::StructureStarts),
@@ -104,6 +86,28 @@ impl ChunkStatus {
     }
 }
 
+impl TryFrom<usize> for ChunkStatus {
+    type Error = ();
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::Empty,
+            1 => Self::StructureStarts,
+            2 => Self::StructureReferences,
+            3 => Self::Biomes,
+            4 => Self::Noise,
+            5 => Self::Surface,
+            6 => Self::Carvers,
+            7 => Self::Features,
+            8 => Self::InitializeLight,
+            9 => Self::Light,
+            10 => Self::Spawn,
+            11 => Self::Full,
+            _ => return Err(()),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,10 +115,10 @@ mod tests {
     #[test]
     fn index_roundtrips() {
         for index in 0..=11 {
-            let status = ChunkStatus::from_index(index).expect("valid index");
+            let status = ChunkStatus::try_from(index).expect("valid index");
             assert_eq!(status.get_index(), index);
         }
-        assert_eq!(ChunkStatus::from_index(12), None);
+        assert_eq!(ChunkStatus::try_from(12), Err(()));
     }
 
     #[test]

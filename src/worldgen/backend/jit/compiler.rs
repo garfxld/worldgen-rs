@@ -329,7 +329,7 @@ impl<'a> DimensionCompiler<'a> {
                     .load(types::F64, flags, blended_ptr, lane_offset);
                 let out_offset = i64::try_from(lane * count * size_of::<f64>())
                     .map_err(|_| CompileError::TooManyChannels)?;
-                let lane_out = builder.ins().iadd_imm(out, out_offset);
+                let lane_out = builder.ins().iadd_imm_s(out, out_offset);
                 builder.ins().call(
                     fill_ref,
                     &[ctx.cache, ctx.pos.x, y, ctx.pos.z, blended, lane_out],
@@ -417,8 +417,6 @@ pub struct CompiledDimension {
     fill: FillFn,
     fill_4x: Fill4xFn,
     combine_final: CombineFn,
-    combine_vein_toggle: CombineFn,
-    combine_vein_ridged: CombineFn,
     interpolated_count: usize,
     vein_interp_enabled: bool,
     slots: usize,
@@ -450,14 +448,6 @@ impl CompiledDimension {
         self.combine_final
     }
 
-    pub(crate) const fn combine_vein_toggle(&self) -> CombineFn {
-        self.combine_vein_toggle
-    }
-
-    pub(crate) const fn combine_vein_ridged(&self) -> CombineFn {
-        self.combine_vein_ridged
-    }
-
     pub const fn interpolated_count(&self) -> usize {
         self.interpolated_count
     }
@@ -474,9 +464,6 @@ impl CompiledDimension {
         self.grid_side
     }
 
-    pub(crate) const fn grid_len_for(&self, slots: usize) -> usize {
-        self.grid_side * self.grid_side * slots
-    }
 }
 
 impl Drop for CompiledDimension {
@@ -684,8 +671,6 @@ impl DimensionCompiler<'_> {
             unsafe { transmute::<*const u8, CombineFn>(code) }
         };
         let combine_final = combine("final_density");
-        let combine_vein_toggle = combine("vein_toggle");
-        let combine_vein_ridged = combine("vein_ridged");
 
         Ok(CompiledDimension {
             module: Some(CodeMapping(self.module)),
@@ -695,8 +680,6 @@ impl DimensionCompiler<'_> {
             fill,
             fill_4x,
             combine_final,
-            combine_vein_toggle,
-            combine_vein_ridged,
             interpolated_count,
             vein_interp_enabled,
             slots: self.layout.slots(),
