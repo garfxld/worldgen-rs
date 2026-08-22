@@ -215,15 +215,6 @@ impl<'a> DimensionCompiler<'a> {
             named_refs.insert(name.clone(), func_ref);
         }
 
-        let fill_ref = match (shape, self.fill_id) {
-            (Shape::Fill4x, Some(id)) => Some(
-                self.module
-                    .inner_mut()
-                    .declare_func_in_func(id, builder.func),
-            ),
-            _ => None,
-        };
-
         let (cache, pos, fill, interpolated, out) = match shape {
             Shape::Full => (
                 params[0],
@@ -313,9 +304,7 @@ impl<'a> DimensionCompiler<'a> {
                 builder.ins().store(store_flags, value, out, offset);
             }
             builder.ins().return_(&[]);
-        } else if let (Shape::Fill4x, Some(channels), Some(out), Some(fill_ref)) =
-            (shape, channels, out, fill_ref)
-        {
+        } else if let (Shape::Fill4x, Some(channels), Some(out)) = (shape, channels, out) {
             let ys_ptr = params[2];
             let blended_ptr = params[4];
             let count = channels.len();
@@ -327,13 +316,17 @@ impl<'a> DimensionCompiler<'a> {
                 let blended = builder
                     .ins()
                     .load(types::F64, flags, blended_ptr, lane_offset);
-                let out_offset = i64::try_from(lane * count * size_of::<f64>())
-                    .map_err(|_| CompileError::TooManyChannels)?;
-                let lane_out = builder.ins().iadd_imm_s(out, out_offset);
-                builder.ins().call(
-                    fill_ref,
-                    &[ctx.cache, ctx.pos.x, y, ctx.pos.z, blended, lane_out],
-                );
+
+                ctx.pos.y = y;
+                ctx.fill = Some(blended);
+                ctx.ref_memo.clear();
+
+                for (index, channel) in channels.iter().enumerate() {
+                    let value = emit_expr(&mut builder, &mut ctx, unwrap_markers(channel))?;
+                    let out_offset = i32::try_from((lane * count + index) * size_of::<f64>())
+                        .map_err(|_| CompileError::TooManyChannels)?;
+                    builder.ins().store(store_flags, value, out, out_offset);
+                }
             }
             builder.ins().return_(&[]);
         } else {
