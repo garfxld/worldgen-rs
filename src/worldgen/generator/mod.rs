@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -61,7 +61,7 @@ pub enum GeneratorError {
 
 pub struct Generator {
     biome_source: BiomeSourceKind,
-    noises: Noises,
+    noises: Arc<Noises>,
     ore_veinifier: Option<OreVeinifier>,
     default_block_id: BlockState,
     default_fluid_id: BlockState,
@@ -143,7 +143,7 @@ impl Generator {
         );
 
         let t = Instant::now();
-        let noises = Noises::new(&program, &settings, &params, seed)?;
+        let noises = Arc::new(Noises::new(&program, &settings, &params, seed)?);
         tracing::debug!(
             "primary noises compiled for {} in {:?}",
             spec.noise_settings,
@@ -151,14 +151,16 @@ impl Generator {
         );
 
         let biome_source = match &spec.biome_source {
-            BiomeSourceSpec::Overworld(parameters) => {
-                let noises = Noises::new(&program, &settings, &params, seed)?;
-                BiomeSourceKind::overworld(seed, noises, build_parameter_list(parameters))
-            }
-            BiomeSourceSpec::Nether(parameters) => {
-                let noises = Noises::new(&program, &settings, &params, seed)?;
-                BiomeSourceKind::nether(seed, noises, build_parameter_list(parameters))
-            }
+            BiomeSourceSpec::Overworld(parameters) => BiomeSourceKind::overworld(
+                seed,
+                Arc::clone(&noises),
+                build_parameter_list(parameters),
+            ),
+            BiomeSourceSpec::Nether(parameters) => BiomeSourceKind::nether(
+                seed,
+                Arc::clone(&noises),
+                build_parameter_list(parameters),
+            ),
             BiomeSourceSpec::End => BiomeSourceKind::end(seed),
         };
 
@@ -221,7 +223,7 @@ impl Generator {
         })
     }
 
-    pub const fn noises(&self) -> &Noises {
+    pub fn noises(&self) -> &Noises {
         &self.noises
     }
 

@@ -16,6 +16,31 @@ pub struct DatapackSurfaceRules {
     uses_steep: bool,
 }
 
+pub struct BiomeIdSet {
+    words: Box<[u64]>,
+}
+
+impl BiomeIdSet {
+    fn from_ids(ids: impl Iterator<Item = u16>) -> Self {
+        let ids: Vec<u16> = ids.collect();
+        let bits = ids.iter().copied().max().map_or(0, |max| max as usize + 1);
+        let mut words = vec![0u64; bits.div_ceil(64)];
+        for id in ids {
+            words[id as usize / 64] |= 1u64 << (id % 64);
+        }
+        Self {
+            words: words.into_boxed_slice(),
+        }
+    }
+
+    #[inline]
+    fn contains(&self, id: u16) -> bool {
+        self.words
+            .get(id as usize / 64)
+            .is_some_and(|word| word >> (id % 64) & 1 == 1)
+    }
+}
+
 enum CompiledRule {
     Block(usize),
     Sequence(Vec<CompiledRule>),
@@ -32,7 +57,7 @@ enum CompiledCondition {
     },
     AbovePreliminarySurface,
     BiomeIs {
-        ids: Vec<u16>,
+        ids: BiomeIdSet,
         use_biome_provider: bool,
     },
     NoiseThreshold {
@@ -118,15 +143,10 @@ impl Compiler {
             }
             SurfaceConditionJson::BiomeIs { biome_is } => {
                 self.uses_biome = true;
-                let ids = biome_is
-                    .as_slice()
-                    .iter()
-                    .filter_map(|b| {
-                        let key: Identifier = b.as_str().parse().ok()?;
-                        REGISTRY.biomes.by_key(&key)
-                    })
-                    .map(|biome| biome.id() as u16)
-                    .collect();
+                let ids = BiomeIdSet::from_ids(biome_is.as_slice().iter().filter_map(|b| {
+                    let key: Identifier = b.as_str().parse().ok()?;
+                    Some(REGISTRY.biomes.by_key(&key)?.id() as u16)
+                }));
                 CompiledCondition::BiomeIs {
                     ids,
                     use_biome_provider: self.uses_preliminary_surface,
@@ -370,7 +390,7 @@ impl DatapackSurfaceRules {
                 } else {
                     ctx.known_biome_id()
                 };
-                biome_id.is_some_and(|id| ids.contains(&id))
+                biome_id.is_some_and(|id| ids.contains(id))
             }
             CompiledCondition::NoiseThreshold {
                 index,

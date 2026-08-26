@@ -12,7 +12,7 @@ use cerium::event::player::{
     CommandResultEvent, PlayerConfigEvent, PlayerEvent, PlayerRequestGameModeEvent,
     PlayerSpawnEvent,
 };
-use cerium::registry::RegistryKey;
+use cerium::registry::{Registries, RegistryKey};
 use cerium::world::biome::Biome as CeriumBiome;
 use cerium::world::block::BlockState;
 use cerium::world::chunk::Chunk;
@@ -35,17 +35,26 @@ fn load_datapack(path: &Path) -> Datapack {
         .layered_over(Datapack::builtin())
 }
 
-fn build_biome_id_table(server: &cerium::Server) -> std::collections::HashMap<u16, i32> {
-    let registries = server.registries();
+fn register_datapack_biomes(registries: &mut Registries, pack: &Datapack) {
+    for (namespace, dir) in pack.namespaced_dirs("worldgen/biome") {
+        let count = registries
+            .load_biomes(&namespace, &dir)
+            .unwrap_or_else(|error| panic!("failed to load biomes of {namespace}: {error}"));
+        tracing::info!("registered {count} biomes of {namespace}");
+    }
+}
+
+fn build_biome_id_table(registries: &Registries) -> std::collections::HashMap<u16, i32> {
     REGISTRY
         .biomes
         .iter()
-        .filter_map(|(id, biome)| {
+        .map(|(id, biome)| {
             let key = format!("{}:{}", biome.key.namespace, biome.key.path);
             let cerium_id = registries
                 .biome
-                .get_id(RegistryKey::<CeriumBiome>::of(key))?;
-            Some((id as u16, i32::from(cerium_id)))
+                .get_id(RegistryKey::<CeriumBiome>::of(key.clone()))
+                .unwrap_or_else(|| panic!("{key} is missing from cerium's biome registry"));
+            (id as u16, i32::from(cerium_id))
         })
         .collect()
 }
@@ -97,24 +106,22 @@ fn main() {
         datapack.namespaces()
     );
 
+    let mut registries = Registries::new();
+    register_datapack_biomes(&mut registries, &datapack);
+
     let worldgen = Arc::new(
         Worldgen::new(WorldgenSettings::new(42, dimension.clone()).with_datapack(datapack))
             .unwrap_or_else(|error| panic!("worldgen should build for {dimension}: {error}")),
     );
 
-    let server = Server::new(AuthMode::Offline);
-    let biome_ids = Arc::new(build_biome_id_table(&server));
-    let total_biomes = REGISTRY.biomes.iter().count();
+    let biome_ids = Arc::new(build_biome_id_table(&registries));
     tracing::info!(
-        "{} of {total_biomes} worldgen biomes mapped into cerium's registry",
-        biome_ids.len()
+        "{} worldgen biomes mapped into cerium's registry of {} biomes",
+        biome_ids.len(),
+        registries.biome.len()
     );
-    if biome_ids.len() < total_biomes {
-        tracing::warn!(
-            "{} datapack biomes are missing from cerium's registry",
-            total_biomes - biome_ids.len()
-        );
-    }
+
+    let server = Server::with_registries(AuthMode::Offline, registries);
 
     let world = World::with_generator(DimensionType::OVERWORLD, move |chunk: &Chunk| {
         fill_chunk(&worldgen, chunk, &biome_ids);

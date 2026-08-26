@@ -1,4 +1,5 @@
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 use crate::util::pos::BlockPos;
 use crate::worldgen::backend::jit::{RouterEntry, WellKnownRouters};
@@ -8,17 +9,17 @@ use crate::worldgen::density::{ColumnCache, Noises};
 const MAX_SPAWN_SEARCH_RADIUS: f32 = 2048.0;
 
 pub struct ClimateSampler {
-    noises: Noises,
+    noises: Arc<Noises>,
     routers: WellKnownRouters,
 }
 
 impl ClimateSampler {
-    pub fn new(noises: Noises) -> Self {
+    pub fn new(noises: Arc<Noises>) -> Self {
         let routers = *noises.compiled().routers();
         Self { noises, routers }
     }
 
-    pub const fn noises(&self) -> &Noises {
+    pub fn noises(&self) -> &Noises {
         &self.noises
     }
 

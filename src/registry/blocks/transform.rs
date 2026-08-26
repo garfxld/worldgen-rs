@@ -1,3 +1,6 @@
+use std::sync::LazyLock;
+use std::sync::atomic::{AtomicU16, Ordering};
+
 use crate::registry::REGISTRY;
 use crate::registry::blocks::vanilla_blocks::BLOCK_TRANSFORMS;
 use crate::util::axis::Axis;
@@ -37,10 +40,47 @@ const ALL_FACES: [Direction; 6] = [
     Direction::East,
 ];
 
+const UNCACHED: u16 = u16::MAX;
+
+fn memo_table(variants: usize) -> Box<[AtomicU16]> {
+    let states = REGISTRY.blocks.state_to_block_lookup.len();
+    (0..states * variants)
+        .map(|_| AtomicU16::new(UNCACHED))
+        .collect()
+}
+
+static ROTATE_MEMO: LazyLock<Box<[AtomicU16]>> = LazyLock::new(|| memo_table(4));
+static MIRROR_MEMO: LazyLock<Box<[AtomicU16]>> = LazyLock::new(|| memo_table(3));
+
+fn memoized(
+    memo: &[AtomicU16],
+    state: BlockState,
+    variant: usize,
+    variants: usize,
+    compute: impl FnOnce(BlockState) -> BlockState,
+) -> BlockState {
+    let Some(slot) = memo.get(state.0 as usize * variants + variant) else {
+        return compute(state);
+    };
+    let cached = slot.load(Ordering::Relaxed);
+    if cached != UNCACHED {
+        return BlockState(cached);
+    }
+    let computed = compute(state);
+    slot.store(computed.0, Ordering::Relaxed);
+    computed
+}
+
 pub fn rotate(state: BlockState, rotation: Rotation) -> BlockState {
     if rotation == Rotation::None {
         return state;
     }
+    memoized(&ROTATE_MEMO, state, rotation as usize, 4, |state| {
+        rotate_uncached(state, rotation)
+    })
+}
+
+fn rotate_uncached(state: BlockState, rotation: Rotation) -> BlockState {
     match transform_of(state) {
         BlockTransform::None => state,
         BlockTransform::Facing
@@ -74,6 +114,12 @@ pub fn mirror(state: BlockState, mirror: Mirror) -> BlockState {
     if mirror == Mirror::None {
         return state;
     }
+    memoized(&MIRROR_MEMO, state, mirror as usize, 3, |state| {
+        mirror_uncached(state, mirror)
+    })
+}
+
+fn mirror_uncached(state: BlockState, mirror: Mirror) -> BlockState {
     match transform_of(state) {
         BlockTransform::None => state,
         BlockTransform::Facing => rotate(state, mirror.get_rotation(facing_of(state))),

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rustc_hash::FxHashSet;
 
 use crate::registry::REGISTRY;
@@ -18,11 +20,11 @@ pub enum BiomeSourceKind {
 }
 
 impl BiomeSourceKind {
-    pub fn overworld(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
+    pub fn overworld(seed: u64, noises: Arc<Noises>, parameters: ParameterList<BiomeRef>) -> Self {
         Self::Overworld(MultiNoiseBiomeSource::new(seed, noises, parameters))
     }
 
-    pub fn nether(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
+    pub fn nether(seed: u64, noises: Arc<Noises>, parameters: ParameterList<BiomeRef>) -> Self {
         Self::Nether(MultiNoiseBiomeSource::new(seed, noises, parameters))
     }
 
@@ -118,7 +120,7 @@ pub struct MultiNoiseBiomeSource {
 }
 
 impl MultiNoiseBiomeSource {
-    pub fn new(seed: u64, noises: Noises, parameters: ParameterList<BiomeRef>) -> Self {
+    pub fn new(seed: u64, noises: Arc<Noises>, parameters: ParameterList<BiomeRef>) -> Self {
         Self {
             seed,
             climate_sampler: ClimateSampler::new(noises),
@@ -321,7 +323,7 @@ mod tests {
         let registry = source.density_function_registry().unwrap();
         let (program, settings) = source.program(&id, &registry).unwrap();
         let params = source.noise_parameters().unwrap();
-        let noises = Noises::new(&program, &settings, &params, seed).unwrap();
+        let noises = Arc::new(Noises::new(&program, &settings, &params, seed).unwrap());
         let biome_params = source.multi_noise_biome_parameters(&id).unwrap();
         let parameters = build_parameter_list(&biome_params);
         if dimension == "nether" {

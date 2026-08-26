@@ -1,4 +1,7 @@
 use std::cmp::Ordering;
+use std::simd::cmp::SimdOrd as _;
+use std::simd::num::SimdInt as _;
+use std::simd::{Simd, i32x8, i64x8};
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -198,9 +201,36 @@ fn snapshot_buckets(entries: &[BuildEntry]) -> (i64, Vec<Vec<BuildEntry>>) {
     (total_cost, buckets)
 }
 
+const LANES: usize = 8;
+
+fn pack_target(target: &[i64; PARAMETER_COUNT]) -> i32x8 {
+    let mut lanes = [0i32; LANES];
+    for (lane, &value) in lanes.iter_mut().zip(target) {
+        *lane = value.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+    }
+    Simd::from_array(lanes)
+}
+
+fn pack_bounds(space: &[Parameter; PARAMETER_COUNT]) -> (i32x8, i32x8) {
+    let mut mins = [0i32; LANES];
+    let mut maxs = [0i32; LANES];
+    for (lane, parameter) in space.iter().enumerate() {
+        mins[lane] = parameter.min.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+        maxs[lane] = parameter.max.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+    }
+    (Simd::from_array(mins), Simd::from_array(maxs))
+}
+
+#[inline]
+fn squared_distance(mins: i32x8, maxs: i32x8, target: i32x8) -> i64 {
+    let delta = (target - maxs).simd_max(mins - target).simd_max(Simd::splat(0));
+    let widened: i64x8 = delta.cast();
+    (widened * widened).reduce_sum()
+}
+
 struct FlatNode {
-    mins: [i64; PARAMETER_COUNT],
-    maxs: [i64; PARAMETER_COUNT],
+    mins: i32x8,
+    maxs: i32x8,
     value_index: u32,
     children_start: u32,
     children_count: u8,
@@ -208,19 +238,8 @@ struct FlatNode {
 
 impl FlatNode {
     #[inline]
-    #[expect(
-        clippy::needless_range_loop,
-        reason = "indexing into parallel min/max arrays; iterator zip would be less clear"
-    )]
-    fn distance(&self, target: &[i64; PARAMETER_COUNT]) -> i64 {
-        let mut d = 0i64;
-        for i in 0..PARAMETER_COUNT {
-            let di = (target[i] - self.maxs[i])
-                .max(self.mins[i] - target[i])
-                .max(0);
-            d += di * di;
-        }
-        d
+    fn distance(&self, target: i32x8) -> i64 {
+        squared_distance(self.mins, self.maxs, target)
     }
 
     #[inline]
@@ -250,9 +269,10 @@ fn flatten_tree(root: RTreeNode) -> Vec<FlatNode> {
                     parameter_space,
                     value_index,
                 } => {
+                    let (mins, maxs) = pack_bounds(&parameter_space);
                     nodes.push(FlatNode {
-                        mins: parameter_space.map(|p| p.min),
-                        maxs: parameter_space.map(|p| p.max),
+                        mins,
+                        maxs,
                         value_index: value_index as u32,
                         children_start: 0,
                         children_count: 0,
@@ -263,9 +283,10 @@ fn flatten_tree(root: RTreeNode) -> Vec<FlatNode> {
                     children,
                 } => {
                     let children_count = children.len() as u8;
+                    let (mins, maxs) = pack_bounds(&parameter_space);
                     nodes.push(FlatNode {
-                        mins: parameter_space.map(|p| p.min),
-                        maxs: parameter_space.map(|p| p.max),
+                        mins,
+                        maxs,
                         value_index: u32::MAX,
                         children_start: 0,
                         children_count,
@@ -282,7 +303,7 @@ fn flatten_tree(root: RTreeNode) -> Vec<FlatNode> {
 fn search_nearest(
     nodes: &[FlatNode],
     node: &FlatNode,
-    target: &[i64; PARAMETER_COUNT],
+    target: i32x8,
     best_dist: &mut i64,
     best_idx: &mut Option<u32>,
 ) {
@@ -305,7 +326,7 @@ fn search_nearest(
 
 pub struct ParameterList<T> {
     values: Vec<(ParameterPoint, T)>,
-    param_spaces: Vec<[Parameter; PARAMETER_COUNT]>,
+    param_spaces: Vec<(i32x8, i32x8)>,
     nodes: Vec<FlatNode>,
 }
 
@@ -313,8 +334,10 @@ impl<T> ParameterList<T> {
     pub fn new(values: Vec<(ParameterPoint, T)>) -> Self {
         assert!(!values.is_empty(), "Need at least one value");
 
-        let param_spaces: Vec<[Parameter; PARAMETER_COUNT]> =
-            values.iter().map(|(pp, _)| pp.parameter_space()).collect();
+        let param_spaces: Vec<(i32x8, i32x8)> = values
+            .iter()
+            .map(|(pp, _)| pack_bounds(&pp.parameter_space()))
+            .collect();
 
         let mut entries: Vec<BuildEntry> = values
             .iter()
@@ -340,7 +363,7 @@ impl<T> ParameterList<T> {
     }
 
     pub fn find_value(&self, target: &TargetPoint) -> &T {
-        let target_array = target.to_parameter_array();
+        let target_array = pack_target(&target.to_parameter_array());
         let root = &self.nodes[0];
         if root.is_leaf() {
             return &self.values[root.value_index as usize].1;
@@ -350,7 +373,7 @@ impl<T> ParameterList<T> {
         search_nearest(
             &self.nodes,
             root,
-            &target_array,
+            target_array,
             &mut best_dist,
             &mut best_idx,
         );
@@ -358,7 +381,7 @@ impl<T> ParameterList<T> {
     }
 
     pub fn find_value_cached(&self, target: &TargetPoint, cache: &mut Option<usize>) -> &T {
-        let target_array = target.to_parameter_array();
+        let target_array = pack_target(&target.to_parameter_array());
 
         let root = &self.nodes[0];
         if root.is_leaf() {
@@ -369,13 +392,8 @@ impl<T> ParameterList<T> {
 
         let (mut best_dist, init_idx) = match *cache {
             Some(idx) => {
-                let ps = &self.param_spaces[idx];
-                let mut d = 0i64;
-                for i in 0..PARAMETER_COUNT {
-                    let di = ps[i].distance(target_array[i]);
-                    d += di * di;
-                }
-                (d, Some(idx as u32))
+                let (mins, maxs) = self.param_spaces[idx];
+                (squared_distance(mins, maxs, target_array), Some(idx as u32))
             }
             None => (i64::MAX, None),
         };
@@ -384,7 +402,7 @@ impl<T> ParameterList<T> {
         search_nearest(
             &self.nodes,
             root,
-            &target_array,
+            target_array,
             &mut best_dist,
             &mut best_idx,
         );
