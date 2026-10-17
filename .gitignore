@@ -4,3 +4,6 @@ perf.data*
 
 # avoid including datapacks
 *.zip
+/testing/vanilla/fixtures
+/testing/vanilla/build
+/testing/vanilla/.classpath

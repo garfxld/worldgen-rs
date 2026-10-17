@@ -6,6 +6,7 @@ pub mod xoroshiro;
 
 use legacy_random::{LegacyRandomFactory, LegacyRandomSource};
 use name_hash::NameHash;
+use shulkr::util::Direction;
 use worldgen_random::WorldgenRandom;
 use xoroshiro::{XoroshiroRandomFactory, XoroshiroRandomSource};
 
@@ -39,7 +40,7 @@ impl RandomSource {
         }
     }
 
-    pub fn draw_count(&self) -> i32 {
+    pub const fn draw_count(&self) -> i32 {
         match self {
             Self::Worldgen(r) => r.count(),
             _ => -1,
@@ -68,6 +69,10 @@ impl RandomSource {
             Self::Legacy(r) => r.next_i32(),
             Self::Worldgen(r) => r.next_i32(),
         }
+    }
+
+    pub fn next_horizontal_direction(&mut self) -> Direction {
+        Direction::HORIZONTAL[self.next_i32_bounded(4) as usize]
     }
 
     pub fn next_i32_bounded(&mut self, bound: i32) -> i32 {

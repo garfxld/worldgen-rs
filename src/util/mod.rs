@@ -1,9 +1,6 @@
-pub mod axis;
-pub mod direction;
-pub mod geometry;
 pub mod hash_set;
-pub mod ident;
 pub mod inclusive_range;
+pub mod interval;
 pub mod math;
 pub mod mirror;
 pub mod noise;
@@ -23,3 +20,5 @@ pub fn shuffle<T>(list: &mut [T], random: &mut RandomSource) {
         i -= 1;
     }
 }
+
+pub use shulkr::util::{Axis, Direction, Key};

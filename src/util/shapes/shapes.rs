@@ -1,10 +1,9 @@
-use crate::util::axis::Axis;
-use crate::util::geometry::BlockLocalAabb;
-use crate::util::shapes::boolean_op::BooleanOp;
 use crate::util::shapes::discrete_voxel_shape::BitSetDiscreteVoxelShape;
 use crate::util::shapes::double_list::DoubleList;
 use crate::util::shapes::index_merger::{IndexMerger, lcm};
 use crate::util::shapes::voxel_shape::VoxelShape;
+use shulkr::util::BooleanOp;
+use shulkr::util::{Aabb, Axis};
 
 pub const EPSILON: f64 = 1.0E-7;
 
@@ -87,7 +86,7 @@ pub fn create(
     VoxelShape::cube(shape)
 }
 
-pub fn create_aabb(aabb: BlockLocalAabb) -> VoxelShape {
+pub fn create_aabb(aabb: Aabb) -> VoxelShape {
     create(
         aabb.min_x(),
         aabb.min_y(),

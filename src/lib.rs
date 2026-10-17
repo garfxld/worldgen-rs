@@ -1,15 +1,13 @@
-#![feature(portable_simd, derive_const, const_cmp, const_trait_impl)]
+#![feature(portable_simd, const_cmp, const_trait_impl)]
 
-pub mod chunk;
 pub mod datapack;
 pub mod error;
 pub mod registry;
 pub mod util;
-pub mod worldgen;
+pub mod world;
 
-pub use chunk::status::ChunkStatus;
-pub use chunk::view::ChunkView;
 pub use error::Error;
-pub use util::ident::Identifier;
 pub use util::pos::ChunkPos;
-pub use worldgen::{Result, Worldgen, WorldgenSettings};
+pub use world::chunk::status::ChunkStatus;
+pub use world::chunk::view::ChunkView;
+pub use world::worldgen::{Result, Worldgen, WorldgenSettings};

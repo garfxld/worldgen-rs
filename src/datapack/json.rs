@@ -6,9 +6,10 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use shulkr::registry::RegistryFrozen;
+use shulkr::util::Key;
 
 use crate::datapack::Lenient;
-use crate::util::ident::Identifier;
 
 #[derive(Debug)]
 pub enum DatapackError {
@@ -20,6 +21,13 @@ pub enum DatapackError {
         path: PathBuf,
         source: serde_json::Error,
     },
+    Registry(RegistryFrozen),
+}
+
+impl From<RegistryFrozen> for DatapackError {
+    fn from(error: RegistryFrozen) -> Self {
+        Self::Registry(error)
+    }
 }
 
 impl Display for DatapackError {
@@ -29,6 +37,7 @@ impl Display for DatapackError {
             Self::Parse { path, source } => {
                 write!(f, "failed to parse {}: {source}", path.display())
             }
+            Self::Registry(error) => Display::fmt(error, f),
         }
     }
 }
@@ -38,6 +47,7 @@ impl StdError for DatapackError {
         match self {
             Self::Read { source, .. } => Some(source),
             Self::Parse { source, .. } => Some(source),
+            Self::Registry(error) => Some(error),
         }
     }
 }
@@ -127,9 +137,8 @@ pub fn path_to_id(namespace: &str, path: &Path, base_dir: &Path) -> String {
 
 const EMPTY_LIST: &[serde_json::Value] = &[];
 
-pub fn parse_id(raw: &str) -> Identifier {
-    raw.parse()
-        .unwrap_or_else(|e| panic!("invalid identifier {raw}: {e}"))
+pub fn parse_id(raw: &str) -> Key {
+    Key::of(raw.to_owned())
 }
 
 pub fn type_of(value: &serde_json::Value) -> &str {

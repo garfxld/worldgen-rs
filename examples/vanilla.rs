@@ -1,58 +1,39 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use cerium::Server;
-use cerium::auth::AuthMode;
-use cerium::command::arg::Arg;
-use cerium::command::arg::kind::ArgKind;
-use cerium::command::{Command, dispatcher::CommandError};
-use cerium::entity::GameMode;
-use cerium::event::player::{
+use shulkr::Server;
+use shulkr::auth::AuthMode;
+use shulkr::command::arg::Arg;
+use shulkr::command::arg::kind::ArgKind;
+use shulkr::command::{Command, dispatcher::CommandError};
+use shulkr::entity::GameMode;
+use shulkr::event::player::{
     CommandResultEvent, PlayerConfigEvent, PlayerEvent, PlayerRequestGameModeEvent,
     PlayerSpawnEvent,
 };
-use cerium::registry::RegistryKey;
-use cerium::world::biome::Biome as CeriumBiome;
-use cerium::world::block::BlockState;
-use cerium::world::chunk::Chunk;
-use cerium::world::{DimensionType, World};
+use shulkr::util::Key;
+use shulkr::world::chunk::Chunk;
+use shulkr::world::{DimensionType, World};
 use worldgen_rs::datapack::Datapack;
-use worldgen_rs::registry::REGISTRY;
-use worldgen_rs::{ChunkPos, ChunkStatus, Identifier, Worldgen, WorldgenSettings};
+use worldgen_rs::{ChunkPos, ChunkStatus, Worldgen, WorldgenSettings};
 
-fn build_biome_id_table(server: &Server) -> std::collections::HashMap<u16, i32> {
-    let registries = server.registries();
-    REGISTRY
-        .biomes
-        .iter()
-        .filter_map(|(id, biome)| {
-            let key = format!("{}:{}", biome.key.namespace, biome.key.path);
-            let cerium_id = registries
-                .biome
-                .get_id(RegistryKey::<CeriumBiome>::of(key))?;
-            Some((id as u16, i32::from(cerium_id)))
-        })
-        .collect()
-}
-
-const SPAWN: (f64, f64, f64) = (0.5, 150.0, 0.5);
+const SPAWN: [f64; 3] = [0.5, 150.0, 0.5];
 
 const DEFAULT_FLYING_SPEED: f32 = 0.05;
 const MIN_FLY_MULTIPLIER: f32 = 0.1;
 const MAX_FLY_MULTIPLIER: f32 = 20.0;
 
-fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk, biome_ids: &HashMap<u16, i32>) {
+fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk) {
     let pos = ChunkPos::new(chunk.x(), chunk.z());
     worldgen
         .generate(pos, ChunkStatus::Features, |view| {
-            chunk.fill_biomes(view.biomes().filter_map(|(pos, biome)| {
-                biome_ids
-                    .get(&biome)
-                    .map(|&id| (pos.x(), pos.y(), pos.z(), id))
-            }));
-            chunk.fill_blocks(view.blocks().filter_map(|(pos, state)| {
-                BlockState::from_id(state.0).map(|s| (pos.x(), pos.y(), pos.z(), s))
-            }));
+            chunk.fill_biomes(
+                view.biomes()
+                    .map(|(pos, biome)| (pos.x(), pos.y(), pos.z(), i32::from(biome))),
+            );
+            chunk
+                .fill_blocks(view.blocks().filter_map(|(pos, state)| {
+                    Some(state).map(|s| (pos.x(), pos.y(), pos.z(), s))
+                }));
         })
         .expect("chunk should generate to Surface");
 }
@@ -70,16 +51,15 @@ fn main() {
     let worldgen = Arc::new(
         Worldgen::new(WorldgenSettings {
             seed: 42,
-            dimension: Identifier::const_vanilla("overworld"),
+            dimension: Key::const_vanilla("overworld"),
             datapack: Datapack::builtin(),
         })
         .expect("worldgen should build"),
     );
 
     let server = Server::new(AuthMode::Offline);
-    let biome_ids = Arc::new(build_biome_id_table(&server));
     let world = World::with_generator(DimensionType::OVERWORLD, move |chunk: &Chunk| {
-        fill_chunk(&worldgen, chunk, &biome_ids);
+        fill_chunk(&worldgen, chunk);
     });
 
     let dispatcher = server.command_dispatcher();
@@ -134,5 +114,7 @@ fn main() {
             event.get_player().send_message(message);
         });
 
-    server.bind("127.0.0.1:25565").unwrap()
+    server
+        .bind("127.0.0.1:25565")
+        .expect("failed binding to 127.0.0.1:25565")
 }

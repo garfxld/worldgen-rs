@@ -1,25 +1,22 @@
-use std::collections::HashMap;
+use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use cerium::Server;
-use cerium::auth::AuthMode;
-use cerium::command::arg::Arg;
-use cerium::command::arg::kind::ArgKind;
-use cerium::command::{Command, dispatcher::CommandError};
-use cerium::entity::GameMode;
-use cerium::event::player::{
+use shulkr::Server;
+use shulkr::auth::AuthMode;
+use shulkr::command::arg::Arg;
+use shulkr::command::arg::kind::ArgKind;
+use shulkr::command::{Command, dispatcher::CommandError};
+use shulkr::entity::GameMode;
+use shulkr::event::player::{
     CommandResultEvent, PlayerConfigEvent, PlayerEvent, PlayerRequestGameModeEvent,
     PlayerSpawnEvent,
 };
-use cerium::registry::{Registries, RegistryKey};
-use cerium::world::biome::Biome as CeriumBiome;
-use cerium::world::block::BlockState;
-use cerium::world::chunk::Chunk;
-use cerium::world::{DimensionType, World};
+use shulkr::util::Key;
+use shulkr::world::chunk::Chunk;
+use shulkr::world::{DimensionType, World};
 use worldgen_rs::datapack::Datapack;
-use worldgen_rs::registry::REGISTRY;
-use worldgen_rs::{ChunkPos, ChunkStatus, Identifier, Worldgen, WorldgenSettings};
+use worldgen_rs::{ChunkPos, ChunkStatus, Worldgen, WorldgenSettings};
 
 const USAGE: &str =
     "usage: cargo run --release --example datapack <datapack.zip|directory> [dimension]";
@@ -35,48 +32,24 @@ fn load_datapack(path: &Path) -> Datapack {
         .layered_over(Datapack::builtin())
 }
 
-fn register_datapack_biomes(registries: &mut Registries, pack: &Datapack) {
-    for (namespace, dir) in pack.namespaced_dirs("worldgen/biome") {
-        let count = registries
-            .load_biomes(&namespace, &dir)
-            .unwrap_or_else(|error| panic!("failed to load biomes of {namespace}: {error}"));
-        tracing::info!("registered {count} biomes of {namespace}");
-    }
-}
-
-fn build_biome_id_table(registries: &Registries) -> std::collections::HashMap<u16, i32> {
-    REGISTRY
-        .biomes
-        .iter()
-        .map(|(id, biome)| {
-            let key = format!("{}:{}", biome.key.namespace, biome.key.path);
-            let cerium_id = registries
-                .biome
-                .get_id(RegistryKey::<CeriumBiome>::of(key.clone()))
-                .unwrap_or_else(|| panic!("{key} is missing from cerium's biome registry"));
-            (id as u16, i32::from(cerium_id))
-        })
-        .collect()
-}
-
-const SPAWN: (f64, f64, f64) = (0.5, 150.0, 0.5);
+const SPAWN: [f64; 3] = [0.5, 150.0, 0.5];
 
 const DEFAULT_FLYING_SPEED: f32 = 0.05;
 const MIN_FLY_MULTIPLIER: f32 = 0.1;
 const MAX_FLY_MULTIPLIER: f32 = 20.0;
 
-fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk, biome_ids: &HashMap<u16, i32>) {
+fn fill_chunk(worldgen: &Worldgen, chunk: &Chunk) {
     let pos = ChunkPos::new(chunk.x(), chunk.z());
     worldgen
         .generate(pos, ChunkStatus::Features, |view| {
-            chunk.fill_biomes(view.biomes().filter_map(|(pos, biome)| {
-                biome_ids
-                    .get(&biome)
-                    .map(|&id| (pos.x(), pos.y(), pos.z(), id))
-            }));
-            chunk.fill_blocks(view.blocks().filter_map(|(pos, state)| {
-                BlockState::from_id(state.0).map(|s| (pos.x(), pos.y(), pos.z(), s))
-            }));
+            chunk.fill_biomes(
+                view.biomes()
+                    .map(|(pos, biome)| (pos.x(), pos.y(), pos.z(), i32::from(biome))),
+            );
+            chunk.fill_blocks(
+                view.blocks()
+                    .map(|(pos, state)| (pos.x(), pos.y(), pos.z(), state)),
+            );
         })
         .expect("chunk should generate to Features");
 }
@@ -91,40 +64,25 @@ fn main() {
         )
         .init();
 
-    let mut args = std::env::args().skip(1);
+    let mut args = env::args().skip(1);
     let path = PathBuf::from(args.next().unwrap_or_else(|| panic!("{USAGE}")));
-    let dimension: Identifier = args
-        .next()
-        .unwrap_or_else(|| "minecraft:overworld".to_owned())
-        .parse()
-        .expect("dimension should be a valid identifier");
+    let dimension = Key::try_from(
+        args.next()
+            .unwrap_or_else(|| "minecraft:overworld".to_owned()),
+    )
+    .expect("dimension should be a valid identifier");
 
     let datapack = load_datapack(&path);
-    tracing::info!(
-        "loaded {} (namespaces: {:?})",
-        path.display(),
-        datapack.namespaces()
-    );
-
-    let mut registries = Registries::new();
-    register_datapack_biomes(&mut registries, &datapack);
 
     let worldgen = Arc::new(
         Worldgen::new(WorldgenSettings::new(42, dimension.clone()).with_datapack(datapack))
             .unwrap_or_else(|error| panic!("worldgen should build for {dimension}: {error}")),
     );
 
-    let biome_ids = Arc::new(build_biome_id_table(&registries));
-    tracing::info!(
-        "{} worldgen biomes mapped into cerium's registry of {} biomes",
-        biome_ids.len(),
-        registries.biome.len()
-    );
-
-    let server = Server::with_registries(AuthMode::Offline, registries);
+    let server = Server::new(AuthMode::Offline);
 
     let world = World::with_generator(DimensionType::OVERWORLD, move |chunk: &Chunk| {
-        fill_chunk(&worldgen, chunk, &biome_ids);
+        fill_chunk(&worldgen, chunk);
     });
 
     let dispatcher = server.command_dispatcher();
@@ -179,5 +137,7 @@ fn main() {
             event.get_player().send_message(message);
         });
 
-    server.bind("127.0.0.1:25565").unwrap()
+    server
+        .bind("127.0.0.1:25565")
+        .expect("failed binding to 127.0.0.1:25565")
 }

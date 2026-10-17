@@ -21,11 +21,6 @@ impl XoroshiroRandomSource {
         Self::new(lo, hi)
     }
 
-    pub const fn from_seed_unmixed(seed: u64) -> Self {
-        let (lo, hi) = Self::upgrade_seed_to_128_bit(seed);
-        Self::new(lo, hi)
-    }
-
     const fn new(lo: u64, hi: u64) -> Self {
         let (lo, hi) = if (lo | hi) == 0 {
             (GOLDEN_RATIO_64, SILVER_RATIO_64)

@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # required to create and push the release tag
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    environment: crates-io
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # need tag history to check for collisions
+
+      - run: cargo build --verbose
+      - run: cargo test --verbose
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - id: version
+        name: Determine version
+        shell: bash
+        run: |
+          VERSION=$(awk -F'"' '/^version/ { print $2; exit }' Cargo.toml)
+          TAG="v${VERSION}"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists — bump package.version in Cargo.toml first."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - run: cargo publish --workspace --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Create tag
+        run: |
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true

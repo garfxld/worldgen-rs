@@ -1,4 +1,3 @@
-pub mod boolean_op;
 pub mod discrete_voxel_shape;
 pub mod double_list;
 pub mod index_merger;

@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use crate::util::rng::RandomSource;
+use crate::world::worldgen::worldgen_context::WorldGenContext;
 
 use super::VerticalAnchor;
 
@@ -30,15 +31,15 @@ pub enum HeightProvider {
 }
 
 impl HeightProvider {
-    pub fn sample(self, random: &mut RandomSource, min_y: i32, height: i32) -> i32 {
+    pub fn sample(self, random: &mut RandomSource, context: &WorldGenContext) -> i32 {
         match self {
-            Self::Constant(anchor) => anchor.resolve_y(min_y, height),
+            Self::Constant(anchor) => anchor.resolve_y(context),
             Self::Uniform {
                 min_inclusive,
                 max_inclusive,
             } => {
-                let min = min_inclusive.resolve_y(min_y, height);
-                let max = max_inclusive.resolve_y(min_y, height);
+                let min = min_inclusive.resolve_y(context);
+                let max = max_inclusive.resolve_y(context);
                 if min > max {
                     min
                 } else {
@@ -50,8 +51,8 @@ impl HeightProvider {
                 max_inclusive,
                 plateau,
             } => {
-                let min = min_inclusive.resolve_y(min_y, height);
-                let max = max_inclusive.resolve_y(min_y, height);
+                let min = min_inclusive.resolve_y(context);
+                let max = max_inclusive.resolve_y(context);
                 if min > max {
                     min
                 } else {
@@ -71,8 +72,8 @@ impl HeightProvider {
                 max_inclusive,
                 inner,
             } => {
-                let min = min_inclusive.resolve_y(min_y, height);
-                let max = max_inclusive.resolve_y(min_y, height);
+                let min = min_inclusive.resolve_y(context);
+                let max = max_inclusive.resolve_y(context);
                 if max - min - inner < 0 {
                     min
                 } else {
@@ -85,8 +86,8 @@ impl HeightProvider {
                 max_inclusive,
                 inner,
             } => {
-                let min = min_inclusive.resolve_y(min_y, height);
-                let max = max_inclusive.resolve_y(min_y, height);
+                let min = min_inclusive.resolve_y(context);
+                let max = max_inclusive.resolve_y(context);
                 if max - min - inner < 0 {
                     min
                 } else {
@@ -192,6 +193,8 @@ impl From<RawHeightProvider> for HeightProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const CONTEXT: WorldGenContext = WorldGenContext::new(-64, 384, 63, -64, 384);
     use crate::util::rng::xoroshiro::XoroshiroRandomSource;
 
     fn rng() -> RandomSource {
@@ -202,7 +205,7 @@ mod tests {
     fn constant_provider_resolves_the_anchor() {
         let provider = HeightProvider::Constant(VerticalAnchor::Absolute(100));
         let mut random = rng();
-        assert_eq!(provider.sample(&mut random, -64, 384), 100);
+        assert_eq!(provider.sample(&mut random, &CONTEXT), 100);
     }
 
     #[test]
@@ -213,7 +216,7 @@ mod tests {
         };
         let mut random = rng();
         for _ in 0..50 {
-            let value = provider.sample(&mut random, -64, 384);
+            let value = provider.sample(&mut random, &CONTEXT);
             assert!((-64..=-54).contains(&value));
         }
     }
@@ -225,7 +228,7 @@ mod tests {
             max_inclusive: VerticalAnchor::AboveBottom(0),
         };
         let mut random = rng();
-        assert_eq!(provider.sample(&mut random, -64, 384), -54);
+        assert_eq!(provider.sample(&mut random, &CONTEXT), -54);
     }
 
     #[test]

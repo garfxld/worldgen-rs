@@ -1,8 +1,8 @@
-use crate::util::axis::Axis;
-use crate::util::shapes::boolean_op::BooleanOp;
 use crate::util::shapes::discrete_voxel_shape::BitSetDiscreteVoxelShape;
 use crate::util::shapes::double_list::DoubleList;
 use crate::util::shapes::shapes;
+use shulkr::util::Axis;
+use shulkr::util::BooleanOp;
 
 #[derive(Debug, Clone)]
 pub enum VoxelShape {

@@ -6,10 +6,13 @@ use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use crate::datapack::DatapackError;
-use crate::util::ident::Identifier;
+use crate::datapack::{
+    DatapackError, collect_json_files, parse_id, path_to_id, read_and_parse_normalized,
+};
+use shulkr::registry::{TagFile, TagLoader};
+use shulkr::util::Key;
 
-const VANILLA_NAMESPACE: &str = Identifier::VANILLA_NAMESPACE;
+const VANILLA_NAMESPACE: &str = Key::VANILLA_NAMESPACE;
 
 #[derive(Debug, Clone)]
 pub struct Datapack {
@@ -82,7 +85,7 @@ fn detect_shape(root: &Path) -> Shape {
 }
 
 fn builtin_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/datapack")
+    PathBuf::from(shulkr_data::DATAPACK_DIR)
 }
 
 impl Datapack {
@@ -180,6 +183,17 @@ impl Datapack {
             .map(|dir| dir.join(relative))
             .filter(|dir| dir.is_dir())
             .collect()
+    }
+
+    pub fn tags(&self, directory: &str) -> Result<TagLoader, DatapackError> {
+        let mut loader = TagLoader::new();
+        for (namespace, dir) in self.namespaced_dirs(directory) {
+            for file in collect_json_files(&dir) {
+                let tag: TagFile = read_and_parse_normalized(&file)?;
+                loader.add(parse_id(&path_to_id(&namespace, &file, &dir)), tag);
+            }
+        }
+        Ok(loader)
     }
 
     pub fn files(&self, namespace: &str, relative: &str) -> Vec<PathBuf> {

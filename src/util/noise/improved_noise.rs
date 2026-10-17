@@ -8,8 +8,8 @@ use std::simd::ptr::SimdConstPtr;
 use std::simd::{Mask, Select, SimdCast, SimdElement, StdFloat};
 
 use crate::util::math::{
-    GRADIENT, fast_floor, fast_floor_simd, grad_dot, grad_dot_simd, lerp2, lerp3, lerp3_simd,
-    smoothstep, smoothstep_derivative, smoothstep_simd,
+    fast_floor, fast_floor_simd, grad_dot, grad_dot_simd, lerp3, lerp3_simd, smoothstep,
+    smoothstep_simd,
 };
 use crate::util::rng::RandomSource;
 
@@ -26,10 +26,6 @@ pub struct ImprovedNoise {
 }
 
 impl ImprovedNoise {
-    pub const fn permutations(&self) -> &[u8; 256] {
-        &self.p
-    }
-
     pub fn new(random: &mut RandomSource) -> Self {
         let xo = random.next_f64() * 256.0;
         let yo = random.next_f64() * 256.0;
@@ -149,28 +145,6 @@ impl ImprovedNoise {
         let yr = y - f64::from(yf);
 
         self.sample_and_lerp(xf, yf, self.zo_floor, xr, yr, self.zo_fraction, yr)
-    }
-
-    pub fn noise_with_derivative(
-        &self,
-        x: f64,
-        y: f64,
-        z: f64,
-        derivative_out: &mut [f64; 3],
-    ) -> f64 {
-        let x = x + self.xo;
-        let y = y + self.yo;
-        let z = z + self.zo;
-
-        let xf = fast_floor(x);
-        let yf = fast_floor(y);
-        let zf = fast_floor(z);
-
-        let xr = x - f64::from(xf);
-        let yr = y - f64::from(yf);
-        let zr = z - f64::from(zf);
-
-        self.sample_with_derivative(xf, yf, zf, xr, yr, zr, derivative_out)
     }
 
     pub fn noise_with_y_scale(&self, x: f64, y: f64, z: f64, y_scale: f64, y_fudge: f64) -> f64 {
@@ -478,110 +452,6 @@ impl ImprovedNoise {
 
         lerp3_simd(
             x_alpha, y_alpha, z_alpha, d000, d100, d010, d110, d001, d101, d011, d111,
-        )
-    }
-
-    #[expect(clippy::too_many_arguments, reason = "matches vanilla signature")]
-    fn sample_with_derivative(
-        &self,
-        x: i32,
-        y: i32,
-        z: i32,
-        xr: f64,
-        yr: f64,
-        zr: f64,
-        derivative_out: &mut [f64; 3],
-    ) -> f64 {
-        let x = x as u8;
-        let y = y as u8;
-        let z = z as u8;
-
-        let x0 = self.p[x as usize];
-        let x1 = self.p[x.wrapping_add(1) as usize];
-        let xy00 = self.p[x0.wrapping_add(y) as usize];
-        let xy01 = self.p[x0.wrapping_add(y).wrapping_add(1) as usize];
-        let xy10 = self.p[x1.wrapping_add(y) as usize];
-        let xy11 = self.p[x1.wrapping_add(y).wrapping_add(1) as usize];
-
-        let h000 = self.p[xy00.wrapping_add(z) as usize] as usize;
-        let h100 = self.p[xy10.wrapping_add(z) as usize] as usize;
-        let h010 = self.p[xy01.wrapping_add(z) as usize] as usize;
-        let h110 = self.p[xy11.wrapping_add(z) as usize] as usize;
-        let h001 = self.p[xy00.wrapping_add(z).wrapping_add(1) as usize] as usize;
-        let h101 = self.p[xy10.wrapping_add(z).wrapping_add(1) as usize] as usize;
-        let h011 = self.p[xy01.wrapping_add(z).wrapping_add(1) as usize] as usize;
-        let h111 = self.p[xy11.wrapping_add(z).wrapping_add(1) as usize] as usize;
-
-        let g000 = Simd::from_array(GRADIENT[h000 & 15]);
-        let g100 = Simd::from_array(GRADIENT[h100 & 15]);
-        let g010 = Simd::from_array(GRADIENT[h010 & 15]);
-        let g110 = Simd::from_array(GRADIENT[h110 & 15]);
-        let g001 = Simd::from_array(GRADIENT[h001 & 15]);
-        let g101 = Simd::from_array(GRADIENT[h101 & 15]);
-        let g011 = Simd::from_array(GRADIENT[h011 & 15]);
-        let g111 = Simd::from_array(GRADIENT[h111 & 15]);
-
-        let d000 = grad_dot(h000, xr, yr, zr);
-        let d100 = grad_dot(h100, xr - 1.0, yr, zr);
-        let d010 = grad_dot(h010, xr, yr - 1.0, zr);
-        let d110 = grad_dot(h110, xr - 1.0, yr - 1.0, zr);
-        let d001 = grad_dot(h001, xr, yr, zr - 1.0);
-        let d101 = grad_dot(h101, xr - 1.0, yr, zr - 1.0);
-        let d011 = grad_dot(h011, xr, yr - 1.0, zr - 1.0);
-        let d111 = grad_dot(h111, xr - 1.0, yr - 1.0, zr - 1.0);
-
-        let alpha_x = smoothstep(xr);
-        let alpha_y = smoothstep(yr);
-        let alpha_z = smoothstep(zr);
-
-        let d1_v = lerp3_simd(
-            Simd::splat(alpha_x),
-            Simd::splat(alpha_y),
-            Simd::splat(alpha_z),
-            g000,
-            g100,
-            g010,
-            g110,
-            g001,
-            g101,
-            g011,
-            g111,
-        );
-
-        let d2x = lerp2(
-            alpha_y,
-            alpha_z,
-            d100 - d000,
-            d110 - d010,
-            d101 - d001,
-            d111 - d011,
-        );
-        let d2y = lerp2(
-            alpha_z,
-            alpha_x,
-            d010 - d000,
-            d011 - d001,
-            d110 - d100,
-            d111 - d101,
-        );
-        let d2z = lerp2(
-            alpha_x,
-            alpha_y,
-            d001 - d000,
-            d101 - d100,
-            d011 - d010,
-            d111 - d110,
-        );
-
-        let x_sd = smoothstep_derivative(xr);
-        let y_sd = smoothstep_derivative(yr);
-        let z_sd = smoothstep_derivative(zr);
-
-        derivative_out[0] += d1_v[0] + x_sd * d2x;
-        derivative_out[1] += d1_v[1] + y_sd * d2y;
-        derivative_out[2] += d1_v[2] + z_sd * d2z;
-        lerp3(
-            alpha_x, alpha_y, alpha_z, d000, d100, d010, d110, d001, d101, d011, d111,
         )
     }
 }

@@ -17,7 +17,6 @@ pub enum IntProvider {
     VeryBiasedToBottom {
         min_inclusive: i32,
         max_inclusive: i32,
-        inner: i32,
     },
     Trapezoid {
         min: i32,
@@ -179,17 +178,10 @@ impl IntProvider {
             Self::VeryBiasedToBottom {
                 min_inclusive,
                 max_inclusive,
-                inner,
             } => {
-                let limit = *max_inclusive - *min_inclusive - *inner + 1;
-                if limit <= 0 {
-                    *min_inclusive
-                } else {
-                    let upper_inclusive = random.next_i32_bounded(limit) + *min_inclusive + *inner;
-                    let biased_upper_inclusive =
-                        random.next_i32_between(*min_inclusive, upper_inclusive - 1);
-                    random.next_i32_between(*min_inclusive, biased_upper_inclusive - 1 + *inner)
-                }
+                let inner = random.next_i32_bounded(*max_inclusive - *min_inclusive + 1) + 1;
+                let middle = random.next_i32_bounded(inner) + 1;
+                *min_inclusive + random.next_i32_bounded(middle)
             }
             Self::Trapezoid { min, max, plateau } => {
                 if *plateau == 0 && *max == -*min {
@@ -264,8 +256,6 @@ pub enum TaggedIntProvider {
     VeryBiasedToBottom {
         min_inclusive: i32,
         max_inclusive: i32,
-        #[serde(default = "default_inner")]
-        inner: i32,
     },
     #[serde(rename = "minecraft:trapezoid")]
     Trapezoid { min: i32, max: i32, plateau: i32 },
@@ -286,10 +276,6 @@ pub enum TaggedIntProvider {
     WeightedList {
         distribution: Vec<WeightedIntProvider>,
     },
-}
-
-const fn default_inner() -> i32 {
-    1
 }
 
 impl From<RawIntProvider> for IntProvider {
@@ -317,11 +303,9 @@ impl From<RawIntProvider> for IntProvider {
             TaggedIntProvider::VeryBiasedToBottom {
                 min_inclusive,
                 max_inclusive,
-                inner,
             } => Self::VeryBiasedToBottom {
                 min_inclusive,
                 max_inclusive,
-                inner,
             },
             TaggedIntProvider::Trapezoid { min, max, plateau } => {
                 Self::Trapezoid { min, max, plateau }

@@ -4,9 +4,6 @@ A Rust library for generating Minecraft worlds. It reads vanilla and custom data
 
 ![vanilla](assets/vanilla.png)
 
-<sub>*In-game screenshot, rendered with [Voxy](https://modrinth.com/mod/voxy) and [Complementary Shaders](https://modrinth.com/shader/complementary-reimagined).*</sub>
-
-
 
 ## Status
 
@@ -40,9 +37,10 @@ worldgen-rs = { git = "https://github.com/garfxld/worldgen-rs" }
 ## Usage
 
 ```rust
-use worldgen_rs::{ChunkPos, ChunkStatus, Identifier, Worldgen, WorldgenSettings};
+use shulkr::util::Key;
+use worldgen_rs::{ChunkPos, ChunkStatus, Worldgen, WorldgenSettings};
 
-let settings = WorldgenSettings::new(42, Identifier::const_vanilla("overworld"));
+let settings = WorldgenSettings::new(42, Key::const_vanilla("overworld"));
 let worldgen = Worldgen::new(settings)?;
 
 let top = worldgen.generate(ChunkPos::new(0, 0), ChunkStatus::Features, |view| {
@@ -58,7 +56,7 @@ To use a custom datapack, layer it over the built-in one:
 use worldgen_rs::datapack::Datapack;
 
 let pack = Datapack::zip("Terralith.zip")?.layered_over(Datapack::builtin());
-let settings = WorldgenSettings::new(42, Identifier::const_vanilla("overworld"))
+let settings = WorldgenSettings::new(42, Key::const_vanilla("overworld"))
     .with_datapack(pack);
 ```
 
@@ -66,7 +64,7 @@ let settings = WorldgenSettings::new(42, Identifier::const_vanilla("overworld"))
 
 ## Examples
 
-Both examples use [cerium](https://github.com/garfxld/cerium) to start a real server you can join.
+Both examples use [shulkr](https://github.com/shulkr-rs/shulkr) to start a real server you can join.
 
 ```bash
 cargo run --release --example vanilla

@@ -1,6 +1,5 @@
 use std::ops;
 use std::simd::cmp::{SimdPartialEq, SimdPartialOrd};
-use std::simd::f64x4;
 use std::simd::num::SimdFloat;
 use std::simd::{Mask, Simd, SimdCast, SimdElement, StdFloat};
 
@@ -40,17 +39,6 @@ impl NormalNoise {
     ) -> Self {
         let mut random = splitter.with_hash_of(&NameHash::new(noise_id));
         Self::create_from_random(&mut random, first_octave, amplitudes)
-    }
-
-    pub fn create_legacy_nether_biome(
-        random: &mut RandomSource,
-        first_octave: i32,
-        amplitudes: &[f64],
-    ) -> Self {
-        let first = PerlinNoise::create_legacy_for_nether(random, first_octave, amplitudes);
-        let second = PerlinNoise::create_legacy_for_nether(random, first_octave, amplitudes);
-
-        Self::finish(first, second, amplitudes)
     }
 
     fn finish(first: PerlinNoise, second: PerlinNoise, amplitudes: &[f64]) -> Self {
@@ -141,39 +129,6 @@ impl NormalNoise {
         let x2 = x * INPUT_FACTOR;
         let y2 = y * INPUT_FACTOR;
         (self.first.get_value_xy(x, y) + self.second.get_value_xy(x2, y2)) * self.value_factor
-    }
-
-    #[inline]
-    pub fn get_value_y_4x(&self, x: f64, ys: f64x4, z: f64) -> f64x4 {
-        let x2 = x * INPUT_FACTOR;
-        let ys2 = ys * f64x4::splat(INPUT_FACTOR);
-        let z2 = z * INPUT_FACTOR;
-        (self
-            .first
-            .get_value_with_y_params_4x(x, ys, z, 0.0, 0.0, false)
-            + self
-                .second
-                .get_value_with_y_params_4x(x2, ys2, z2, 0.0, 0.0, false))
-            * f64x4::splat(self.value_factor)
-    }
-
-    #[inline]
-    pub fn get_value_y_simd<const N: usize>(
-        &self,
-        x: f64,
-        ys: Simd<f64, N>,
-        z: f64,
-    ) -> Simd<f64, N> {
-        let x2 = x * INPUT_FACTOR;
-        let ys2 = ys * Simd::splat(INPUT_FACTOR);
-        let z2 = z * INPUT_FACTOR;
-        (self
-            .first
-            .get_value_with_y_params_simd::<N>(x, ys, z, 0.0, 0.0, false)
-            + self
-                .second
-                .get_value_with_y_params_simd::<N>(x2, ys2, z2, 0.0, 0.0, false))
-            * Simd::splat(self.value_factor)
     }
 
     #[inline]

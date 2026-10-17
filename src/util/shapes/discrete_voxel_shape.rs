@@ -1,4 +1,4 @@
-use crate::util::axis::Axis;
+use shulkr::util::Axis;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BitSet {

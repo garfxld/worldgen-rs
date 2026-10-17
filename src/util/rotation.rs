@@ -1,38 +1,47 @@
-use glam::IVec3;
-use serde::Deserialize;
-
-use crate::util::direction::Direction;
-use crate::util::geometry::BoundingBox;
-use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
+use glam::IVec3;
+use shulkr::util::BlockPosition;
+use shulkr::util::BoundingBox;
+use shulkr::util::Direction;
+use shulkr::world::block::Rotation;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-pub enum Rotation {
-    #[default]
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "clockwise_90")]
-    Clockwise90,
-    #[serde(rename = "180")]
-    Clockwise180,
-    #[serde(rename = "counterclockwise_90")]
-    CounterClockwise90,
+pub trait RotationExt {
+    fn get_random(rng: &mut RandomSource) -> Self;
+
+    fn get_shuffled(rng: &mut RandomSource) -> [Rotation; 4];
+
+    fn rotate(self, dir: Direction) -> Direction;
+
+    fn rotate_pos(self, pos: BlockPosition) -> BlockPosition;
+
+    fn rotate_index(self, rotation: i32, steps: i32) -> i32;
+
+    fn transform_pos(self, pos: IVec3, pivot: IVec3) -> IVec3;
+
+    fn rotate_size(self, size: IVec3) -> IVec3;
+
+    fn transform_pos_mirrored(self, pos: IVec3, pivot: IVec3, mirror_front_back: bool) -> IVec3;
+
+    fn get_bounding_box_full(
+        self,
+        pos: IVec3,
+        size: IVec3,
+        pivot: IVec3,
+        mirror_front_back: bool,
+    ) -> BoundingBox;
+
+    fn get_bounding_box_with_pivot(self, pos: IVec3, size: IVec3, pivot: IVec3) -> BoundingBox;
+
+    fn get_bounding_box(self, pos: IVec3, size: IVec3) -> BoundingBox;
 }
 
-const ALL_ROTATIONS: [Rotation; 4] = [
-    Rotation::None,
-    Rotation::Clockwise90,
-    Rotation::Clockwise180,
-    Rotation::CounterClockwise90,
-];
-
-impl Rotation {
-    pub fn get_random(rng: &mut RandomSource) -> Self {
-        ALL_ROTATIONS[rng.next_i32_bounded(4) as usize]
+impl RotationExt for Rotation {
+    fn get_random(rng: &mut RandomSource) -> Self {
+        Rotation::ALL[rng.next_i32_bounded(4) as usize]
     }
 
-    pub fn get_shuffled(rng: &mut RandomSource) -> [Rotation; 4] {
-        let mut rotations = ALL_ROTATIONS;
+    fn get_shuffled(rng: &mut RandomSource) -> [Rotation; 4] {
+        let mut rotations = Rotation::ALL;
         for i in (1..4).rev() {
             let j = rng.next_i32_bounded((i + 1) as i32) as usize;
             rotations.swap(i, j);
@@ -40,7 +49,7 @@ impl Rotation {
         rotations
     }
 
-    pub const fn rotate(self, dir: Direction) -> Direction {
+    fn rotate(self, dir: Direction) -> Direction {
         match self {
             Self::None => dir,
             Self::Clockwise90 => dir.rotate_y_clockwise(),
@@ -49,16 +58,16 @@ impl Rotation {
         }
     }
 
-    pub const fn rotate_pos(self, pos: BlockPos) -> BlockPos {
+    fn rotate_pos(self, pos: BlockPosition) -> BlockPosition {
         match self {
             Self::None => pos,
-            Self::Clockwise90 => BlockPos::new(-pos.z(), pos.y(), pos.x()),
-            Self::Clockwise180 => BlockPos::new(-pos.x(), pos.y(), -pos.z()),
-            Self::CounterClockwise90 => BlockPos::new(pos.z(), pos.y(), -pos.x()),
+            Self::Clockwise90 => BlockPosition::new(-pos.z(), pos.y(), pos.x()),
+            Self::Clockwise180 => BlockPosition::new(-pos.x(), pos.y(), -pos.z()),
+            Self::CounterClockwise90 => BlockPosition::new(pos.z(), pos.y(), -pos.x()),
         }
     }
 
-    pub const fn rotate_index(self, rotation: i32, steps: i32) -> i32 {
+    fn rotate_index(self, rotation: i32, steps: i32) -> i32 {
         match self {
             Self::None => rotation,
             Self::Clockwise90 => (rotation + steps / 4) % steps,
@@ -67,11 +76,7 @@ impl Rotation {
         }
     }
 
-    pub const fn then(self, other: Self) -> Self {
-        ALL_ROTATIONS[((self as u8 + other as u8) % 4) as usize]
-    }
-
-    pub const fn transform_pos(self, pos: IVec3, pivot: IVec3) -> IVec3 {
+    fn transform_pos(self, pos: IVec3, pivot: IVec3) -> IVec3 {
         let (x, y, z) = (pos.x, pos.y, pos.z);
         let (px, pz) = (pivot.x, pivot.z);
         match self {
@@ -82,25 +87,20 @@ impl Rotation {
         }
     }
 
-    pub const fn rotate_size(self, size: IVec3) -> IVec3 {
+    fn rotate_size(self, size: IVec3) -> IVec3 {
         match self {
             Self::Clockwise90 | Self::CounterClockwise90 => IVec3::new(size.z, size.y, size.x),
             Self::None | Self::Clockwise180 => size,
         }
     }
 
-    pub const fn transform_pos_mirrored(
-        self,
-        pos: IVec3,
-        pivot: IVec3,
-        mirror_front_back: bool,
-    ) -> IVec3 {
+    fn transform_pos_mirrored(self, pos: IVec3, pivot: IVec3, mirror_front_back: bool) -> IVec3 {
         let mx = if mirror_front_back { -pos.x } else { pos.x };
         let mirrored_pos = IVec3::new(mx, pos.y, pos.z);
         self.transform_pos(mirrored_pos, pivot)
     }
 
-    pub fn get_bounding_box_full(
+    fn get_bounding_box_full(
         self,
         pos: IVec3,
         size: IVec3,
@@ -113,14 +113,15 @@ impl Rotation {
             pivot,
             mirror_front_back,
         );
-        BoundingBox::new(c1.min(c2) + pos, c1.max(c2) + pos)
+        let (min, max) = (c1.min(c2) + pos, c1.max(c2) + pos);
+        BoundingBox::new(min.x, min.y, min.z, max.x, max.y, max.z)
     }
 
-    pub fn get_bounding_box_with_pivot(self, pos: IVec3, size: IVec3, pivot: IVec3) -> BoundingBox {
+    fn get_bounding_box_with_pivot(self, pos: IVec3, size: IVec3, pivot: IVec3) -> BoundingBox {
         self.get_bounding_box_full(pos, size, pivot, false)
     }
 
-    pub fn get_bounding_box(self, pos: IVec3, size: IVec3) -> BoundingBox {
+    fn get_bounding_box(self, pos: IVec3, size: IVec3) -> BoundingBox {
         self.get_bounding_box_full(pos, size, IVec3::ZERO, false)
     }
 }

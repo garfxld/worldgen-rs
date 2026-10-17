@@ -1,294 +1,180 @@
 use std::path::Path;
-use std::sync::{LazyLock, OnceLock};
+use std::sync::LazyLock;
 
-use serde::{Deserialize, Deserializer};
+use shulkr::registry::{Ref, Registry};
+use shulkr::world::biome::{Biome, TemperatureModifier};
+use shulkr::world::block::Block;
 
 use crate::datapack::{
     DatapackError, collect_json_files, parse_id, path_to_id, read_and_parse_normalized,
 };
-use crate::registry::blocks::vanilla_blocks;
+
 use crate::registry::fluid::is_water_fluid;
-use crate::registry::{REGISTRY, Registry};
-use crate::util::ident::Identifier;
-use crate::util::noise::perlin_simplex_noise::PerlinSimplexNoise;
-use crate::util::pos::BlockPos;
 use crate::util::rng::RandomSource;
 use crate::util::rng::legacy_random::LegacyRandomSource;
-use crate::worldgen::block_survival::can_survive;
-use crate::worldgen::region::WorldGenRegion;
+use crate::world::worldgen::block_survival::can_survive;
+use crate::world::worldgen::region::WorldGenRegion;
+use crate::world::worldgen::synth::{Noise, NoiseStack, SimplexNoise};
+use shulkr::util::BlockPosition;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TemperatureModifier {
-    None,
-    Frozen,
+pub type BiomeRef = &'static Ref<Biome>;
+
+fn height_adjusted_temperature(biome: &Biome, pos: BlockPosition, sea_level: i32) -> f32 {
+    let adjusted_temperature =
+        modify_temperature(biome.temperature_modifier(), pos, biome.temperature());
+    let snow_level = sea_level + 17;
+    if pos.y() > snow_level {
+        let v = temperature_noise().get2(
+            f64::from(pos.x() as f32 / 8.0),
+            f64::from(pos.z() as f32 / 8.0),
+        ) * 8.0;
+        adjusted_temperature - (v + pos.y() as f32 - snow_level as f32) * 0.05 / 40.0
+    } else {
+        adjusted_temperature
+    }
 }
 
-#[derive(Debug)]
-pub struct Biome {
-    pub key: Identifier,
-    pub has_precipitation: bool,
-    pub temperature: f32,
-    pub temperature_modifier: TemperatureModifier,
-    pub carvers: Vec<Identifier>,
-    pub features: Vec<Vec<Identifier>>,
-    pub id: OnceLock<usize>,
+pub fn warm_enough_to_rain(biome: &Biome, pos: BlockPosition, sea_level: i32) -> bool {
+    height_adjusted_temperature(biome, pos, sea_level) >= 0.15
 }
 
-impl Biome {
-    pub fn has_tag(&'static self, tag: &Identifier) -> bool {
-        REGISTRY.biomes.is_in_tag(&self.key, tag)
+pub fn cold_enough_to_snow(biome: &Biome, pos: BlockPosition, sea_level: i32) -> bool {
+    !warm_enough_to_rain(biome, pos, sea_level)
+}
+
+pub fn should_melt_frozen_ocean_iceberg_slightly(
+    biome: &Biome,
+    pos: BlockPosition,
+    sea_level: i32,
+) -> bool {
+    height_adjusted_temperature(biome, pos, sea_level) > 0.1
+}
+
+pub fn should_freeze(
+    biome: &Biome,
+    region: &WorldGenRegion<'_>,
+    pos: BlockPosition,
+    check_neighbors: bool,
+) -> bool {
+    if warm_enough_to_rain(biome, pos, region.sea_level()) {
+        return false;
     }
 
-    pub fn id(&self) -> usize {
-        *self.id.get().expect("biome not registered")
-    }
-
-    fn height_adjusted_temperature(&self, pos: BlockPos, sea_level: i32) -> f32 {
-        let adjusted_temperature = self
-            .temperature_modifier
-            .modify_temperature(pos, self.temperature);
-        let snow_level = sea_level + 17;
-        if pos.y() > snow_level {
-            let v = (temperature_noise().get_value(
-                f64::from(pos.x() as f32 / 8.0),
-                f64::from(pos.z() as f32 / 8.0),
-            ) * 8.0) as f32;
-            adjusted_temperature - (v + pos.y() as f32 - snow_level as f32) * 0.05 / 40.0
-        } else {
-            adjusted_temperature
-        }
-    }
-
-    pub fn warm_enough_to_rain(&self, pos: BlockPos, sea_level: i32) -> bool {
-        self.height_adjusted_temperature(pos, sea_level) >= 0.15
-    }
-
-    pub fn cold_enough_to_snow(&self, pos: BlockPos, sea_level: i32) -> bool {
-        !self.warm_enough_to_rain(pos, sea_level)
-    }
-
-    pub fn should_freeze(
-        &self,
-        region: &WorldGenRegion<'_>,
-        pos: BlockPos,
-        check_neighbors: bool,
-    ) -> bool {
-        if self.warm_enough_to_rain(pos, region.sea_level()) {
-            return false;
-        }
-
-        if region.is_inside_build_height(pos.y()) {
-            let state = region.get_block(pos);
-            if is_water_fluid(state.get_fluid_state().fluid_id)
-                && state.get_block() == &vanilla_blocks::WATER
-            {
-                if !check_neighbors {
-                    return true;
-                }
-
-                let surrounded_by_water = is_water_at(region, pos.west())
-                    && is_water_at(region, pos.east())
-                    && is_water_at(region, pos.north())
-                    && is_water_at(region, pos.south());
-                if !surrounded_by_water {
-                    return true;
-                }
+    if region.is_inside_build_height(pos.y()) {
+        let state = region.get_block(pos);
+        if is_water_fluid(state.get_fluid_state().fluid()) && state.is(Block::WATER) {
+            if !check_neighbors {
+                return true;
             }
-        }
 
-        false
-    }
-
-    pub fn should_snow(&self, region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
-        if !self.has_precipitation || !self.cold_enough_to_snow(pos, region.sea_level()) {
-            return false;
-        }
-
-        if region.is_inside_build_height(pos.y()) {
-            let state = region.get_block(pos);
-            if (state.is_air() || state.get_block() == &vanilla_blocks::SNOW)
-                && can_survive(region, pos, vanilla_blocks::SNOW.default_state())
-            {
+            let surrounded_by_water = is_water_at(region, pos.west())
+                && is_water_at(region, pos.east())
+                && is_water_at(region, pos.north())
+                && is_water_at(region, pos.south());
+            if !surrounded_by_water {
                 return true;
             }
         }
-
-        false
     }
+
+    false
 }
 
-fn is_water_at(region: &WorldGenRegion<'_>, pos: BlockPos) -> bool {
-    is_water_fluid(region.get_block(pos).get_fluid_state().fluid_id)
+pub fn should_snow(biome: &Biome, region: &WorldGenRegion<'_>, pos: BlockPosition) -> bool {
+    if !biome.has_precipitation() || !cold_enough_to_snow(biome, pos, region.sea_level()) {
+        return false;
+    }
+
+    if region.is_inside_build_height(pos.y()) {
+        let state = region.get_block(pos);
+        if (state.is_air() || state.is(Block::SNOW))
+            && can_survive(region, pos, Block::SNOW.default_state())
+        {
+            return true;
+        }
+    }
+
+    false
 }
 
-fn temperature_noise() -> &'static PerlinSimplexNoise {
-    static NOISE: LazyLock<PerlinSimplexNoise> = LazyLock::new(|| {
+fn is_water_at(region: &WorldGenRegion<'_>, pos: BlockPosition) -> bool {
+    is_water_fluid(region.get_block(pos).get_fluid_state().fluid())
+}
+
+fn temperature_noise() -> &'static SimplexNoise {
+    static NOISE: LazyLock<SimplexNoise> = LazyLock::new(|| {
         let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(1234));
-        PerlinSimplexNoise::new(&mut random, &[0])
+        SimplexNoise::new_discarding_offset(&mut random, true)
     });
     &NOISE
 }
 
-fn frozen_temperature_noise() -> &'static PerlinSimplexNoise {
-    static NOISE: LazyLock<PerlinSimplexNoise> = LazyLock::new(|| {
+pub fn frozen_temperature_noise() -> &'static Noise {
+    static NOISE: LazyLock<Noise> = LazyLock::new(|| {
         let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(3456));
-        PerlinSimplexNoise::new(&mut random, &[-2, -1, 0])
+        let a = SimplexNoise::new_discarding_offset(&mut random, true);
+        let b = SimplexNoise::new_discarding_offset(&mut random, true);
+        let c = SimplexNoise::new_discarding_offset(&mut random, true);
+        Noise::Stack(
+            NoiseStack::builder()
+                .add(Noise::Simplex(a), 1.0, 0.142_857_15)
+                .add(Noise::Simplex(b), 0.5, 0.285_714_3)
+                .add(Noise::Simplex(c), 0.25, 0.571_428_6)
+                .build(),
+        )
     });
     &NOISE
 }
 
-fn biome_info_noise() -> &'static PerlinSimplexNoise {
-    static NOISE: LazyLock<PerlinSimplexNoise> = LazyLock::new(|| {
+pub fn biome_info_noise() -> &'static SimplexNoise {
+    static NOISE: LazyLock<SimplexNoise> = LazyLock::new(|| {
         let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(2345));
-        PerlinSimplexNoise::new(&mut random, &[0])
+        SimplexNoise::new_discarding_offset(&mut random, true)
     });
     &NOISE
 }
 
-impl TemperatureModifier {
-    fn modify_temperature(self, pos: BlockPos, base_temperature: f32) -> f32 {
-        match self {
-            Self::None => base_temperature,
-            Self::Frozen => {
-                let ground_value_large_variation = frozen_temperature_noise()
-                    .get_value(f64::from(pos.x()) * 0.05, f64::from(pos.z()) * 0.05)
-                    * 7.0;
-                let ground_value_edge_variation = biome_info_noise()
-                    .get_value(f64::from(pos.x()) * 0.2, f64::from(pos.z()) * 0.2);
-                let ice_patches = ground_value_large_variation + ground_value_edge_variation;
-                if ice_patches < 0.3 {
-                    let ground_value_small_variation = biome_info_noise()
-                        .get_value(f64::from(pos.x()) * 0.09, f64::from(pos.z()) * 0.09);
-                    if ground_value_small_variation < 0.8 {
-                        return 0.2;
-                    }
+fn modify_temperature(
+    modifier: TemperatureModifier,
+    pos: BlockPosition,
+    base_temperature: f32,
+) -> f32 {
+    match modifier {
+        TemperatureModifier::None => base_temperature,
+        TemperatureModifier::Frozen => {
+            let ground_value_large_variation = f64::from(
+                frozen_temperature_noise()
+                    .get2(f64::from(pos.x()) * 0.05, f64::from(pos.z()) * 0.05)
+                    * 7.0,
+            );
+            let ground_value_edge_variation = f64::from(
+                biome_info_noise().get2(f64::from(pos.x()) * 0.2, f64::from(pos.z()) * 0.2),
+            );
+            let ice_patches = ground_value_large_variation + ground_value_edge_variation;
+            if ice_patches < 0.3 {
+                let ground_value_small_variation = f64::from(
+                    biome_info_noise().get2(f64::from(pos.x()) * 0.09, f64::from(pos.z()) * 0.09),
+                );
+                if ground_value_small_variation < 0.8 {
+                    return 0.2;
                 }
-                base_temperature
             }
+            base_temperature
         }
     }
 }
 
-pub type BiomeRef = &'static Biome;
-
-#[derive(Deserialize)]
-struct BiomeJson {
-    has_precipitation: bool,
-    temperature: f32,
-    #[serde(default)]
-    temperature_modifier: Option<String>,
-    #[serde(deserialize_with = "one_or_many")]
-    carvers: Vec<String>,
-    features: Vec<Vec<String>>,
-}
-
-fn one_or_many<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum OneOrMany {
-        One(String),
-        Many(Vec<String>),
+pub fn load_biomes(
+    registry: &Registry<Biome>,
+    namespace: &str,
+    worldgen_dir: &Path,
+) -> Result<(), DatapackError> {
+    let dir = worldgen_dir.join("biome");
+    for file in collect_json_files(&dir) {
+        let biome: Biome = read_and_parse_normalized(&file)?;
+        registry.register(parse_id(&path_to_id(namespace, &file, &dir)), biome)?;
     }
-    Ok(match OneOrMany::deserialize(d)? {
-        OneOrMany::One(s) => vec![s],
-        OneOrMany::Many(v) => v,
-    })
-}
-
-pub struct BiomeRegistry {
-    registry: Registry<Biome>,
-}
-
-impl Default for BiomeRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl BiomeRegistry {
-    pub fn new() -> Self {
-        Self {
-            registry: Registry::new(),
-        }
-    }
-
-    pub fn register(&mut self, biome: BiomeRef) -> usize {
-        let id = self.registry.register(biome.key.clone(), biome);
-        let cached = biome.id.get_or_init(|| id);
-        assert_eq!(*cached, id, "biome registered with conflicting id");
-        id
-    }
-
-    pub fn load_from_datapack(
-        &mut self,
-        namespace: &str,
-        worldgen_dir: &Path,
-    ) -> Result<(), DatapackError> {
-        let dir = worldgen_dir.join("biome");
-        for file in collect_json_files(&dir) {
-            let json: BiomeJson = read_and_parse_normalized(&file)?;
-            let key = parse_id(&path_to_id(namespace, &file, &dir));
-
-            let temperature_modifier = match json.temperature_modifier.as_deref() {
-                Some("frozen") => TemperatureModifier::Frozen,
-                _ => TemperatureModifier::None,
-            };
-            let carvers = json
-                .carvers
-                .iter()
-                .map(|raw| parse_id(raw))
-                .collect();
-            let features = json
-                .features
-                .into_iter()
-                .map(|step| step.iter().map(|raw| parse_id(raw)).collect())
-                .collect();
-
-            let biome = Box::leak(Box::new(Biome {
-                key,
-                has_precipitation: json.has_precipitation,
-                temperature: json.temperature,
-                temperature_modifier,
-                carvers,
-                features,
-                id: OnceLock::new(),
-            }));
-            self.register(biome);
-        }
-        Ok(())
-    }
-
-    pub const fn freeze(&mut self) {
-        self.registry.freeze();
-    }
-
-    pub fn by_id(&self, id: usize) -> Option<BiomeRef> {
-        self.registry.by_id(id)
-    }
-
-    pub fn by_key(&self, key: &Identifier) -> Option<BiomeRef> {
-        self.registry.by_key(key)
-    }
-
-    pub fn load_tags_from_datapack(
-        &mut self,
-        namespace: &str,
-        directory: &std::path::Path,
-    ) -> Result<(), crate::datapack::DatapackError> {
-        self.registry.load_tags_from_datapack(namespace, directory)
-    }
-
-    pub fn is_in_tag(&self, key: &Identifier, tag: &Identifier) -> bool {
-        self.registry.is_in_tag(key, tag)
-    }
-
-    pub fn register_tag(&mut self, tag: Identifier, keys: &[&'static str]) {
-        self.registry.register_tag(tag, keys);
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (usize, BiomeRef)> + '_ {
-        self.registry.iter()
-    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -299,38 +185,41 @@ impl BiomeRegistry {
 mod tests {
     use super::*;
     use crate::datapack::Datapack;
+    use crate::world::worldgen;
+    use shulkr::registry::registries;
+    use shulkr::util::Key;
 
-    fn create_test_registry() -> BiomeRegistry {
-        let mut registry = BiomeRegistry::new();
-        for (namespace, dir) in Datapack::builtin().namespaced_dirs("worldgen") {
-            registry.load_from_datapack(&namespace, &dir).unwrap();
-        }
-        registry.freeze();
-        registry
+    fn create_test_registry() -> &'static Registry<Biome> {
+        worldgen::ensure_registry_initialized(&Datapack::builtin())
+            .expect("vanilla datapack should load");
+        &registries::BIOME
     }
 
     #[test]
     fn plains_has_expected_climate() {
         let registry = create_test_registry();
-        let plains = registry
-            .by_key(&Identifier::const_vanilla("plains"))
-            .unwrap();
+        let plains = registry.by_key(&Key::const_vanilla("plains")).unwrap();
 
-        assert!(plains.has_precipitation);
-        assert_eq!(plains.temperature, 0.8);
-        assert_eq!(plains.temperature_modifier, TemperatureModifier::None);
-        assert!(plains.carvers.contains(&Identifier::const_vanilla("cave")));
+        assert!(plains.has_precipitation());
+        assert_eq!(plains.temperature(), 0.8);
+        assert_eq!(plains.temperature_modifier(), TemperatureModifier::None);
+        assert!(
+            plains
+                .generation_settings()
+                .carvers()
+                .contains(&Key::const_vanilla("cave"))
+        );
     }
 
     #[test]
     fn frozen_ocean_uses_frozen_temperature_modifier() {
         let registry = create_test_registry();
         let frozen_ocean = registry
-            .by_key(&Identifier::const_vanilla("frozen_ocean"))
+            .by_key(&Key::const_vanilla("frozen_ocean"))
             .unwrap();
 
         assert_eq!(
-            frozen_ocean.temperature_modifier,
+            frozen_ocean.temperature_modifier(),
             TemperatureModifier::Frozen
         );
     }
@@ -339,22 +228,20 @@ mod tests {
     fn nether_wastes_single_carver_is_not_dropped() {
         let registry = create_test_registry();
         let nether_wastes = registry
-            .by_key(&Identifier::const_vanilla("nether_wastes"))
+            .by_key(&Key::const_vanilla("nether_wastes"))
             .unwrap();
 
         assert_eq!(
-            nether_wastes.carvers,
-            vec![Identifier::const_vanilla("nether_cave")]
+            nether_wastes.generation_settings().carvers(),
+            vec![Key::const_vanilla("nether_cave")]
         );
     }
 
     #[test]
     fn ids_are_stable_and_cached() {
         let registry = create_test_registry();
-        let plains = registry
-            .by_key(&Identifier::const_vanilla("plains"))
-            .unwrap();
+        let plains = registry.by_key(&Key::const_vanilla("plains")).unwrap();
 
-        assert_eq!(registry.by_id(plains.id()).unwrap().key, plains.key);
+        assert_eq!(registry.by_id(plains.id()).unwrap().key(), plains.key());
     }
 }

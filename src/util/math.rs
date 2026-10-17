@@ -1,4 +1,3 @@
-use core::f64::consts::PI;
 use std::simd::num::{SimdFloat, SimdInt};
 use std::sync::LazyLock;
 use std::{
@@ -8,26 +7,6 @@ use std::{
         cmp::{SimdPartialEq, SimdPartialOrd},
     },
 };
-
-#[cfg(not(target_feature = "avx512f"))]
-#[inline]
-fn transpose<F>(
-    r0: Simd<F, 4>,
-    r1: Simd<F, 4>,
-    r2: Simd<F, 4>,
-    r3: Simd<F, 4>,
-) -> (Simd<F, 4>, Simd<F, 4>, Simd<F, 4>, Simd<F, 4>)
-where
-    F: SimdElement,
-{
-    let (t0, t1) = r0.deinterleave(r1);
-    let (t2, t3) = r2.deinterleave(r3);
-
-    let (col0, col2) = t0.deinterleave(t2);
-    let (col1, col3) = t1.deinterleave(t3);
-
-    (col0, col1, col2, col3)
-}
 
 #[inline(always)]
 pub fn fast_floor(v: f64) -> i32 {
@@ -66,12 +45,6 @@ pub fn ceil_f32(v: f32) -> i32 {
 pub fn floor_f64(v: f64) -> i32 {
     let i = v as i32;
     if v < f64::from(i) { i - 1 } else { i }
-}
-
-#[inline(always)]
-pub fn ceil_f64(v: f64) -> i32 {
-    let i = v as i32;
-    if v > f64::from(i) { i + 1 } else { i }
 }
 
 #[inline]
@@ -154,33 +127,6 @@ pub const GRADIENT_4: [[f64; 4]; 16] = [
 #[inline]
 pub fn dot(g: &[f64; 3], x: f64, y: f64, z: f64) -> f64 {
     g[0] * x + g[1] * y + g[2] * z
-}
-
-#[inline(always)]
-pub fn grad_dot_4x<F>(hashes: [usize; 4], x: Simd<F, 4>, y: Simd<F, 4>, z: Simd<F, 4>) -> Simd<F, 4>
-where
-    F: SimdElement + SimdCast,
-    Simd<F, 4>: ops::Mul<Output = Simd<F, 4>>
-        + ops::Add<Output = Simd<F, 4>>
-        + ops::Sub<Output = Simd<F, 4>>
-        + ops::Neg<Output = Simd<F, 4>>,
-{
-    #[cfg(target_feature = "avx512f")]
-    {
-        grad_dot_simd(hashes, x, y, z)
-    }
-
-    #[cfg(not(target_feature = "avx512f"))]
-    {
-        let h0 = Simd::from_array(GRADIENT_4[hashes[0] & 15]).cast::<F>();
-        let h1 = Simd::from_array(GRADIENT_4[hashes[1] & 15]).cast::<F>();
-        let h2 = Simd::from_array(GRADIENT_4[hashes[2] & 15]).cast::<F>();
-        let h3 = Simd::from_array(GRADIENT_4[hashes[3] & 15]).cast::<F>();
-
-        let (gx, gy, gz, _gw) = transpose(h0, h1, h2, h3);
-
-        gx * x + gy * y + gz * z
-    }
 }
 
 #[inline]
@@ -272,17 +218,6 @@ pub fn clamped_lerp_simd<const N: usize>(
 
 #[inline]
 pub fn clamp(value: f64, min: f64, max: f64) -> f64 {
-    if value < min {
-        min
-    } else if value > max {
-        max
-    } else {
-        value
-    }
-}
-
-#[inline]
-pub const fn clamp_i32(value: i32, min: i32, max: i32) -> i32 {
     if value < min {
         min
     } else if value > max {
@@ -406,11 +341,6 @@ pub fn smoothstep(x: f64) -> f64 {
 }
 
 #[inline]
-pub fn smoothstep_derivative(x: f64) -> f64 {
-    30.0 * x * x * (x - 1.0) * (x - 1.0)
-}
-
-#[inline]
 pub fn smoothstep_simd<F, const N: usize>(x: Simd<F, N>) -> Simd<F, N>
 where
     F: SimdElement + SimdCast,
@@ -424,11 +354,6 @@ where
 }
 
 #[inline]
-pub fn bias_towards_extreme(noise: f64, factor: f64) -> f64 {
-    noise + (PI * noise).sin() * factor / PI
-}
-
-#[inline]
 pub fn cube(x: f64) -> f64 {
     x * x * x
 }
@@ -438,9 +363,9 @@ pub fn square(x: f64) -> f64 {
     x * x
 }
 
-const TRIG_INDEX_SCALE: f32 = 10_430.378;
+const TRIG_INDEX_SCALE: f64 = 10_430.378_350_470_453;
 const TRIG_TABLE_LEN: usize = 65_536;
-const TRIG_TABLE_MASK: i32 = 0xFFFF;
+const TRIG_TABLE_MASK: i64 = 0xFFFF;
 
 static SIN_TABLE: LazyLock<Box<[f32; TRIG_TABLE_LEN]>> = LazyLock::new(|| {
     let mut table: Box<[f32; TRIG_TABLE_LEN]> = vec![0.0_f32; TRIG_TABLE_LEN]
@@ -448,26 +373,27 @@ static SIN_TABLE: LazyLock<Box<[f32; TRIG_TABLE_LEN]>> = LazyLock::new(|| {
         .try_into()
         .expect("65536-element vec");
     for (i, slot) in table.iter_mut().enumerate() {
-        *slot = (i as f64 * std::f64::consts::PI * 2.0 / 65_536.0).sin() as f32;
+        *slot = (i as f64 / TRIG_INDEX_SCALE).sin() as f32;
     }
     table
 });
 
 #[inline]
-pub fn sin(angle: f32) -> f32 {
-    let idx = (((angle * TRIG_INDEX_SCALE) as i32) & TRIG_TABLE_MASK) as usize;
+pub fn sin(angle: f64) -> f32 {
+    let idx = (((angle * TRIG_INDEX_SCALE) as i64) & TRIG_TABLE_MASK) as usize;
     SIN_TABLE[idx]
 }
 
 #[inline]
-pub fn cos(angle: f32) -> f32 {
-    let idx = (((angle * TRIG_INDEX_SCALE + 16_384.0) as i32) & TRIG_TABLE_MASK) as usize;
+pub fn cos(angle: f64) -> f32 {
+    let idx = (((angle * TRIG_INDEX_SCALE + 16_384.0) as i64) & TRIG_TABLE_MASK) as usize;
     SIN_TABLE[idx]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::f64::consts::{FRAC_PI_2, PI};
     use std::simd::f64x4;
 
     #[test]
@@ -546,28 +472,23 @@ mod tests {
     #[test]
     fn sin_cos_match_known_angles_within_table_resolution() {
         let tolerance = 1e-4;
-        const PI_F: f32 = core::f32::consts::PI;
         assert!((f64::from(sin(0.0))).abs() < tolerance);
         assert!((f64::from(cos(0.0)) - 1.0).abs() < tolerance);
-        assert!((f64::from(sin(PI_F / 2.0)) - 1.0).abs() < tolerance);
-        assert!((f64::from(cos(PI_F)) + 1.0).abs() < tolerance);
+        assert!((f64::from(sin(PI / 2.0)) - 1.0).abs() < tolerance);
+        assert!((f64::from(cos(PI)) + 1.0).abs() < tolerance);
     }
 
     #[test]
     fn cos_is_sin_quarter_turn_ahead() {
-        for angle in [0.2_f32, 1.3, 2.5, -0.8] {
-            assert!(
-                (f64::from(cos(angle)) - f64::from(sin(angle + core::f32::consts::FRAC_PI_2)))
-                    .abs()
-                    < 1e-6
-            );
+        for angle in [0.2_f64, 1.3, 2.5, -0.8] {
+            assert!((f64::from(cos(angle)) - f64::from(sin(angle + FRAC_PI_2))).abs() < 1e-4);
         }
     }
 
     #[test]
     fn sin_is_periodic_over_a_full_turn() {
-        for angle in [0.4_f32, 1.1, 3.0] {
-            let full_turn = 2.0 * core::f32::consts::PI;
+        for angle in [0.4_f64, 1.1, 3.0] {
+            let full_turn = 2.0 * PI;
             assert!((f64::from(sin(angle)) - f64::from(sin(angle + full_turn))).abs() < 1e-4);
         }
     }

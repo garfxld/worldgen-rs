@@ -1,7 +1,7 @@
 use std::io;
 
-use crate::chunk::status::ChunkStatus;
 use crate::util::pos::ChunkPos;
+use crate::world::chunk::status::ChunkStatus;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

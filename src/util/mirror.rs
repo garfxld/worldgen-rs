@@ -1,22 +1,17 @@
-use serde::Deserialize;
+use shulkr::util::Axis;
+use shulkr::util::Direction;
+use shulkr::world::block::{Mirror, Rotation};
 
-use crate::util::axis::Axis;
-use crate::util::direction::Direction;
-use crate::util::rotation::Rotation;
+pub trait MirrorExt {
+    fn mirror_index(self, rotation: i32, steps: i32) -> i32;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-pub enum Mirror {
-    #[default]
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "left_right")]
-    LeftRight,
-    #[serde(rename = "front_back")]
-    FrontBack,
+    fn get_rotation(self, direction: Direction) -> Rotation;
+
+    fn mirror(self, direction: Direction) -> Direction;
 }
 
-impl Mirror {
-    pub const fn mirror_index(self, rotation: i32, steps: i32) -> i32 {
+impl MirrorExt for Mirror {
+    fn mirror_index(self, rotation: i32, steps: i32) -> i32 {
         let half_steps = steps / 2;
         let corrected = if rotation > half_steps {
             rotation - steps
@@ -30,7 +25,7 @@ impl Mirror {
         }
     }
 
-    pub const fn get_rotation(self, direction: Direction) -> Rotation {
+    fn get_rotation(self, direction: Direction) -> Rotation {
         let axis = direction.get_axis();
         match self {
             Self::LeftRight if matches!(axis, Axis::Z) => Rotation::Clockwise180,
@@ -39,7 +34,7 @@ impl Mirror {
         }
     }
 
-    pub const fn mirror(self, direction: Direction) -> Direction {
+    fn mirror(self, direction: Direction) -> Direction {
         match self {
             Self::FrontBack if matches!(direction.get_axis(), Axis::X) => direction.opposite(),
             Self::LeftRight if matches!(direction.get_axis(), Axis::Z) => direction.opposite(),

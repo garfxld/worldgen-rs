@@ -33,19 +33,6 @@ pub struct BlendedNoiseSnapshot<'a> {
 }
 
 impl BlendedNoise {
-    pub const fn snapshot(&self) -> BlendedNoiseSnapshot<'_> {
-        BlendedNoiseSnapshot {
-            min_limit_noise: &self.min_limit_noise,
-            max_limit_noise: &self.max_limit_noise,
-            main_noise: &self.main_noise,
-            xz_multiplier: self.xz_multiplier,
-            y_multiplier: self.y_multiplier,
-            xz_factor: self.xz_factor,
-            y_factor: self.y_factor,
-            smear_scale_multiplier: self.smear_scale_multiplier,
-        }
-    }
-
     pub fn new(
         random: &mut RandomSource,
         xz_scale: f64,
@@ -193,40 +180,6 @@ impl BlendedNoise {
         let max_scaled = blend_max / Simd::splat(512.0);
         let result = clamped_lerp_simd(min_scaled, max_scaled, factors) / Simd::splat(128.0);
         result.to_array()
-    }
-
-    pub fn compute_column(&self, block_x: i32, block_ys: &[i32], block_z: i32, out: &mut [f64]) {
-        let count = block_ys.len().min(out.len());
-        let block_x = f64::from(block_x);
-        let block_z = f64::from(block_z);
-        let mut processed = 0;
-
-        let chunks_4 = count / 4;
-        for chunk in 0..chunks_4 {
-            let base = chunk * 4;
-            let batch_ys = [
-                f64::from(block_ys[base]),
-                f64::from(block_ys[base + 1]),
-                f64::from(block_ys[base + 2]),
-                f64::from(block_ys[base + 3]),
-            ];
-            out[base..base + 4].copy_from_slice(&self.compute_simd(block_x, batch_ys, block_z));
-        }
-        processed += chunks_4 * 4;
-
-        if count - processed >= 2 {
-            let batch_ys = [
-                f64::from(block_ys[processed]),
-                f64::from(block_ys[processed + 1]),
-            ];
-            out[processed..processed + 2]
-                .copy_from_slice(&self.compute_simd(block_x, batch_ys, block_z));
-            processed += 2;
-        }
-
-        for i in processed..count {
-            out[i] = self.compute(block_x, f64::from(block_ys[i]), block_z);
-        }
     }
 
     #[inline]
