@@ -2,7 +2,7 @@
 
 A Rust library for generating Minecraft worlds. It reads vanilla and custom datapacks, JIT-compiles their density functions, and generates chunks that match vanilla's output.
 
-![vanilla](assets/vanilla.png)
+![vanilla](assets/vanilla.jpg)
 
 
 ## Status
@@ -29,7 +29,7 @@ This crate requires a nightly toolchain, since it uses `portable_simd` and sever
 
 ```toml
 [dependencies]
-worldgen-rs = { git = "https://github.com/garfxld/worldgen-rs" }
+worldgen-rs = "0.1.2"
 ```
 
 
