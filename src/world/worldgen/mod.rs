@@ -24,7 +24,7 @@ pub mod synth;
 pub mod worldgen_context;
 
 use std::result::Result as StdResult;
-use std::sync::Once;
+use std::sync::{Arc, Once};
 use std::time::Instant;
 
 use shulkr::registry::freeze;
@@ -64,8 +64,9 @@ impl WorldgenSettings {
     }
 }
 
+#[derive(Clone)]
 pub struct Worldgen {
-    store: ChunkStore,
+    store: Arc<ChunkStore>,
 }
 
 pub(crate) fn ensure_registry_initialized(datapack: &Datapack) -> Result<()> {
@@ -90,7 +91,7 @@ pub(crate) fn ensure_registry_initialized(datapack: &Datapack) -> Result<()> {
 }
 
 impl Worldgen {
-    pub fn new(settings: WorldgenSettings) -> Result<Self> {
+    pub(crate) fn new(settings: WorldgenSettings) -> Result<Self> {
         ensure_registry_initialized(&settings.datapack)?;
 
         let spec = dimension::resolve(&settings.datapack, &settings.dimension)
@@ -100,7 +101,7 @@ impl Worldgen {
             .map_err(|e| Error::Generator(e.to_string()))?;
 
         Ok(Self {
-            store: ChunkStore::new(generator),
+            store: Arc::new(ChunkStore::new(generator)),
         })
     }
 

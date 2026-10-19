@@ -1,6 +1,5 @@
 use std::env;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use shulkr::Server;
 use shulkr::auth::AuthMode;
@@ -16,7 +15,7 @@ use shulkr::util::Key;
 use shulkr::world::chunk::Chunk;
 use shulkr::world::{DimensionType, World};
 use worldgen_rs::datapack::Datapack;
-use worldgen_rs::{ChunkPos, ChunkStatus, Worldgen, WorldgenSettings};
+use worldgen_rs::{ChunkPos, ChunkStatus, Worldgen, WorldgenBuilder};
 
 const USAGE: &str =
     "usage: cargo run --release --example datapack <datapack.zip|directory> [dimension]";
@@ -74,10 +73,12 @@ fn main() {
 
     let datapack = load_datapack(&path);
 
-    let worldgen = Arc::new(
-        Worldgen::new(WorldgenSettings::new(42, dimension.clone()).with_datapack(datapack))
-            .unwrap_or_else(|error| panic!("worldgen should build for {dimension}: {error}")),
-    );
+    let worldgen = WorldgenBuilder::new()
+        .with_seed(42)
+        .with_dimension(dimension.clone())
+        .with_datapack(datapack)
+        .build()
+        .expect("failed to build worldgen");
 
     let server = Server::new(AuthMode::Offline);
 

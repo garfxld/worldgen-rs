@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use shulkr::Server;
 use shulkr::auth::AuthMode;
 use shulkr::command::arg::Arg;
@@ -10,11 +8,9 @@ use shulkr::event::player::{
     CommandResultEvent, PlayerConfigEvent, PlayerEvent, PlayerRequestGameModeEvent,
     PlayerSpawnEvent,
 };
-use shulkr::util::Key;
 use shulkr::world::chunk::Chunk;
 use shulkr::world::{DimensionType, World};
-use worldgen_rs::datapack::Datapack;
-use worldgen_rs::{ChunkPos, ChunkStatus, Worldgen, WorldgenSettings};
+use worldgen_rs::{ChunkPos, ChunkStatus, Worldgen, WorldgenBuilder};
 
 const SPAWN: [f64; 3] = [0.5, 150.0, 0.5];
 
@@ -48,14 +44,10 @@ fn main() {
         )
         .init();
 
-    let worldgen = Arc::new(
-        Worldgen::new(WorldgenSettings {
-            seed: 42,
-            dimension: Key::const_vanilla("overworld"),
-            datapack: Datapack::builtin(),
-        })
-        .expect("worldgen should build"),
-    );
+    let worldgen = WorldgenBuilder::new()
+        .with_seed(42)
+        .build()
+        .expect("failed to build worldgen");
 
     let server = Server::new(AuthMode::Offline);
     let world = World::with_generator(DimensionType::OVERWORLD, move |chunk: &Chunk| {
