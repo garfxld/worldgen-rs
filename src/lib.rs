@@ -30,7 +30,7 @@ impl WorldgenBuilder {
         }
     }
 
-    pub fn with_seed(mut self, seed: i64) -> Self {
+    pub const fn with_seed(mut self, seed: i64) -> Self {
         self.seed = seed;
         self
     }
@@ -51,5 +51,11 @@ impl WorldgenBuilder {
             dimension: self.dimension,
             datapack: self.datapack,
         })
+    }
+}
+
+impl Default for WorldgenBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
