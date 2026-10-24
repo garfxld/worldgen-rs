@@ -37,15 +37,18 @@ worldgen-rs = "0.1.2"
 ## Usage
 
 ```rust
-use shulkr::util::Key;
-use worldgen_rs::{ChunkPos, ChunkStatus, Worldgen, WorldgenSettings};
+use worldgen_rs::{ChunkPos, ChunkStatus, WorldgenBuilder};
 
-let settings = WorldgenSettings::new(42, Key::const_vanilla("overworld"));
-let worldgen = Worldgen::new(settings)?;
+let worldgen = WorldgenBuilder::new()
+    .with_seed(42)
+    .build()
+    .expect("failed to build worldgen");
 
-let top = worldgen.generate(ChunkPos::new(0, 0), ChunkStatus::Features, |view| {
-    view.get_relative_block(0, (view.height() - 1) as usize, 0)
-})?;
+let top = worldgen
+    .generate(ChunkPos::new(0, 0), ChunkStatus::Features, |view| {
+        view.get_relative_block(0, (view.height() - 1) as usize, 0)
+    })
+    .expect("failed to generate chunk");
 ```
 
 `generate` takes a closure rather than returning the chunk, so the chunk data is read under the store's lock and never copied out wholesale. `ChunkView` exposes block and biome lookups, the dimension's `min_y` and `height`, and iterators over both.
@@ -53,11 +56,15 @@ let top = worldgen.generate(ChunkPos::new(0, 0), ChunkStatus::Features, |view| {
 To use a custom datapack, layer it over the built-in one:
 
 ```rust
-use worldgen_rs::datapack::Datapack;
+use worldgen_rs::{WorldgenBuilder, datapack::Datapack};
 
-let pack = Datapack::zip("Terralith.zip")?.layered_over(Datapack::builtin());
-let settings = WorldgenSettings::new(42, Key::const_vanilla("overworld"))
-    .with_datapack(pack);
+let datapack = Datapack::zip("Terralith.zip")?.layered_over(Datapack::builtin());
+
+let worldgen = WorldgenBuilder::new()
+    .with_seed(42)
+    .with_datapack(datapack)
+    .build()
+    .expect("failed to build worldgen");
 ```
 
 
