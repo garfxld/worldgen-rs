@@ -29,7 +29,7 @@ This crate requires a nightly toolchain, since it uses `portable_simd` and sever
 
 ```toml
 [dependencies]
-worldgen-rs = "0.1.2"
+worldgen-rs = "0.1.3"
 ```
 
 
@@ -58,7 +58,9 @@ To use a custom datapack, layer it over the built-in one:
 ```rust
 use worldgen_rs::{WorldgenBuilder, datapack::Datapack};
 
-let datapack = Datapack::zip("Terralith.zip")?.layered_over(Datapack::builtin());
+let datapack = Datapack::zip("Terralith.zip")
+    .expect("failed to load Terralith datapack")
+    .layered_over(Datapack::builtin());
 
 let worldgen = WorldgenBuilder::new()
     .with_seed(42)
