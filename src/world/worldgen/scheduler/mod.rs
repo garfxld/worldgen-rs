@@ -251,7 +251,6 @@ impl ChunkStore {
                     center.min_y(),
                     center.height(),
                     self.generator
-                        .chunk_generator()
                         .generation_context(center.min_y(), center.height()),
                     self.generator.seed(),
                     self.generator.biome_zoom_seed(),

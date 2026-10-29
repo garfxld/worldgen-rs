@@ -120,9 +120,7 @@ pub struct GenerationContext<'a> {
 
 impl GenerationContext<'_> {
     pub fn worldgen_context(&self) -> WorldGenContext {
-        self.generator
-            .chunk_generator()
-            .generation_context(self.min_y, self.height)
+        self.generator.generation_context(self.min_y, self.height)
     }
 
     pub fn could_structure_exist_in_column(

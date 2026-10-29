@@ -28,10 +28,15 @@ use crate::world::worldgen::structure::{self};
 impl Generator {
     pub fn possible_structure_sets(&self) -> &[&'static StructureSet] {
         self.possible_structure_sets.get_or_init(|| {
+            if self.is_debug() {
+                return Vec::new();
+            }
+            let overrides = self.structure_overrides();
             structure::registry()
                 .sets()
                 .iter()
                 .copied()
+                .filter(|set| overrides.is_none_or(|keys| keys.contains(&set.key)))
                 .filter(|set| {
                     set.structures.iter().any(|entry| {
                         entry.structure.biomes().is_some_and(|biomes| {
@@ -210,7 +215,7 @@ impl Generator {
         }
 
         let mut random = RandomSource::Legacy(LegacyRandomSource::from_seed(0));
-        random.set_seed(self.seed());
+        random.set_seed(self.concentric_rings_seed());
         let mut angle = random.next_f64() * TAU;
         let mut position_in_circle = 0;
         let mut circle = 0;

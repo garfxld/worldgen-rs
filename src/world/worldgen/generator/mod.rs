@@ -18,9 +18,12 @@ use crate::world::worldgen::biome::biome_source::BiomeSource;
 use crate::world::worldgen::biome::obfuscate_biome_seed;
 use crate::world::worldgen::densityfunction::context::SamplerContext;
 use crate::world::worldgen::densityfunction::registry::DensityRegistry;
-use crate::world::worldgen::dimension::{BiomeSourceSpec, DimensionSpec, dimension_type_height};
-use crate::world::worldgen::feature::features;
+use crate::world::worldgen::dimension::{
+    BiomeSourceSpec, DimensionSpec, GeneratorSpec, dimension_type,
+};
 use crate::world::worldgen::feature::sorter::{StepFeatureData, build_features_per_step};
+use crate::world::worldgen::feature::{PlacedFeature, features};
+use crate::world::worldgen::generator::flat::FlatGenerator;
 use crate::world::worldgen::material::registry::MaterialRegistry;
 use crate::world::worldgen::noise_based_chunk_generator::{NoiseBasedChunkGenerator, NoiseColumn};
 use crate::world::worldgen::noise_generator_settings::NoiseGeneratorSettings;
@@ -28,21 +31,38 @@ use crate::world::worldgen::noise_spawn_finder::find_spawn_position;
 use crate::world::worldgen::random_state::RandomState;
 use crate::world::worldgen::structure::structure::Structure;
 use crate::world::worldgen::structure::structure_set::StructureSet;
+use crate::world::worldgen::worldgen_context::WorldGenContext;
+use shulkr::registry::registries;
 
 const WORLDGEN_REGION_RANDOM: &str = "minecraft:worldgen_region_random";
 pub const GENERATION_STEPS: usize = 11;
 
+mod debug;
 mod feature;
+mod flat;
 mod structure;
+
+const SIMPLE_GEN_DEPTH: i32 = 384;
+const FLAT_SEA_LEVEL: i32 = -63;
+const DEBUG_SEA_LEVEL: i32 = 63;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GeneratorError {
     #[error(transparent)]
     Datapack(#[from] DatapackError),
+    #[error("unknown biome {0}")]
+    UnknownBiome(Key),
+}
+
+enum GeneratorKind {
+    Noise,
+    Flat(FlatGenerator),
+    Debug,
 }
 
 pub struct Generator {
     chunk_generator: NoiseBasedChunkGenerator,
+    kind: GeneratorKind,
     random_state: RandomState,
     biome_zoom_seed: i64,
     seed: i64,
@@ -71,18 +91,39 @@ impl Generator {
         )?);
         let seed = seed as i64;
         let random_state = RandomState::create(&densities, seed, &settings);
-        let (min_y, height) = dimension_type_height(pack, &spec.dimension_type)?;
+        let dimension_type = dimension_type(pack, &spec.dimension_type)?;
+        let (min_y, height) = (dimension_type.min_y, dimension_type.height);
         let biome_source = Arc::new(match spec.biome_source {
             BiomeSourceSpec::MultiNoise(parameters) => BiomeSource::multi_noise(parameters),
             BiomeSourceSpec::TheEnd => BiomeSource::the_end(),
+            BiomeSourceSpec::Fixed(key) => BiomeSource::Fixed(
+                registries::BIOME
+                    .by_key(&key)
+                    .ok_or(GeneratorError::UnknownBiome(key))?,
+            ),
         });
+        let kind = match &spec.generator {
+            GeneratorSpec::Noise => GeneratorKind::Noise,
+            GeneratorSpec::Debug => GeneratorKind::Debug,
+            GeneratorSpec::Flat(flat) => {
+                let biome = registries::BIOME
+                    .by_key(&flat.biome)
+                    .ok_or_else(|| GeneratorError::UnknownBiome(flat.biome.clone()))?;
+                GeneratorKind::Flat(FlatGenerator::new(flat, biome))
+            }
+        };
 
         let possible_biomes = biome_source.possible_biomes();
         let possible_biome_ids = possible_biomes.iter().map(|biome| biome.id()).collect();
-        let features_per_step = build_features_per_step(&possible_biomes, |biome| {
-            features().features_for_biome(biome)
+        let features_per_step = build_features_per_step(&possible_biomes, |biome| match &kind {
+            GeneratorKind::Flat(flat) => flat.features_for_biome(biome),
+            GeneratorKind::Noise | GeneratorKind::Debug => features().features_for_biome(biome),
         });
-        let sea_level = settings.sea_level;
+        let sea_level = match kind {
+            GeneratorKind::Noise => settings.sea_level,
+            GeneratorKind::Flat(_) => FLAT_SEA_LEVEL,
+            GeneratorKind::Debug => DEBUG_SEA_LEVEL,
+        };
 
         tracing::debug!(
             "generator for {} initialized in {:?}",
@@ -92,6 +133,7 @@ impl Generator {
 
         Ok(Self {
             chunk_generator: NoiseBasedChunkGenerator::new(biome_source, settings),
+            kind,
             random_state,
             biome_zoom_seed: obfuscate_biome_seed(seed),
             seed,
@@ -128,12 +170,55 @@ impl Generator {
         self.biome_zoom_seed
     }
 
+    pub fn generation_context(&self, level_min_y: i32, level_height: i32) -> WorldGenContext {
+        match self.kind {
+            GeneratorKind::Noise => self
+                .chunk_generator
+                .generation_context(level_min_y, level_height),
+            GeneratorKind::Flat(_) | GeneratorKind::Debug => WorldGenContext::new(
+                0,
+                SIMPLE_GEN_DEPTH,
+                self.sea_level,
+                level_min_y,
+                level_height,
+            ),
+        }
+    }
+
+    pub(crate) fn features_for_biome(&self, biome: BiomeRef) -> &[Vec<&'static PlacedFeature>] {
+        match &self.kind {
+            GeneratorKind::Flat(flat) => flat.features_for_biome(biome),
+            GeneratorKind::Noise | GeneratorKind::Debug => features().features_for_biome(biome),
+        }
+    }
+
+    pub(crate) const fn is_debug(&self) -> bool {
+        matches!(self.kind, GeneratorKind::Debug)
+    }
+
+    pub(crate) fn structure_overrides(&self) -> Option<&[Key]> {
+        match &self.kind {
+            GeneratorKind::Flat(flat) => flat.structure_overrides(),
+            GeneratorKind::Noise | GeneratorKind::Debug => None,
+        }
+    }
+
+    pub(crate) const fn concentric_rings_seed(&self) -> i64 {
+        match self.kind {
+            GeneratorKind::Flat(_) => 0,
+            GeneratorKind::Noise | GeneratorKind::Debug => self.seed,
+        }
+    }
+
     pub const fn seed(&self) -> i64 {
         self.seed
     }
 
     pub fn dimension_origin(&self) -> ChunkPos {
         *self.dimension_origin.get_or_init(|| {
+            if !matches!(self.kind, GeneratorKind::Noise) {
+                return ChunkPos::new(0, 0);
+            }
             let spawn_target = &self.chunk_generator.generator_settings().spawn_target;
             if spawn_target.is_empty() {
                 return ChunkPos::new(0, 0);
@@ -152,6 +237,11 @@ impl Generator {
     }
 
     pub fn get_base_height(&self, x: i32, z: i32, heightmap: HeightmapType) -> i32 {
+        match &self.kind {
+            GeneratorKind::Flat(flat) => return flat.first_free_height(self.min_y, heightmap),
+            GeneratorKind::Debug => return self.min_y,
+            GeneratorKind::Noise => {}
+        }
         self.chunk_generator.get_base_height(
             x,
             z,
@@ -163,6 +253,19 @@ impl Generator {
     }
 
     pub fn get_base_column(&self, x: i32, z: i32) -> NoiseColumn {
+        match &self.kind {
+            GeneratorKind::Flat(flat) => {
+                let (min_y, column) = flat.base_column(self.min_y);
+                return NoiseColumn { min_y, column };
+            }
+            GeneratorKind::Debug => {
+                return NoiseColumn {
+                    min_y: self.min_y,
+                    column: Vec::new(),
+                };
+            }
+            GeneratorKind::Noise => {}
+        }
         self.chunk_generator
             .get_base_column(x, z, self.min_y, self.height, &self.random_state)
     }
@@ -217,6 +320,19 @@ impl Generator {
         noise_biome: &dyn Fn(i32, i32, i32) -> BiomeRef,
         possible_biomes: &FxHashSet<u16>,
     ) {
+        match &self.kind {
+            GeneratorKind::Flat(flat) => {
+                flat.build_terrain(chunk);
+                chunk.prime_heightmaps(HeightmapType::final_types());
+                return;
+            }
+            GeneratorKind::Debug => {
+                chunk.prime_heightmaps(HeightmapType::worldgen_types());
+                chunk.prime_heightmaps(HeightmapType::final_types());
+                return;
+            }
+            GeneratorKind::Noise => {}
+        }
         let noise_settings = self
             .chunk_generator
             .generator_settings()

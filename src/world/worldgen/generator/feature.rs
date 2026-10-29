@@ -3,7 +3,7 @@ use rustc_hash::FxHashSet;
 use crate::util::pos::ChunkPos;
 use crate::util::rng::RandomSource;
 use crate::util::rng::worldgen_random::WorldgenRandom;
-use crate::world::worldgen::feature::features;
+use crate::world::worldgen::generator::debug;
 use crate::world::worldgen::generator::{GENERATION_STEPS, Generator};
 use crate::world::worldgen::region::WorldGenRegion;
 use shulkr::registry::registries;
@@ -11,6 +11,10 @@ use shulkr::util::BlockPosition;
 
 impl Generator {
     pub fn apply_biome_decoration(&self, region: &WorldGenRegion<'_>) {
+        if self.is_debug() {
+            debug::decorate(region);
+            return;
+        }
         let center = region.center();
         let origin = BlockPosition::new(center.0.x * 16, region.min_y(), center.0.y * 16);
 
@@ -48,7 +52,7 @@ impl Generator {
                 let Some(biome) = registries::BIOME.by_id(biome_id) else {
                     continue;
                 };
-                let features_in_biome = features().features_for_biome(biome);
+                let features_in_biome = self.features_for_biome(biome);
                 let Some(features_in_step) = features_in_biome.get(step) else {
                     continue;
                 };

@@ -20,7 +20,7 @@ Generation runs through `ChunkStatus::Features`. `InitializeLight`, `Light`, `Sp
 - Biomes, noise, surface rules, carvers, features, and structures
 - Overworld, nether, and end, plus datapack-defined dimensions
 - Parallel chunk generation on a Rayon pool
-
+- World presets (e.g. amplified, large biomes)
 
 
 ## Installation
@@ -71,11 +71,21 @@ let worldgen = WorldgenBuilder::new()
 
 ## Examples
 
-Both examples use [shulkr](https://github.com/shulkr-rs/shulkr) to start a real server you can join.
+The examples use [shulkr](https://github.com/shulkr-rs/shulkr) to start a real server you can join.
 
 ```bash
-cargo run --release --example vanilla
-cargo run --release --example datapack <datapack.zip|directory> [dimension]
+cargo r -r --example vanilla
+cargo r -r --example datapack <datapack.zip|directory> [dimension]
+```
+
+There are also examples for every world preset:
+
+```bash
+cargo r -r --example flat_world [water_world|tunnelers_dream|the_void|...]
+cargo r -r --example debug_world
+cargo r -r --example amplified
+cargo r -r --example large_biomes
+cargo r -r --example single_biome [biome]
 ```
 
 

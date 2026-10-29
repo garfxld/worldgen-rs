@@ -12,6 +12,7 @@ pub use biome_resolver::BiomeResolver;
 pub enum BiomeSource {
     MultiNoise(ParameterList<BiomeRef>),
     TheEnd([BiomeRef; 5]),
+    Fixed(BiomeRef),
 }
 
 impl BiomeSource {
@@ -41,13 +42,16 @@ impl BiomeSource {
                     .collect(),
             ),
             Self::TheEnd(biomes) => biomes.to_vec(),
+            Self::Fixed(biome) => vec![*biome],
         }
     }
 
     fn multi_noise_biome(&self, target: &TargetPoint, last_result: &mut Option<usize>) -> BiomeRef {
         match self {
             Self::MultiNoise(parameters) => parameters.find_value_cached(target, last_result),
-            Self::TheEnd(_) => unreachable!("the end biome source has no climate parameters"),
+            Self::TheEnd(_) | Self::Fixed(_) => {
+                unreachable!("only multi-noise biome sources have climate parameters")
+            }
         }
     }
 
@@ -60,6 +64,7 @@ impl BiomeSource {
         quart_z: i32,
     ) -> BiomeRef {
         match self {
+            Self::Fixed(biome) => biome,
             Self::MultiNoise(_) => {
                 let target = sampler.sample(quart_x, quart_y, quart_z);
                 self.multi_noise_biome(&target, last_result)

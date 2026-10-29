@@ -529,10 +529,7 @@ mod tests {
             .collect();
         let min_y = chunks[4].min_y();
         let height = chunks[4].height();
-        let generation_context = store
-            .generator()
-            .chunk_generator()
-            .generation_context(min_y, height);
+        let generation_context = store.generator().generation_context(min_y, height);
 
         let generator = store.generator();
         let region = WorldGenRegion::new(
